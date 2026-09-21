@@ -38,6 +38,13 @@ Also in this plan (bugfix, small):
 |-----|---------|-------------|
 | Services session list “jitters” / keeps moving when multiple rows | User report on Windows Services page | `frontend/src/App.tsx` polls `listSessions` every **400ms** and always `setSessions`; also refresh on every event. Unstable order or missing stable React `key` can make the list jump. |
 
+UI polish follow-ups (landed on `main` after the Files PR; not Plan 4):
+
+| Item | Requirement | Where |
+|------|-------------|-------|
+| Glass scrollbar | Thin, low-contrast, rounded thumbs on the main/right pane (and log/result overflow); light/dark aware; CSS only (`scrollbar-*` + webkit); do not break scrolling | `frontend/src/styles/glass.css` (`.main`, `.log`, `.result`) |
+| i18n | English + 简体中文 (`zh-CN`); switcher near theme toggle (Settings or sidebar as in current UI); persist last choice; default OS/browser locale else English; chrome only (nav, titles, buttons, labels, empty states, theme). Do not translate session IDs, addresses, or raw EventData | `frontend/src/i18n/*`, language/theme controls in Settings or sidebar |
+
 ---
 
 ## File map (expected; adjust to match tree)
@@ -51,6 +58,8 @@ Also in this plan (bugfix, small):
 | `frontend/src/App.tsx` | Enable Files nav; **fix poll/list stability** |
 | `frontend/src/pages/FilesPage.tsx` | New Files UI |
 | `frontend/src/pages/ServicesPage.tsx` | Optional files-serve shortcut if design fits |
+| `frontend/src/styles/glass.css` | Liquid Glass tokens + thin main/log/result scrollbars |
+| `frontend/src/i18n/*` | English + zh-CN catalogs, locale detect/persist, `useI18n` |
 | `docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-3.md` | This plan |
 | `docs/superpowers/plans/README.md` | List Plan 3 |
 
@@ -131,7 +140,9 @@ Also in this plan (bugfix, small):
 - Real: compiles; manual/integration where possible
 - No Plan 4 creep
 - Windows `npm run build` remains Node-based `.keep` write
+- Main/right content scrollbar matches Liquid Glass (thin, rounded, light/dark)
+- UI chrome is English or 简体中文 via sidebar switcher; choice persists; technical identifiers stay untranslated
 
 ## Self-review
 
-Plan 3 is file-focused. Exact Tailcat API names deferred to implementer reading pinned module. Task 0 is required user-reported UX bug, not optional polish.
+Plan 3 is file-focused. Exact Tailcat API names deferred to implementer reading pinned module. Task 0 is required user-reported UX bug, not optional polish. Scrollbar + i18n are UI polish on the same Files-era client, not Plan 4.
