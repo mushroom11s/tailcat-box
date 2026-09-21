@@ -5,7 +5,11 @@ export const en = {
   navFiles: "Files",
   navKeys: "Keys & Addresses",
   navDiagnostics: "Diagnostics",
+  navSettings: "Settings",
   fallbackChip: "In-browser fake adapter",
+  settingsTitle: "Settings",
+  settingsPendingLede:
+    "Theme and language live on this page once Settings lands. DERP region and map URL stay on Keys & Addresses.",
   theme: "Theme",
   themeSystem: "System",
   themeLight: "Light",

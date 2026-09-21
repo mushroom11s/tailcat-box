@@ -6,7 +6,7 @@ import KeysPage from "./pages/KeysPage";
 import ServicesPage from "./pages/ServicesPage";
 import { parsePortMappings } from "./lib/ports";
 import { sameKeys, sameSessions } from "./lib/snapshot";
-import { useI18n, type Locale } from "./i18n";
+import { useI18n } from "./i18n";
 import {
   createKey,
   deleteKey,
@@ -41,17 +41,21 @@ import {
   type TailcatEvent,
 } from "./lib/wails";
 
-type Page = "connect" | "services" | "files" | "keys" | "diagnostics";
+type Page = "connect" | "services" | "files" | "keys" | "diagnostics" | "settings";
 type Theme = "system" | "light" | "dark";
 
 const THEME_KEY = "tailcat-theme";
 
-const NAV: Array<{ id: Page; labelKey: "navConnect" | "navServices" | "navFiles" | "navKeys" | "navDiagnostics" }> = [
+const NAV: Array<{
+  id: Page;
+  labelKey: "navConnect" | "navServices" | "navFiles" | "navKeys" | "navDiagnostics" | "navSettings";
+}> = [
   { id: "connect", labelKey: "navConnect" },
   { id: "services", labelKey: "navServices" },
   { id: "files", labelKey: "navFiles" },
   { id: "keys", labelKey: "navKeys" },
   { id: "diagnostics", labelKey: "navDiagnostics" },
+  { id: "settings", labelKey: "navSettings" },
 ];
 
 function applyTheme(theme: Theme): void {
@@ -72,9 +76,9 @@ function readTheme(): Theme {
 }
 
 export default function App() {
-  const { locale, setLocale, t } = useI18n();
+  const { t } = useI18n();
   const [page, setPage] = useState<Page>("services");
-  const [theme, setTheme] = useState<Theme>(() => readTheme());
+  const [theme] = useState<Theme>(() => readTheme());
   const [sessions, setSessions] = useState<Session[]>([]);
   const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [events, setEvents] = useState<TailcatEvent[]>([]);
@@ -167,33 +171,7 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-footer">
-          {fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}
-          <div className="lang-toggle" role="group" aria-label={t("language")}>
-            {(["en", "zh-CN"] as Locale[]).map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={locale === value ? "active" : ""}
-                onClick={() => setLocale(value)}
-              >
-                {value === "en" ? t("langEnglish") : t("langChinese")}
-              </button>
-            ))}
-          </div>
-          <div className="theme-toggle" role="group" aria-label={t("theme")}>
-            {(["system", "light", "dark"] as Theme[]).map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={theme === value ? "active" : ""}
-                onClick={() => setTheme(value)}
-              >
-                {value === "system" ? t("themeSystem") : value === "light" ? t("themeLight") : t("themeDark")}
-              </button>
-            ))}
-          </div>
-        </div>
+        <div className="sidebar-footer">{fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}</div>
       </aside>
       <main className="glass main">
         {page === "services" ? (
@@ -283,6 +261,12 @@ export default function App() {
             onPing={(addr, untilDirect) => void run(() => startPing(addr, untilDirect))}
             onStop={(id) => void run(() => stopSession(id))}
           />
+        ) : null}
+        {page === "settings" ? (
+          <section className="page">
+            <h2>{t("settingsTitle")}</h2>
+            <p className="lede">{t("settingsPendingLede")}</p>
+          </section>
         ) : null}
       </main>
     </div>
