@@ -113,3 +113,19 @@ export function TailcatVersion() {
 export function StopSession(arg1) {
   return window['go']['main']['App']['StopSession'](arg1);
 }
+
+export function GetClientInfo() {
+  return window['go']['main']['App']['GetClientInfo']();
+}
+
+export function GetSystemInfo() {
+  return window['go']['main']['App']['GetSystemInfo']();
+}
+
+export function RecordUpdateCheck() {
+  return window['go']['main']['App']['RecordUpdateCheck']();
+}
+
+export function SetLaunchAtLogin(arg1) {
+  return window['go']['main']['App']['SetLaunchAtLogin'](arg1);
+}

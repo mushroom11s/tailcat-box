@@ -4,9 +4,9 @@ import (
 	"context"
 	"io"
 	"net"
-	"runtime/debug"
 	"sync"
 
+	"github.com/mushroom11s/tailcat-desktop-client/internal/appinfo"
 	"github.com/tailscale/tailcat"
 )
 
@@ -52,16 +52,7 @@ func (r *Real) Version() string {
 
 // TailcatVersion reports the compiled github.com/tailscale/tailcat module version.
 func TailcatVersion() string {
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		return "unknown"
-	}
-	for _, d := range info.Deps {
-		if d.Path == "github.com/tailscale/tailcat" && d.Version != "" {
-			return d.Version
-		}
-	}
-	return "unknown"
+	return appinfo.TailcatVersion()
 }
 
 func (r *Real) StartPipeServe(ctx context.Context, sessionID string) (<-chan Event, error) {

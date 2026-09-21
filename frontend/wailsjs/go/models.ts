@@ -110,7 +110,7 @@ export namespace store {
 	        this.Path = source["Path"];
 	        this.Client = source["Client"];
 	        this.Address = source["Address"];
-	        this.Source = source["Source"];
+		this.Source = source["Source"];
 	    }
 	}
 
@@ -126,6 +126,50 @@ export namespace store {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Region = source["Region"];
 	        this.DERPMapURL = source["DERPMapURL"];
+	    }
+	}
+
+}
+
+export namespace main {
+
+	export class ClientInfo {
+	    StartedAt: string;
+	    AppVersion: string;
+	    TailcatVersion: string;
+	    LastUpdateCheck: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ClientInfo(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.StartedAt = source["StartedAt"];
+	        this.AppVersion = source["AppVersion"];
+	        this.TailcatVersion = source["TailcatVersion"];
+	        this.LastUpdateCheck = source["LastUpdateCheck"];
+	    }
+	}
+
+	export class SystemInfo {
+	    OSVersion: string;
+	    LaunchAtLogin: boolean;
+	    LaunchAtLoginSupported: boolean;
+	    NetworkOnline: boolean;
+	    NetworkSummary: string;
+
+	    static createFrom(source: any = {}) {
+	        return new SystemInfo(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.OSVersion = source["OSVersion"];
+	        this.LaunchAtLogin = source["LaunchAtLogin"];
+	        this.LaunchAtLoginSupported = source["LaunchAtLoginSupported"];
+	        this.NetworkOnline = source["NetworkOnline"];
+		this.NetworkSummary = source["NetworkSummary"];
 	    }
 	}
 

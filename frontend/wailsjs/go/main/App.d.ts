@@ -3,6 +3,7 @@
 import {session} from '../models';
 import {store} from '../models';
 import {adapter} from '../models';
+import {main} from '../models';
 
 export function CreateKey(arg1:string,arg2:boolean,arg3:string):Promise<string>;
 
@@ -59,3 +60,11 @@ export function SetNetworkSettings(arg1:string,arg2:string):Promise<void>;
 export function TailcatVersion():Promise<string>;
 
 export function StopSession(arg1:string):Promise<void>;
+
+export function GetClientInfo():Promise<main.ClientInfo>;
+
+export function GetSystemInfo():Promise<main.SystemInfo>;
+
+export function RecordUpdateCheck():Promise<main.ClientInfo>;
+
+export function SetLaunchAtLogin(arg1:boolean):Promise<main.SystemInfo>;

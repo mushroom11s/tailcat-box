@@ -26,9 +26,13 @@ import {
   StartExec as bindStartExec,
   StopSession as bindStopSession,
   TailcatVersion as bindTailcatVersion,
+  GetClientInfo as bindGetClientInfo,
+  GetSystemInfo as bindGetSystemInfo,
+  RecordUpdateCheck as bindRecordUpdateCheck,
+  SetLaunchAtLogin as bindSetLaunchAtLogin,
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
-import { adapter, session, store } from "../../wailsjs/go/models";
+import { adapter, main, session, store } from "../../wailsjs/go/models";
 
 export type Session = {
   ID: string;
@@ -74,6 +78,21 @@ export type FileEntry = {
   Size: number;
   Mode: string;
   ModTime: string;
+};
+
+export type ClientInfo = {
+  StartedAt: string;
+  AppVersion: string;
+  TailcatVersion: string;
+  LastUpdateCheck: string;
+};
+
+export type SystemInfo = {
+  OSVersion: string;
+  LaunchAtLogin: boolean;
+  LaunchAtLoginSupported: boolean;
+  NetworkOnline: boolean;
+  NetworkSummary: string;
 };
 
 const TAILCAT_EVENT = "tailcat:event";
@@ -136,6 +155,9 @@ type FakeState = {
   ports: Map<string, string>;
   files: Map<string, string>;
   peers: Map<string, string>;
+  startedAt: string;
+  lastUpdateCheck: string;
+  launchAtLogin: boolean;
 };
 
 const fake: FakeState = {
@@ -146,6 +168,9 @@ const fake: FakeState = {
   ports: new Map(),
   files: new Map(),
   peers: new Map(),
+  startedAt: new Date().toISOString(),
+  lastUpdateCheck: "",
+  launchAtLogin: false,
 };
 
 function newID(): string {
@@ -765,6 +790,75 @@ export async function tailcatVersion(): Promise<string> {
     return bindTailcatVersion();
   }
   return "fake";
+}
+
+function asClientInfo(info: main.ClientInfo): ClientInfo {
+  return {
+    StartedAt: info.StartedAt ?? "",
+    AppVersion: info.AppVersion ?? "",
+    TailcatVersion: info.TailcatVersion ?? "",
+    LastUpdateCheck: info.LastUpdateCheck ?? "",
+  };
+}
+
+function asSystemInfo(info: main.SystemInfo): SystemInfo {
+  return {
+    OSVersion: info.OSVersion ?? "",
+    LaunchAtLogin: Boolean(info.LaunchAtLogin),
+    LaunchAtLoginSupported: Boolean(info.LaunchAtLoginSupported),
+    NetworkOnline: Boolean(info.NetworkOnline),
+    NetworkSummary: info.NetworkSummary ?? "",
+  };
+}
+
+function fakeClientInfo(): ClientInfo {
+  return {
+    StartedAt: fake.startedAt,
+    AppVersion: "0.1.0-dev",
+    TailcatVersion: "v0.7.0",
+    LastUpdateCheck: fake.lastUpdateCheck,
+  };
+}
+
+function fakeSystemInfo(): SystemInfo {
+  const online = typeof navigator !== "undefined" ? navigator.onLine : true;
+  return {
+    OSVersion: typeof navigator !== "undefined" ? navigator.platform || "browser" : "browser",
+    LaunchAtLogin: fake.launchAtLogin,
+    LaunchAtLoginSupported: false,
+    NetworkOnline: online,
+    NetworkSummary: online ? "browser" : "offline",
+  };
+}
+
+export async function getClientInfo(): Promise<ClientInfo> {
+  if (hasWailsBindings()) {
+    return asClientInfo(await bindGetClientInfo());
+  }
+  return fakeClientInfo();
+}
+
+export async function getSystemInfo(): Promise<SystemInfo> {
+  if (hasWailsBindings()) {
+    return asSystemInfo(await bindGetSystemInfo());
+  }
+  return fakeSystemInfo();
+}
+
+export async function recordUpdateCheck(): Promise<ClientInfo> {
+  if (hasWailsBindings()) {
+    return asClientInfo(await bindRecordUpdateCheck());
+  }
+  fake.lastUpdateCheck = new Date().toISOString();
+  return fakeClientInfo();
+}
+
+export async function setLaunchAtLogin(enabled: boolean): Promise<SystemInfo> {
+  if (hasWailsBindings()) {
+    return asSystemInfo(await bindSetLaunchAtLogin(enabled));
+  }
+  fake.launchAtLogin = enabled;
+  return fakeSystemInfo();
 }
 
 export function onTailcatEvent(callback: (ev: TailcatEvent) => void): () => void {

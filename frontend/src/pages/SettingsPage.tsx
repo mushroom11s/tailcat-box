@@ -1,0 +1,282 @@
+import { useEffect, useState, type ReactNode } from "react";
+import { useI18n, type Locale } from "../i18n";
+import {
+  getClientInfo,
+  getSystemInfo,
+  recordUpdateCheck,
+  setLaunchAtLogin,
+  type ClientInfo,
+  type SystemInfo,
+} from "../lib/wails";
+
+export type Theme = "system" | "light" | "dark";
+
+type Props = {
+  theme: Theme;
+  onTheme: (theme: Theme) => void;
+};
+
+function formatUptime(startedAt: string): string {
+  const start = Date.parse(startedAt);
+  if (!Number.isFinite(start)) {
+    return "—";
+  }
+  const ms = Math.max(0, Date.now() - start);
+  const hours = Math.floor(ms / 3600000);
+  const minutes = Math.floor((ms % 3600000) / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function formatChecked(iso: string, locale: Locale, neverLabel: string): string {
+  if (!iso) {
+    return neverLabel;
+  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return neverLabel;
+  }
+  return d.toLocaleString(locale === "zh-CN" ? "zh-CN" : "en-US");
+}
+
+function BoardIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+        d="M7 4v3M12 4v3M17 4v3M7 17v3M12 17v3M17 17v3M5 7h14v10H5z"
+      />
+      <rect x="8.5" y="10" width="3" height="3" rx="0.5" fill="currentColor" />
+      <rect x="12.5" y="10" width="3" height="4" rx="0.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.25" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="12" cy="8.25" r="1" fill="currentColor" />
+      <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" d="M12 11.25v5" />
+    </svg>
+  );
+}
+
+function InfoCard({
+  title,
+  icon,
+  tone,
+  action,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  tone: "warning" | "danger";
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <article className="glass info-card">
+      <header className="info-card-head">
+        <div className="info-card-title">
+          <span className={`info-card-icon ${tone}`}>{icon}</span>
+          <h3>{title}</h3>
+        </div>
+        {action ? <div className="info-card-action">{action}</div> : null}
+      </header>
+      <div className="info-card-body">{children}</div>
+    </article>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  mono,
+  children,
+}: {
+  label: string;
+  value?: string;
+  mono?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="info-card-row">
+      <span className="info-card-label">{label}</span>
+      {children ? (
+        <span className="info-card-value">{children}</span>
+      ) : (
+        <span className={`info-card-value${mono ? " mono" : ""}`}>{value || "—"}</span>
+      )}
+    </div>
+  );
+}
+
+export default function SettingsPage({ theme, onTheme }: Props) {
+  const { locale, setLocale, t } = useI18n();
+  const [client, setClient] = useState<ClientInfo | null>(null);
+  const [system, setSystem] = useState<SystemInfo | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [browserOnline, setBrowserOnline] = useState(() =>
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function refresh(): Promise<void> {
+    const [nextClient, nextSystem] = await Promise.all([getClientInfo(), getSystemInfo()]);
+    setClient(nextClient);
+    setSystem(nextSystem);
+  }
+
+  useEffect(() => {
+    void refresh().catch((err) => {
+      setError(err instanceof Error ? err.message : String(err));
+    });
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    function onOnline() {
+      setBrowserOnline(true);
+      void refresh();
+    }
+    function onOffline() {
+      setBrowserOnline(false);
+      void refresh();
+    }
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
+  async function onCheckNow(): Promise<void> {
+    setBusy(true);
+    setError("");
+    try {
+      setClient(await recordUpdateCheck());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onToggleLaunch(enabled: boolean): Promise<void> {
+    setBusy(true);
+    setError("");
+    try {
+      setSystem(await setLaunchAtLogin(enabled));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  void now;
+  const uptime = client ? formatUptime(client.StartedAt) : "—";
+
+  const goOnline = system?.NetworkOnline;
+  const online = goOnline ?? browserOnline;
+  let networkValue = online ? t("online") : t("offline");
+  if (system?.NetworkSummary) {
+    networkValue = `${networkValue} · ${system.NetworkSummary}`;
+  }
+  if (system && browserOnline !== system.NetworkOnline) {
+    networkValue = `${networkValue} (${browserOnline ? t("browserOnline") : t("browserOffline")})`;
+  }
+
+  return (
+    <section className="page">
+      <h2>{t("settingsTitle")}</h2>
+      <p className="lede">{t("settingsLede")}</p>
+
+      <h3 className="kind">{t("appearance")}</h3>
+      <div className="appearance-toggles">
+        <div className="field">
+          <label id="settings-language">{t("language")}</label>
+          <div className="lang-toggle" role="group" aria-labelledby="settings-language">
+            {(["en", "zh-CN"] as Locale[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={locale === value ? "active" : ""}
+                onClick={() => setLocale(value)}
+              >
+                {value === "en" ? t("langEnglish") : t("langChinese")}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <label id="settings-theme">{t("theme")}</label>
+          <div className="theme-toggle" role="group" aria-labelledby="settings-theme">
+            {(["system", "light", "dark"] as Theme[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={theme === value ? "active" : ""}
+                onClick={() => onTheme(value)}
+              >
+                {value === "system" ? t("themeSystem") : value === "light" ? t("themeLight") : t("themeDark")}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-cards">
+        <InfoCard
+          title={t("clientInfoTitle")}
+          icon={<BoardIcon />}
+          tone="warning"
+          action={
+            <button className="btn-link" type="button" disabled={busy} onClick={() => void onCheckNow()}>
+              {t("checkNow")}
+            </button>
+          }
+        >
+          <InfoRow label={t("uptime")} value={uptime} mono />
+          <InfoRow label={t("appVersion")} value={client?.AppVersion ?? "—"} mono />
+          <InfoRow label={t("tailcatVersion")} value={client?.TailcatVersion ?? "—"} mono />
+          <InfoRow
+            label={t("lastUpdateCheck")}
+            value={formatChecked(client?.LastUpdateCheck ?? "", locale, t("never"))}
+          />
+          <p className="info-card-note">{t("updateCheckHint")}</p>
+        </InfoCard>
+
+        <InfoCard title={t("systemInfoTitle")} icon={<InfoIcon />} tone="danger">
+          <InfoRow label={t("osVersion")} value={system?.OSVersion ?? "—"} />
+          <InfoRow label={t("launchAtLogin")}>
+            <button
+              type="button"
+              className={`chip-toggle${system?.LaunchAtLogin ? " on" : ""}`}
+              disabled={busy || !system}
+              onClick={() => void onToggleLaunch(!system?.LaunchAtLogin)}
+            >
+              {system?.LaunchAtLogin ? t("on") : t("off")}
+            </button>
+          </InfoRow>
+          <InfoRow label={t("networkStatus")} value={system ? networkValue : "—"} />
+          {system && !system.LaunchAtLoginSupported ? (
+            <p className="info-card-note">{t("launchAtLoginNote")}</p>
+          ) : null}
+        </InfoCard>
+      </div>
+
+      {error ? <p className="err">{error}</p> : null}
+    </section>
+  );
+}

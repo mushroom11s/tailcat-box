@@ -4,6 +4,7 @@ import DiagnosticsPage from "./pages/DiagnosticsPage";
 import FilesPage from "./pages/FilesPage";
 import KeysPage from "./pages/KeysPage";
 import ServicesPage from "./pages/ServicesPage";
+import SettingsPage from "./pages/SettingsPage";
 import { parsePortMappings } from "./lib/ports";
 import { sameKeys, sameSessions } from "./lib/snapshot";
 import { useI18n } from "./i18n";
@@ -78,7 +79,7 @@ function readTheme(): Theme {
 export default function App() {
   const { t } = useI18n();
   const [page, setPage] = useState<Page>("services");
-  const [theme] = useState<Theme>(() => readTheme());
+  const [theme, setTheme] = useState<Theme>(() => readTheme());
   const [sessions, setSessions] = useState<Session[]>([]);
   const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [events, setEvents] = useState<TailcatEvent[]>([]);
@@ -262,12 +263,7 @@ export default function App() {
             onStop={(id) => void run(() => stopSession(id))}
           />
         ) : null}
-        {page === "settings" ? (
-          <section className="page">
-            <h2>{t("settingsTitle")}</h2>
-            <p className="lede">{t("settingsPendingLede")}</p>
-          </section>
-        ) : null}
+        {page === "settings" ? <SettingsPage theme={theme} onTheme={setTheme} /> : null}
       </main>
     </div>
   );
