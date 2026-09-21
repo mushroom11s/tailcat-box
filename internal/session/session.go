@@ -10,12 +10,15 @@ import (
 type Kind string
 
 const (
-	KindPipeServe Kind = "pipe_serve"
-	KindPipeDial  Kind = "pipe_dial"
-	KindPortServe Kind = "port_serve"
-	KindForward   Kind = "forward"
-	KindBrowse    Kind = "browse"
-	KindPing      Kind = "ping"
+	KindPipeServe  Kind = "pipe_serve"
+	KindPipeDial   Kind = "pipe_dial"
+	KindPortServe  Kind = "port_serve"
+	KindForward    Kind = "forward"
+	KindBrowse     Kind = "browse"
+	KindPing       Kind = "ping"
+	KindRecv       Kind = "recv"
+	KindCopy       Kind = "copy"
+	KindFilesServe Kind = "files_serve"
 )
 
 type Status string

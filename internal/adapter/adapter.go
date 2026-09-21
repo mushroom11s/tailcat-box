@@ -48,6 +48,35 @@ func (m PortMapping) destPort() uint16 {
 	return m.LocalPort
 }
 
+// FileServeMode matches Tailcat CLI --files suffixes: ro, rw, wo, wo+.
+type FileServeMode string
+
+const (
+	FileServeRO     FileServeMode = "ro"
+	FileServeRW     FileServeMode = "rw"
+	FileServeWO     FileServeMode = "wo"
+	FileServeWOPlus FileServeMode = "wo+"
+)
+
+type FilesServeOpts struct {
+	Mode FileServeMode // empty means read-only
+}
+
+func (o FilesServeOpts) mode() FileServeMode {
+	if o.Mode == "" {
+		return FileServeRO
+	}
+	return o.Mode
+}
+
+type FileEntry struct {
+	Name    string
+	IsDir   bool
+	Size    int64
+	Mode    string
+	ModTime time.Time
+}
+
 type TailcatAdapter interface {
 	// StartPipeServe begins an ephemeral server; emits EventReady with Address, then EventData/Closed/Error.
 	StartPipeServe(ctx context.Context, sessionID string) (<-chan Event, error)
@@ -65,5 +94,13 @@ type TailcatAdapter interface {
 	ParseAddr(raw string) (string, error)
 	// ResolveAddr returns a self-contained equivalent of raw (CLI `resolve`).
 	ResolveAddr(ctx context.Context, raw string) (string, error)
+	// StartRecv serves a write-only drop-box inbox (CLI `recv`).
+	StartRecv(ctx context.Context, sessionID string, inboxDir string, acceptDirs bool) (<-chan Event, error)
+	// StartCopy copies localPaths to peerAddr:remotePath (CLI `cp` send).
+	StartCopy(ctx context.Context, sessionID string, peerAddr string, localPaths []string, remotePath string) (<-chan Event, error)
+	// StartFilesServe serves rootDir over SFTP (CLI `serve files`).
+	StartFilesServe(ctx context.Context, sessionID string, rootDir string, opts FilesServeOpts) (<-chan Event, error)
+	// ListRemote lists path on a files/recv/ssh peer (CLI `ls`).
+	ListRemote(ctx context.Context, peerAddr string, path string) ([]FileEntry, error)
 	Stop(sessionID string) error
 }

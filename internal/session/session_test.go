@@ -40,6 +40,9 @@ func TestPlan2SessionKinds(t *testing.T) {
 		session.KindForward,
 		session.KindBrowse,
 		session.KindPing,
+		session.KindRecv,
+		session.KindCopy,
+		session.KindFilesServe,
 	}
 	for _, kind := range kinds {
 		s := session.New(kind)
