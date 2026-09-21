@@ -2,10 +2,12 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/tailscale/tailcat"
 )
@@ -201,6 +203,22 @@ func (r *Real) DialPipe(ctx context.Context, sessionID string, addr string, payl
 	}()
 
 	return ch, nil
+}
+
+func (r *Real) StartPortServe(ctx context.Context, sessionID string, mappings []PortMapping) (<-chan Event, error) {
+	return nil, fmt.Errorf("StartPortServe not implemented")
+}
+
+func (r *Real) StartForward(ctx context.Context, sessionID string, serverAddr string, mappings []PortMapping) (<-chan Event, error) {
+	return nil, fmt.Errorf("StartForward not implemented")
+}
+
+func (r *Real) StartBrowse(ctx context.Context, sessionID string, serverAddr string) (<-chan Event, error) {
+	return nil, fmt.Errorf("StartBrowse not implemented")
+}
+
+func (r *Real) StartPing(ctx context.Context, sessionID string, addr string, untilDirect bool, timeout time.Duration) (<-chan Event, error) {
+	return nil, fmt.Errorf("StartPing not implemented")
 }
 
 func (r *Real) Stop(sessionID string) error {

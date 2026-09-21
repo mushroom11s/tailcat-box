@@ -33,3 +33,27 @@ func TestTransitionRejectsStoppedToRunning(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestPlan2SessionKinds(t *testing.T) {
+	kinds := []session.Kind{
+		session.KindPortServe,
+		session.KindForward,
+		session.KindBrowse,
+		session.KindPing,
+	}
+	for _, kind := range kinds {
+		s := session.New(kind)
+		if s.Kind != kind {
+			t.Fatalf("kind=%s want=%s", s.Kind, kind)
+		}
+		if s.Status != session.StatusStarting {
+			t.Fatalf("%s status=%s", kind, s.Status)
+		}
+		if err := s.Transition(session.StatusRunning); err != nil {
+			t.Fatalf("%s running: %v", kind, err)
+		}
+		if err := s.Transition(session.StatusStopped); err != nil {
+			t.Fatalf("%s stopped: %v", kind, err)
+		}
+	}
+}
