@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/service"
@@ -18,11 +20,19 @@ type App struct {
 	svc *service.Service
 }
 
-// NewApp creates a new App application struct backed by the fake Tailcat adapter.
-// Task 7 switches the default to the real library with a TAILCAT_ADAPTER=fake override.
+func newAdapter() adapter.TailcatAdapter {
+	if strings.EqualFold(os.Getenv("TAILCAT_ADAPTER"), "fake") {
+		return adapter.NewFake()
+	}
+	return adapter.NewReal()
+}
+
+// NewApp creates a new App application struct.
+// The default adapter is the embedded Tailcat library; set TAILCAT_ADAPTER=fake
+// for offline UI demos and tests.
 func NewApp() *App {
 	return &App{
-		svc: service.New(adapter.NewFake()),
+		svc: service.New(newAdapter()),
 	}
 }
 

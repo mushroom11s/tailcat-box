@@ -9,6 +9,7 @@ import (
 )
 
 func TestStartPipeServeReturnsSession(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
 	a := NewApp()
 	sess, err := a.StartPipeServe()
 	if err != nil {
@@ -23,6 +24,7 @@ func TestStartPipeServeReturnsSession(t *testing.T) {
 }
 
 func TestAppPipeServeDialAndStop(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
 	a := NewApp()
 	serveSess, err := a.StartPipeServe()
 	if err != nil {
