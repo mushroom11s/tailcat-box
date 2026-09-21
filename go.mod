@@ -4,8 +4,10 @@ go 1.27.1
 
 require (
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
+	github.com/pkg/sftp v1.13.6
 	github.com/tailscale/tailcat v0.7.0
 	github.com/wailsapp/wails/v2 v2.16.0
+	golang.org/x/crypto v0.57.0
 )
 
 require (
@@ -46,7 +48,6 @@ require (
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/pires/go-proxyproto v0.8.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pkg/sftp v1.13.6 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/safchain/ethtool v0.3.0 // indirect
 	github.com/samber/lo v1.49.1 // indirect
@@ -66,7 +67,6 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go4.org/mem v0.0.0-20240501181205-ae6ca9944745 // indirect
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb // indirect
-	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
