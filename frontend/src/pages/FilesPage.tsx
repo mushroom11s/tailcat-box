@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import SessionCard from "../components/SessionCard";
+import { useI18n } from "../i18n";
 import { selectDirectory, selectFiles, type FileEntry, type Session } from "../lib/wails";
 
 type Tab = "recv" | "send" | "serve" | "ls";
@@ -27,6 +28,7 @@ export default function FilesPage({
   onList,
   onStop,
 }: Props) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("recv");
   const [inbox, setInbox] = useState("");
   const [acceptDirs, setAcceptDirs] = useState(false);
@@ -54,7 +56,7 @@ export default function FilesPage({
 
   async function pickFiles(): Promise<void> {
     try {
-      const files = await selectFiles("Files to send");
+      const files = await selectFiles(t("pickSendFiles"));
       if (files.length) {
         setLocalPaths(files.join("\n"));
       }
@@ -87,14 +89,18 @@ export default function FilesPage({
     onList(addr.trim(), listPath.trim() || ".");
   }
 
+  const tabLabel: Record<Tab, "tabRecv" | "tabSend" | "tabServe" | "tabList"> = {
+    recv: "tabRecv",
+    send: "tabSend",
+    serve: "tabServe",
+    ls: "tabList",
+  };
+
   return (
     <section className="page">
-      <h2>Files</h2>
-      <p className="lede">
-        Receive into an inbox, send files to a peer, serve a directory, or list remote paths. Paths work on Windows
-        (C:\Users\me\inbox) and Unix (/home/me/inbox).
-      </p>
-      <div className="tabs" role="tablist" aria-label="Files mode">
+      <h2>{t("filesTitle")}</h2>
+      <p className="lede">{t("filesLede")}</p>
+      <div className="tabs" role="tablist" aria-label={t("filesMode")}>
         {(["recv", "send", "serve", "ls"] as Tab[]).map((value) => (
           <button
             key={value}
@@ -104,7 +110,7 @@ export default function FilesPage({
             className={tab === value ? "active" : ""}
             onClick={() => setTab(value)}
           >
-            {value === "ls" ? "List" : value[0].toUpperCase() + value.slice(1)}
+            {t(tabLabel[value])}
           </button>
         ))}
       </div>
@@ -112,7 +118,7 @@ export default function FilesPage({
       {tab === "recv" ? (
         <form onSubmit={submitRecv}>
           <div className="field">
-            <label htmlFor="inbox">Inbox directory</label>
+            <label htmlFor="inbox">{t("inboxDirectory")}</label>
             <input
               id="inbox"
               value={inbox}
@@ -123,14 +129,14 @@ export default function FilesPage({
           </div>
           <label className="check">
             <input type="checkbox" checked={acceptDirs} onChange={(e) => setAcceptDirs(e.target.checked)} />
-            Accept directory trees (wo+)
+            {t("acceptDirs")}
           </label>
           <div className="row">
-            <button className="btn btn-ghost" type="button" onClick={() => void pickDir(setInbox, "Recv inbox")}>
-              Browse
+            <button className="btn btn-ghost" type="button" onClick={() => void pickDir(setInbox, t("pickRecvInbox"))}>
+              {t("browse")}
             </button>
             <button className="btn" type="submit" disabled={busy || !inbox.trim()}>
-              Start recv
+              {t("startRecv")}
             </button>
           </div>
         </form>
@@ -139,7 +145,7 @@ export default function FilesPage({
       {tab === "send" ? (
         <form onSubmit={submitSend}>
           <div className="field">
-            <label htmlFor="send-addr">Peer address</label>
+            <label htmlFor="send-addr">{t("peerAddress")}</label>
             <input
               id="send-addr"
               value={addr}
@@ -149,7 +155,7 @@ export default function FilesPage({
             />
           </div>
           <div className="field">
-            <label htmlFor="send-paths">Local paths (one per line)</label>
+            <label htmlFor="send-paths">{t("localPaths")}</label>
             <textarea
               id="send-paths"
               value={localPaths}
@@ -158,7 +164,7 @@ export default function FilesPage({
             />
           </div>
           <div className="field">
-            <label htmlFor="send-remote">Remote path</label>
+            <label htmlFor="send-remote">{t("remotePath")}</label>
             <input
               id="send-remote"
               value={remotePath}
@@ -169,10 +175,10 @@ export default function FilesPage({
           </div>
           <div className="row">
             <button className="btn btn-ghost" type="button" onClick={() => void pickFiles()}>
-              Browse files
+              {t("browseFiles")}
             </button>
             <button className="btn" type="submit" disabled={busy || !addr.trim() || !localPaths.trim()}>
-              Send
+              {t("send")}
             </button>
           </div>
         </form>
@@ -181,7 +187,7 @@ export default function FilesPage({
       {tab === "serve" ? (
         <form onSubmit={submitServe}>
           <div className="field">
-            <label htmlFor="serve-dir">Directory</label>
+            <label htmlFor="serve-dir">{t("directory")}</label>
             <input
               id="serve-dir"
               value={rootDir}
@@ -191,20 +197,20 @@ export default function FilesPage({
             />
           </div>
           <div className="field">
-            <label htmlFor="serve-mode">Mode</label>
+            <label htmlFor="serve-mode">{t("mode")}</label>
             <select id="serve-mode" value={mode} onChange={(e) => setMode(e.target.value)}>
-              <option value="ro">Read-only (ro)</option>
-              <option value="rw">Read-write (rw)</option>
-              <option value="wo">Write-only drop box (wo)</option>
-              <option value="wo+">Recursive drop box (wo+)</option>
+              <option value="ro">{t("modeRo")}</option>
+              <option value="rw">{t("modeRw")}</option>
+              <option value="wo">{t("modeWo")}</option>
+              <option value="wo+">{t("modeWoPlus")}</option>
             </select>
           </div>
           <div className="row">
-            <button className="btn btn-ghost" type="button" onClick={() => void pickDir(setRootDir, "Serve directory")}>
-              Browse
+            <button className="btn btn-ghost" type="button" onClick={() => void pickDir(setRootDir, t("pickServeDir"))}>
+              {t("browse")}
             </button>
             <button className="btn" type="submit" disabled={busy || !rootDir.trim()}>
-              Start files serve
+              {t("startFilesServe")}
             </button>
           </div>
         </form>
@@ -213,7 +219,7 @@ export default function FilesPage({
       {tab === "ls" ? (
         <form onSubmit={submitList}>
           <div className="field">
-            <label htmlFor="ls-addr">Peer address</label>
+            <label htmlFor="ls-addr">{t("peerAddress")}</label>
             <input
               id="ls-addr"
               value={addr}
@@ -223,7 +229,7 @@ export default function FilesPage({
             />
           </div>
           <div className="field">
-            <label htmlFor="ls-path">Remote path</label>
+            <label htmlFor="ls-path">{t("remotePath")}</label>
             <input
               id="ls-path"
               value={listPath}
@@ -234,7 +240,7 @@ export default function FilesPage({
           </div>
           <div className="row">
             <button className="btn" type="submit" disabled={busy || !addr.trim()}>
-              List
+              {t("list")}
             </button>
           </div>
         </form>
@@ -246,15 +252,15 @@ export default function FilesPage({
         <div className="glass result" style={{ marginTop: 16, overflow: "auto" }}>
           {listing.length === 0 ? (
             <p className="empty" style={{ margin: 0 }}>
-              Remote listing will appear here.
+              {t("listingEmpty")}
             </p>
           ) : (
             <table className="listing">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Size</th>
-                  <th>Mode</th>
+                  <th>{t("listingName")}</th>
+                  <th>{t("listingSize")}</th>
+                  <th>{t("listingMode")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -276,7 +282,7 @@ export default function FilesPage({
 
       {tab === "recv" ? (
         <div className="stack" style={{ marginTop: 16 }}>
-          {recvs.length === 0 ? <p className="empty">No recv sessions yet.</p> : null}
+          {recvs.length === 0 ? <p className="empty">{t("emptyRecv")}</p> : null}
           {recvs.map((sess) => (
             <SessionCard key={sess.ID} session={sess} onStop={onStop} />
           ))}
@@ -285,7 +291,7 @@ export default function FilesPage({
 
       {tab === "send" ? (
         <div className="stack" style={{ marginTop: 16 }}>
-          {copies.length === 0 ? <p className="empty">No copy sessions yet.</p> : null}
+          {copies.length === 0 ? <p className="empty">{t("emptyCopy")}</p> : null}
           {copies.map((sess) => (
             <SessionCard key={sess.ID} session={sess} onStop={onStop} />
           ))}
@@ -294,7 +300,7 @@ export default function FilesPage({
 
       {tab === "serve" ? (
         <div className="stack" style={{ marginTop: 16 }}>
-          {serves.length === 0 ? <p className="empty">No files serve sessions yet.</p> : null}
+          {serves.length === 0 ? <p className="empty">{t("emptyFilesServe")}</p> : null}
           {serves.map((sess) => (
             <SessionCard key={sess.ID} session={sess} onStop={onStop} />
           ))}

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import SessionCard from "../components/SessionCard";
+import { useI18n } from "../i18n";
 import type { Session } from "../lib/wails";
 
 type Tab = "pipe" | "forward" | "browse";
@@ -25,6 +26,7 @@ export default function ConnectPage({
   onBrowse,
   onStop,
 }: Props) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("pipe");
   const [addr, setAddr] = useState("");
   const [payload, setPayload] = useState("hello");
@@ -48,11 +50,17 @@ export default function ConnectPage({
     onBrowse(addr.trim());
   }
 
+  const tabLabel: Record<Tab, "tabPipe" | "tabForward" | "tabBrowse"> = {
+    pipe: "tabPipe",
+    forward: "tabForward",
+    browse: "tabBrowse",
+  };
+
   return (
     <section className="page">
-      <h2>Connect</h2>
-      <p className="lede">Dial a Tailcat address over the pipe, forward local TCP ports, or browse a served HTTP port.</p>
-      <div className="tabs" role="tablist" aria-label="Connect mode">
+      <h2>{t("connectTitle")}</h2>
+      <p className="lede">{t("connectLede")}</p>
+      <div className="tabs" role="tablist" aria-label={t("connectMode")}>
         {(["pipe", "forward", "browse"] as Tab[]).map((value) => (
           <button
             key={value}
@@ -62,7 +70,7 @@ export default function ConnectPage({
             className={tab === value ? "active" : ""}
             onClick={() => setTab(value)}
           >
-            {value[0].toUpperCase() + value.slice(1)}
+            {t(tabLabel[value])}
           </button>
         ))}
       </div>
@@ -70,7 +78,7 @@ export default function ConnectPage({
       {tab === "pipe" ? (
         <form onSubmit={submitPipe}>
           <div className="field">
-            <label htmlFor="addr">Address</label>
+            <label htmlFor="addr">{t("address")}</label>
             <input
               id="addr"
               value={addr}
@@ -80,12 +88,12 @@ export default function ConnectPage({
             />
           </div>
           <div className="field">
-            <label htmlFor="payload">Payload</label>
+            <label htmlFor="payload">{t("payload")}</label>
             <textarea id="payload" value={payload} onChange={(e) => setPayload(e.target.value)} />
           </div>
           <div className="row">
             <button className="btn" type="submit" disabled={busy || !addr.trim()}>
-              Send
+              {t("send")}
             </button>
           </div>
         </form>
@@ -94,7 +102,7 @@ export default function ConnectPage({
       {tab === "forward" ? (
         <form onSubmit={submitForward}>
           <div className="field">
-            <label htmlFor="fwd-addr">Address</label>
+            <label htmlFor="fwd-addr">{t("address")}</label>
             <input
               id="fwd-addr"
               value={addr}
@@ -104,7 +112,7 @@ export default function ConnectPage({
             />
           </div>
           <div className="field">
-            <label htmlFor="fwd-spec">Mappings</label>
+            <label htmlFor="fwd-spec">{t("mappings")}</label>
             <input
               id="fwd-spec"
               value={spec}
@@ -115,7 +123,7 @@ export default function ConnectPage({
           </div>
           <div className="row">
             <button className="btn" type="submit" disabled={busy || !addr.trim() || !spec.trim()}>
-              Start forward
+              {t("startForward")}
             </button>
           </div>
         </form>
@@ -124,7 +132,7 @@ export default function ConnectPage({
       {tab === "browse" ? (
         <form onSubmit={submitBrowse}>
           <div className="field">
-            <label htmlFor="browse-addr">Address</label>
+            <label htmlFor="browse-addr">{t("address")}</label>
             <input
               id="browse-addr"
               value={addr}
@@ -135,7 +143,7 @@ export default function ConnectPage({
           </div>
           <div className="row">
             <button className="btn" type="submit" disabled={busy || !addr.trim()}>
-              Browse port 80
+              {t("browsePort80")}
             </button>
           </div>
         </form>
@@ -145,8 +153,8 @@ export default function ConnectPage({
 
       {tab === "pipe" ? (
         <>
-          <h3 className="kind">Echo</h3>
-          <div className="glass result">{echo || "EventData will appear here."}</div>
+          <h3 className="kind">{t("echo")}</h3>
+          <div className="glass result">{echo || t("echoEmpty")}</div>
           <div className="stack" style={{ marginTop: 16 }}>
             {dials.map((sess) => (
               <SessionCard key={sess.ID} session={sess} onStop={onStop} />
@@ -157,7 +165,7 @@ export default function ConnectPage({
 
       {tab === "forward" ? (
         <div className="stack" style={{ marginTop: 16 }}>
-          {forwards.length === 0 ? <p className="empty">No forward sessions yet.</p> : null}
+          {forwards.length === 0 ? <p className="empty">{t("emptyForwards")}</p> : null}
           {forwards.map((sess) => (
             <SessionCard key={sess.ID} session={sess} onStop={onStop} />
           ))}
@@ -166,7 +174,7 @@ export default function ConnectPage({
 
       {tab === "browse" ? (
         <div className="stack" style={{ marginTop: 16 }}>
-          {browses.length === 0 ? <p className="empty">No browse sessions yet.</p> : null}
+          {browses.length === 0 ? <p className="empty">{t("emptyBrowses")}</p> : null}
           {browses.map((sess) => (
             <SessionCard key={sess.ID} session={sess} onStop={onStop} />
           ))}

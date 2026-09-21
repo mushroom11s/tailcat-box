@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
+import { useI18n } from "../i18n";
 import type { KeyInfo } from "../lib/wails";
 
 async function copyText(text: string): Promise<void> {
@@ -41,6 +42,7 @@ export default function KeysPage({
   onParse,
   onResolve,
 }: Props) {
+  const { t } = useI18n();
   const [name, setName] = useState("default");
   const [client, setClient] = useState(false);
   const [region, setRegion] = useState("");
@@ -63,16 +65,16 @@ export default function KeysPage({
 
   return (
     <section className="page">
-      <h2>Keys & Addresses</h2>
-      <p className="lede">Create genkey-style named keys, copy addresses, and parse or resolve a Tailcat address.</p>
+      <h2>{t("keysTitle")}</h2>
+      <p className="lede">{t("keysLede")}</p>
 
       <form onSubmit={submitCreate}>
         <div className="field">
-          <label htmlFor="key-name">Name</label>
+          <label htmlFor="key-name">{t("name")}</label>
           <input id="key-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
         </div>
         <div className="field">
-          <label htmlFor="key-region">Region hint (optional)</label>
+          <label htmlFor="key-region">{t("regionHint")}</label>
           <input
             id="key-region"
             value={region}
@@ -84,35 +86,35 @@ export default function KeysPage({
         </div>
         <label className="check">
           <input type="checkbox" checked={client} onChange={(e) => setClient(e.target.checked)} />
-          Client identity key
+          {t("clientIdentityKey")}
         </label>
         <div className="row">
           <button className="btn" type="submit" disabled={busy || !name.trim()}>
-            Create key
+            {t("createKey")}
           </button>
         </div>
       </form>
 
       <div className="keys stack">
-        {keys.length === 0 ? <p className="empty">No saved keys yet.</p> : null}
+        {keys.length === 0 ? <p className="empty">{t("emptyKeys")}</p> : null}
         {keys.map((key) => (
           <article key={key.Name + key.Source} className="glass key-row">
             <div className="key-meta">
               <h3>
-                {key.Name} {key.Client ? "(client)" : "(server)"}{" "}
+                {key.Name} {key.Client ? t("keyClient") : t("keyServer")}{" "}
                 <span className="pill">{key.Source || "app"}</span>
               </h3>
-              <p className="address">{key.Address || "No address"}</p>
+              <p className="address">{key.Address || t("noAddress")}</p>
             </div>
             <div className="card-actions">
               {key.Address ? (
                 <button className="btn btn-ghost" type="button" onClick={() => void copyText(key.Address)}>
-                  Copy
+                  {t("copy")}
                 </button>
               ) : null}
               {key.Source !== "cli" ? (
                 <button className="btn btn-danger" type="button" disabled={busy} onClick={() => onDelete(key.Name)}>
-                  Delete
+                  {t("delete")}
                 </button>
               ) : null}
             </div>
@@ -121,11 +123,11 @@ export default function KeysPage({
       </div>
 
       <h3 className="kind" style={{ marginTop: 24 }}>
-        Parse / resolve
+        {t("parseResolve")}
       </h3>
       <form onSubmit={submitParse}>
         <div className="field">
-          <label htmlFor="addr-tools">Address</label>
+          <label htmlFor="addr-tools">{t("address")}</label>
           <input
             id="addr-tools"
             value={raw}
@@ -136,18 +138,18 @@ export default function KeysPage({
         </div>
         <div className="row">
           <button className="btn" type="submit" disabled={busy || !raw.trim()}>
-            Parse
+            {t("parse")}
           </button>
           <button className="btn btn-ghost" type="button" disabled={busy || !raw.trim()} onClick={submitResolve}>
-            Resolve
+            {t("resolve")}
           </button>
         </div>
       </form>
       {error ? <p className="err">{error}</p> : null}
-      <h3 className="kind">Parse JSON</h3>
-      <div className="glass result">{parseResult || "Parse output will appear here."}</div>
-      <h3 className="kind">Resolved address</h3>
-      <div className="glass result">{resolveResult || "Resolve output will appear here."}</div>
+      <h3 className="kind">{t("parseJson")}</h3>
+      <div className="glass result">{parseResult || t("parseEmpty")}</div>
+      <h3 className="kind">{t("resolvedAddress")}</h3>
+      <div className="glass result">{resolveResult || t("resolveEmpty")}</div>
     </section>
   );
 }

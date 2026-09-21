@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import SessionCard from "../components/SessionCard";
+import { useI18n } from "../i18n";
 import type { Session, TailcatEvent } from "../lib/wails";
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export default function DiagnosticsPage({ sessions, events, busy, error, onPing, onStop }: Props) {
+  const { t } = useI18n();
   const [addr, setAddr] = useState("");
   const [untilDirect, setUntilDirect] = useState(true);
   const pings = sessions.filter((s) => s.Kind === "ping");
@@ -28,11 +30,11 @@ export default function DiagnosticsPage({ sessions, events, busy, error, onPing,
 
   return (
     <section className="page">
-      <h2>Diagnostics</h2>
-      <p className="lede">Ping a Tailcat address, watch EventData lines, and inspect active sessions.</p>
+      <h2>{t("diagnosticsTitle")}</h2>
+      <p className="lede">{t("diagnosticsLede")}</p>
       <form onSubmit={submit}>
         <div className="field">
-          <label htmlFor="ping-addr">Address</label>
+          <label htmlFor="ping-addr">{t("address")}</label>
           <input
             id="ping-addr"
             value={addr}
@@ -43,31 +45,31 @@ export default function DiagnosticsPage({ sessions, events, busy, error, onPing,
         </div>
         <label className="check">
           <input type="checkbox" checked={untilDirect} onChange={(e) => setUntilDirect(e.target.checked)} />
-          Until direct
+          {t("untilDirect")}
         </label>
         <div className="row">
           <button className="btn" type="submit" disabled={busy || !addr.trim()}>
-            Ping
+            {t("ping")}
           </button>
         </div>
       </form>
       {error ? <p className="err">{error}</p> : null}
-      <h3 className="kind">EventData log</h3>
-      <div className="glass result log">{log || "Pong lines will appear here."}</div>
+      <h3 className="kind">{t("eventLog")}</h3>
+      <div className="glass result log">{log || t("eventLogEmpty")}</div>
       <h3 className="kind" style={{ marginTop: 24 }}>
-        Ping sessions
+        {t("pingSessions")}
       </h3>
       <div className="stack">
-        {pings.length === 0 ? <p className="empty">No ping sessions yet.</p> : null}
+        {pings.length === 0 ? <p className="empty">{t("emptyPings")}</p> : null}
         {pings.map((sess) => (
           <SessionCard key={sess.ID} session={sess} onStop={onStop} />
         ))}
       </div>
       <h3 className="kind" style={{ marginTop: 24 }}>
-        Active sessions
+        {t("activeSessions")}
       </h3>
       <div className="stack">
-        {active.length === 0 ? <p className="empty">No active sessions.</p> : null}
+        {active.length === 0 ? <p className="empty">{t("emptyActive")}</p> : null}
         {active.map((sess) => (
           <SessionCard key={sess.ID} session={sess} onStop={onStop} />
         ))}
