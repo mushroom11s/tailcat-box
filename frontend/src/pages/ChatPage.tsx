@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent, type RefObject } from "react";
 import { ClipboardSetText, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import VoiceNote from "../components/VoiceNote";
 import { useI18n } from "../i18n";
 import { localizeChatError, systemText } from "../lib/chatText";
+import { createLiveCall, type CallMode, type CallView, type LiveCall, type LiveDevices } from "../lib/liveCall";
 import { startVoiceCapture, type VoiceCapture } from "../lib/voiceCapture";
 import { hasWailsBindings, selectFiles } from "../lib/wails";
 
@@ -53,6 +54,10 @@ type Props = {
   onResend?: (id: string) => Promise<void>;
   onSave?: (id: string) => Promise<void>;
   onRetry: () => Promise<void>;
+  onSendSignal?: (metaJSON: string) => Promise<void>;
+  incomingSignal?: { seq: number; data: string } | null;
+  liveMedia?: LiveDevices;
+  peerConnection?: new (config?: RTCConfiguration) => RTCPeerConnection;
 };
 
 async function copyText(text: string): Promise<void> {
@@ -101,6 +106,10 @@ export default function ChatPage({
   onResend,
   onSave,
   onRetry,
+  onSendSignal,
+  incomingSignal,
+  liveMedia,
+  peerConnection,
 }: Props) {
   const { t } = useI18n();
   const peerRef = useRef<HTMLInputElement>(null);
@@ -118,6 +127,37 @@ export default function ChatPage({
   const pendingRef = useRef(false);
   const stopEarlyRef = useRef(false);
   const recordSource = useRef<"button" | "enter" | null>(null);
+  const liveMediaRef = useRef(liveMedia);
+  const peerCtorRef = useRef(peerConnection);
+  const sendSignalRef = useRef(onSendSignal);
+  const signalSeq = useRef(0);
+  liveMediaRef.current = liveMedia;
+  peerCtorRef.current = peerConnection;
+  sendSignalRef.current = onSendSignal;
+  const callRef = useRef<LiveCall | null>(null);
+  const [callView, setCallView] = useState<CallView>({
+    phase: "idle",
+    mode: null,
+    role: null,
+    expanded: false,
+    error: "",
+    localStream: null,
+    remoteStream: null,
+  });
+  if (!callRef.current) {
+    callRef.current = createLiveCall({
+      send: (meta) => {
+        const send = sendSignalRef.current;
+        if (!send) {
+          throw new Error("no peer");
+        }
+        return send(JSON.stringify(meta));
+      },
+      devices: () => liveMediaRef.current,
+      PeerConnection: () => peerCtorRef.current ?? RTCPeerConnection,
+      onChange: setCallView,
+    });
+  }
   burnRef.current = burnMode;
 
   async function reportStatus(status: string): Promise<void> {
@@ -272,6 +312,29 @@ export default function ChatPage({
       captureRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!incomingSignal || incomingSignal.seq === signalSeq.current) {
+      return;
+    }
+    signalSeq.current = incomingSignal.seq;
+    void callRef.current?.receive(incomingSignal.data);
+  }, [incomingSignal]);
+
+  useEffect(() => {
+    const call = callRef.current;
+    return () => {
+      void call?.hangup();
+    };
+  }, []);
+
+  async function placeCall(mode: CallMode): Promise<void> {
+    if (!peer) {
+      peerRef.current?.focus();
+      return;
+    }
+    await callRef.current?.start(mode);
+  }
 
   async function beginRecording(source: "button" | "enter"): Promise<void> {
     if (pendingRef.current || captureRef.current) {
@@ -456,6 +519,7 @@ export default function ChatPage({
           {t("chatConnect")}
         </button>
       </div>
+      <div className="chat-stage">
       <div className="chat-log">
         {messages.length === 0 ? <p className="lede">{t("chatEmptyLede")}</p> : null}
         {messages.map((msg) =>
@@ -503,6 +567,26 @@ export default function ChatPage({
           </p>
         ))}
       </div>
+      {callView.phase !== "idle" ? (
+        <aside className={`glass media-dock${callView.expanded ? " expanded" : ""}`} role="complementary" aria-label={t("chatMediaDock")}>
+          <MediaPreview label={t("chatLocalPreview")} stream={callView.localStream} muted />
+          <MediaPreview label={t("chatRemoteMedia")} stream={callView.remoteStream} />
+          <div className="row">
+            <button className="btn" type="button" onClick={() => void callRef.current?.hangup()}>
+              {t("chatHangUp")}
+            </button>
+            <button
+              className="btn"
+              type="button"
+              aria-expanded={callView.expanded}
+              onClick={() => callRef.current?.toggleExpanded()}
+            >
+              {callView.expanded ? t("chatCollapse") : t("chatExpand")}
+            </button>
+          </div>
+        </aside>
+      ) : null}
+      </div>
       <div className="field">
         <label htmlFor="chat-burn">{t("chatBurnLabel")}</label>
         <select id="chat-burn" value={burnMode} onChange={(e) => setBurnMode(e.target.value)}>
@@ -523,6 +607,7 @@ export default function ChatPage({
         />
       </div>
       {notice ? <p>{notice}</p> : null}
+      {callView.error ? <p className="err">{localizeChatError(callView.error, t) || callView.error}</p> : null}
       <div className="row">
         <button className="btn" type="button" onClick={() => attach()}>
           {t("chatAttach")}
@@ -539,6 +624,15 @@ export default function ChatPage({
         >
           {recording ? t("chatRecording") : t("chatRecord")}
         </button>
+        <button className="btn" type="button" onClick={() => void placeCall("voice")}>
+          {t("chatCallVoice")}
+        </button>
+        <button className="btn" type="button" onClick={() => void placeCall("video")}>
+          {t("chatCallVideo")}
+        </button>
+        <button className="btn" type="button" onClick={() => void placeCall("screen")}>
+          {t("chatCallScreen")}
+        </button>
         <button className="btn" type="button" onClick={() => send()}>
           {t("send")}
         </button>
@@ -551,6 +645,33 @@ export default function ChatPage({
         onChange={(e) => void onPicked(e)}
       />
     </section>
+  );
+}
+
+function MediaPreview({ label, stream, muted }: { label: string; stream: MediaStream | null; muted?: boolean }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const showVideo = Boolean(stream && stream.getVideoTracks().length > 0);
+  useEffect(() => {
+    const el = showVideo ? videoRef.current : audioRef.current;
+    if (!el) {
+      return;
+    }
+    try {
+      el.srcObject = stream;
+    } catch {
+      // Test doubles are not DOM media streams.
+    }
+  }, [showVideo, stream]);
+  return (
+    <div className="media-slot">
+      <p>{label}</p>
+      {showVideo ? (
+        <video ref={videoRef as RefObject<HTMLVideoElement>} autoPlay muted={muted} playsInline />
+      ) : (
+        <audio ref={audioRef as RefObject<HTMLAudioElement>} autoPlay muted={muted} />
+      )}
+    </div>
   );
 }
 

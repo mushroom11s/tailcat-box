@@ -27,6 +27,18 @@ func Pack(meta map[string]any, payload []byte) ([]byte, error) {
 	return frame, nil
 }
 
+// RawMeta returns the JSON object inside a TCH1 frame without decoding it.
+func RawMeta(frame []byte) ([]byte, bool) {
+	if len(frame) < 8 || string(frame[:4]) != "TCH1" {
+		return nil, false
+	}
+	n := binary.BigEndian.Uint32(frame[4:8])
+	if uint64(n) > uint64(len(frame)-8) {
+		return nil, false
+	}
+	return frame[8 : 8+int(n)], true
+}
+
 func Unpack(frame []byte) (map[string]any, []byte, error) {
 	if len(frame) < 8 || string(frame[:4]) != "TCH1" {
 		return nil, nil, fmt.Errorf("bad magic")

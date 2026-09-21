@@ -20,6 +20,7 @@ import {
   RestartChatRoom as bindRestartChatRoom,
   SaveChatFile as bindSaveChatFile,
   SendChatFile as bindSendChatFile,
+  SendChatSignal as bindSendChatSignal,
   SendChatText as bindSendChatText,
   SendChatVoice as bindSendChatVoice,
   StartChatRoom as bindStartChatRoom,
@@ -652,6 +653,14 @@ export async function decodeChatVoice(mime: string, audioBase64: string): Promis
     return audioBase64;
   }
   throw new Error("Cannot play this voice message.");
+}
+
+export async function sendChatSignal(metaJSON: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSendChatSignal(metaJSON);
+    return;
+  }
+  browserChat.sendSignal(metaJSON);
 }
 
 export async function sendChatText(body: string, burn = false, ttlSec = 0): Promise<void> {

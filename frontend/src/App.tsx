@@ -19,6 +19,7 @@ import {
   saveChatFile,
   sendChatFile,
   sendChatFileBytes,
+  sendChatSignal,
   sendChatText,
   sendChatVoice,
   setNetworkSettings,
@@ -87,6 +88,7 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [transfers, setTransfers] = useState<ChatTransfer[]>([]);
   const [roomError, setRoomError] = useState("");
+  const [liveSignal, setLiveSignal] = useState<{ seq: number; data: string } | null>(null);
   const [roomKey, setRoomKey] = useState("");
   const [appliedRoom, setAppliedRoom] = useState({ key: "", region: "", derp: "" });
   const roomKeyRef = useRef("");
@@ -183,6 +185,9 @@ export default function App() {
         } catch {
           // ignore malformed event data
         }
+      } else if (ev.Kind === "signal" && ev.Data) {
+        const data = ev.Data;
+        setLiveSignal((prev) => ({ seq: (prev?.seq ?? 0) + 1, data }));
       } else if (ev.Kind === "discard" && ev.Data) {
         try {
           const data = JSON.parse(ev.Data) as { id?: string };
@@ -327,6 +332,8 @@ export default function App() {
             onConnect={connectChatPeer}
             onSend={sendChatText}
             onSendVoice={sendChatVoice}
+            onSendSignal={sendChatSignal}
+            incomingSignal={liveSignal}
             onSendPath={sendChatFile}
             onSendBrowserFile={sendChatFileBytes}
             onDiscard={discardChatMessage}

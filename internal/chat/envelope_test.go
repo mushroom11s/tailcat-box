@@ -61,6 +61,37 @@ func TestPackForcesVersionAndOmitsCaps(t *testing.T) {
 	}
 }
 
+func TestUnpackGoldenWebRTCControls(t *testing.T) {
+	offer := golden([]byte(`{"v":1,"type":"rtc-offer","mode":"screen","description":{"type":"offer","sdp":"v=0"}}`), nil)
+	meta, payload, err := Unpack(offer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta["type"] != "rtc-offer" || meta["mode"] != "screen" || len(payload) != 0 || meta["v"].(float64) != 1 {
+		t.Fatalf("offer=%v payload=%q", meta, payload)
+	}
+	desc, ok := meta["description"].(map[string]any)
+	if !ok || desc["type"] != "offer" || desc["sdp"] != "v=0" {
+		t.Fatalf("description=%v", meta["description"])
+	}
+	raw, ok := RawMeta(offer)
+	if !ok || string(raw) != `{"v":1,"type":"rtc-offer","mode":"screen","description":{"type":"offer","sdp":"v=0"}}` {
+		t.Fatalf("raw=%s ok=%v", raw, ok)
+	}
+
+	answer := golden([]byte(`{"v":1,"type":"rtc-answer","description":{"type":"answer","sdp":"v=0"}}`), nil)
+	meta, payload, err = Unpack(answer)
+	if err != nil || meta["type"] != "rtc-answer" || len(payload) != 0 {
+		t.Fatalf("answer=%v %v payload=%q", meta, err, payload)
+	}
+
+	hangup := golden([]byte(`{"v":1,"type":"rtc-hangup"}`), nil)
+	meta, payload, err = Unpack(hangup)
+	if err != nil || meta["type"] != "rtc-hangup" || len(payload) != 0 {
+		t.Fatalf("hangup=%v %v payload=%q", meta, err, payload)
+	}
+}
+
 func TestUnpackRejectsBadMagicAndOverrun(t *testing.T) {
 	if _, _, err := Unpack([]byte("XXXX\x00\x00\x00\x02{}")); err == nil {
 		t.Fatal("expected bad magic")

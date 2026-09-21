@@ -1,4 +1,11 @@
 import type { MessageKey } from "../i18n/en";
+import {
+  cameraDeniedError,
+  liveMediaError,
+  micDeniedError,
+  screenDeniedError,
+  screenUnavailableError,
+} from "./liveCall";
 
 export function systemText(code: string | undefined, body: string, t: (key: MessageKey) => string): string {
   switch (code) {
@@ -23,8 +30,16 @@ export function localizeChatError(message: string, t: (key: MessageKey) => strin
       return t("chatAddrError");
     case "Could not reach peer. Check the address and that they are online.":
       return t("chatUnreachable");
-    case "Microphone access was denied.":
+    case micDeniedError:
       return t("chatMicDenied");
+    case cameraDeniedError:
+      return t("chatCamDenied");
+    case screenDeniedError:
+      return t("chatScreenDenied");
+    case screenUnavailableError:
+      return t("chatScreenUnavailable");
+    case liveMediaError:
+      return t("chatLiveFailed");
     case "room is starting":
       return "";
     default:

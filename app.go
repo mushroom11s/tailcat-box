@@ -342,6 +342,12 @@ func (a *App) SendChatVoice(mime string, durationSec int, audio []byte, burn boo
 	return a.chat.SendVoice(mime, durationSec, audio, burn, ttlSec)
 }
 
+// SendChatSignal sends one port 100 WebRTC control envelope. metaJSON is the
+// control object (rtc-offer, rtc-answer, or rtc-hangup). The payload is empty.
+func (a *App) SendChatSignal(metaJSON string) error {
+	return a.chat.SendSignal(metaJSON)
+}
+
 // DecodeChatVoice turns a voice payload the webview cannot play into WAV bytes.
 func (a *App) DecodeChatVoice(mime string, audio []byte) ([]byte, error) {
 	return chat.DecodeVoiceWAV(mime, audio)

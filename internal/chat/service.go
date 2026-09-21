@@ -310,6 +310,8 @@ func (s *Service) onInbound(sessionID string, ev adapter.ChatEvent) {
 		s.deliverOffset(stringField(meta, "id"), asInt(meta["offset"]))
 	case "voice":
 		s.onVoice(sessionID, meta, payload)
+	case "rtc-offer", "rtc-answer", "rtc-hangup":
+		s.emitControl(sessionID, ev.Data)
 	default:
 		return
 	}

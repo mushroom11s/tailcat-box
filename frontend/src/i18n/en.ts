@@ -279,6 +279,20 @@ export const en = {
   chatVoiceUnplayable: "Cannot play this voice message.",
   chatMicDenied: "Microphone access was denied.",
   chatPlay: "Play",
+  chatCallVoice: "Voice",
+  chatCallVideo: "Video",
+  chatCallScreen: "Screen share",
+  chatHangUp: "Hang up",
+  chatExpand: "Expand",
+  chatCollapse: "Collapse",
+  chatLocalPreview: "Local preview",
+  chatRemoteMedia: "Remote media",
+  chatMediaDock: "Live media",
+  chatCamDenied: "Camera access was denied.",
+  chatScreenDenied: "Screen sharing was denied.",
+  chatScreenUnavailable: "Screen sharing is unavailable on this system.",
+  chatLiveFailed:
+    "Live media failed. Restrictive networks have no relay for calls, so voice and video can fail while chat still works.",
 } as const;
 
 export type MessageKey = keyof typeof en;

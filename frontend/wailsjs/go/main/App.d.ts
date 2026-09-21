@@ -49,6 +49,8 @@ export function SelectFiles(arg1:string):Promise<Array<string>>;
 
 export function SendChatFile(arg1:string,arg2:boolean,arg3:number):Promise<string>;
 
+export function SendChatSignal(arg1:string):Promise<void>;
+
 export function SendChatText(arg1:string,arg2:boolean,arg3:number):Promise<void>;
 
 export function SendChatVoice(arg1:string,arg2:number,arg3:string,arg4:boolean,arg5:number):Promise<void>;

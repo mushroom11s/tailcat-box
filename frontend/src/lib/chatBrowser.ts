@@ -24,6 +24,10 @@ export type BrowserFile = {
 
 type Listener = (ev: { Kind: string; Data?: string; Address?: string; SessionID: string }) => void;
 
+type RoomEntry = { sessionID: string; emit: Listener };
+
+const rooms = new Map<string, RoomEntry>();
+
 function id(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -84,11 +88,36 @@ export function createBrowserHub() {
     }
   }
 
+  let registeredAddr = "";
+
+  function bindAddress(next: string): void {
+    if (registeredAddr && registeredAddr !== next) {
+      const current = rooms.get(registeredAddr);
+      if (current?.emit === emit) {
+        rooms.delete(registeredAddr);
+      }
+    }
+    registeredAddr = next;
+    rooms.set(next, { sessionID, emit });
+  }
+
+  function unbind(): void {
+    if (!registeredAddr) {
+      return;
+    }
+    const current = rooms.get(registeredAddr);
+    if (current?.emit === emit) {
+      rooms.delete(registeredAddr);
+    }
+    registeredAddr = "";
+  }
+
   async function open(nextID: string, keyJSON: string, restarted: boolean): Promise<{ address: string }> {
     sessionID = nextID;
     address = await addressFor(nextID, keyJSON);
     peer = "";
     running = true;
+    bindAddress(address);
     emit({ Kind: "room-ready", SessionID: sessionID, Address: address, Data: JSON.stringify({ address }) });
     if (restarted) {
       const msg = message("system", "system", "Room restarted. Send the new address.", "room-restarted");
@@ -260,11 +289,27 @@ export function createBrowserHub() {
         Data: JSON.stringify({ id: transferID, offset: 0, size: 0, mode: "resume", status: "active" }),
       });
     },
+    sendSignal(metaJSON: string) {
+      if (!peer) {
+        throw new Error("no peer");
+      }
+      JSON.parse(metaJSON);
+      const target = rooms.get(peer);
+      if (target) {
+        target.emit({ Kind: "signal", SessionID: target.sessionID, Data: metaJSON });
+        return;
+      }
+      if (peer === "tc:fake-echo" || peer === "tc:fake-official" || peer === "tc:fake-box" || peer === "tc:fake-resume") {
+        return;
+      }
+      throw new Error("Could not reach peer. Check the address and that they are online.");
+    },
     stop() {
       running = false;
       peer = "";
       sending = false;
       queued = null;
+      unbind();
     },
     onEvent(cb: Listener) {
       listeners.add(cb);

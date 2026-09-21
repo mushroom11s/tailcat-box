@@ -90,6 +90,10 @@ export function SendChatFile(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendChatFile'](arg1, arg2, arg3);
 }
 
+export function SendChatSignal(arg1) {
+  return window['go']['main']['App']['SendChatSignal'](arg1);
+}
+
 export function SendChatText(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendChatText'](arg1, arg2, arg3);
 }

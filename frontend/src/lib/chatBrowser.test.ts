@@ -44,6 +44,27 @@ describe("browser hub", () => {
     expect(messages[0]?.audio).toBe(btoa("\u0001\u0002"));
   });
 
+  it("delivers a signal envelope from one fake room to the other", async () => {
+    const a = createBrowserHub();
+    const b = createBrowserHub();
+    const addrA = (await a.start("sig-a", "")).address;
+    const addrB = (await b.start("sig-b", "")).address;
+    await a.connect(addrB);
+    await b.connect(addrA);
+    const events: Array<{ Kind: string; Data?: string }> = [];
+    b.onEvent((ev) => events.push(ev));
+    const meta = JSON.stringify({
+      v: 1,
+      type: "rtc-offer",
+      mode: "screen",
+      description: { type: "offer", sdp: "v=0" },
+    });
+    a.sendSignal(meta);
+    expect(events).toEqual([expect.objectContaining({ Kind: "signal", Data: meta })]);
+    a.stop();
+    b.stop();
+  });
+
   it("lets an official peer accept a voice note without answering", async () => {
     const hub = createBrowserHub();
     await hub.start("sess-official", "");
