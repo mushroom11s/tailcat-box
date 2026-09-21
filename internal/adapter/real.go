@@ -2,12 +2,10 @@ package adapter
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"runtime/debug"
 	"sync"
-	"time"
 
 	"github.com/tailscale/tailcat"
 )
@@ -18,11 +16,12 @@ const PipePort uint16 = 1
 
 const maxPipeBytes = 1 << 20
 
-// Real embeds github.com/tailscale/tailcat for Plan 1 pipe serve and dial.
+// Real embeds github.com/tailscale/tailcat for Plan 1 and Plan 2 modes.
 type Real struct {
-	mu     sync.Mutex
-	serves map[string]*serveRun
-	dials  map[string]context.CancelFunc
+	mu       sync.Mutex
+	serves   map[string]*serveRun
+	forwards map[string]*forwardRun
+	cancels  map[string]context.CancelFunc
 }
 
 type serveRun struct {
@@ -30,10 +29,18 @@ type serveRun struct {
 	stop   chan struct{}
 }
 
+type forwardRun struct {
+	client    *tailcat.Client
+	listeners []net.Listener
+	stop      chan struct{}
+	cancel    context.CancelFunc
+}
+
 func NewReal() *Real {
 	return &Real{
-		serves: make(map[string]*serveRun),
-		dials:  make(map[string]context.CancelFunc),
+		serves:   make(map[string]*serveRun),
+		forwards: make(map[string]*forwardRun),
+		cancels:  make(map[string]context.CancelFunc),
 	}
 }
 
@@ -157,10 +164,10 @@ func (r *Real) DialPipe(ctx context.Context, sessionID string, addr string, payl
 	ctx, cancel := context.WithCancel(ctx)
 
 	r.mu.Lock()
-	if prev, ok := r.dials[sessionID]; ok {
+	if prev, ok := r.cancels[sessionID]; ok {
 		prev()
 	}
-	r.dials[sessionID] = cancel
+	r.cancels[sessionID] = cancel
 	r.mu.Unlock()
 
 	go func() {
@@ -168,7 +175,7 @@ func (r *Real) DialPipe(ctx context.Context, sessionID string, addr string, payl
 		defer close(ch)
 		defer func() {
 			r.mu.Lock()
-			delete(r.dials, sessionID)
+			delete(r.cancels, sessionID)
 			r.mu.Unlock()
 		}()
 
@@ -205,39 +212,19 @@ func (r *Real) DialPipe(ctx context.Context, sessionID string, addr string, payl
 	return ch, nil
 }
 
-func (r *Real) StartPortServe(ctx context.Context, sessionID string, mappings []PortMapping) (<-chan Event, error) {
-	return nil, fmt.Errorf("StartPortServe not implemented")
-}
-
-func (r *Real) StartForward(ctx context.Context, sessionID string, serverAddr string, mappings []PortMapping) (<-chan Event, error) {
-	return nil, fmt.Errorf("StartForward not implemented")
-}
-
-func (r *Real) StartBrowse(ctx context.Context, sessionID string, serverAddr string) (<-chan Event, error) {
-	return nil, fmt.Errorf("StartBrowse not implemented")
-}
-
-func (r *Real) StartPing(ctx context.Context, sessionID string, addr string, untilDirect bool, timeout time.Duration) (<-chan Event, error) {
-	return nil, fmt.Errorf("StartPing not implemented")
-}
-
-func (r *Real) ParseAddr(raw string) (string, error) {
-	return "", fmt.Errorf("ParseAddr not implemented")
-}
-
-func (r *Real) ResolveAddr(ctx context.Context, raw string) (string, error) {
-	return "", fmt.Errorf("ResolveAddr not implemented")
-}
-
 func (r *Real) Stop(sessionID string) error {
 	r.mu.Lock()
 	run, ok := r.serves[sessionID]
 	if ok {
 		delete(r.serves, sessionID)
 	}
-	cancel, dialing := r.dials[sessionID]
-	if dialing {
-		delete(r.dials, sessionID)
+	fwd, forwarding := r.forwards[sessionID]
+	if forwarding {
+		delete(r.forwards, sessionID)
+	}
+	cancel, canceling := r.cancels[sessionID]
+	if canceling {
+		delete(r.cancels, sessionID)
 	}
 	r.mu.Unlock()
 
@@ -251,7 +238,23 @@ func (r *Real) Stop(sessionID string) error {
 			_ = run.server.Close()
 		}
 	}
-	if dialing && cancel != nil {
+	if forwarding {
+		select {
+		case <-fwd.stop:
+		default:
+			close(fwd.stop)
+		}
+		if fwd.cancel != nil {
+			fwd.cancel()
+		}
+		for _, ln := range fwd.listeners {
+			_ = ln.Close()
+		}
+		if fwd.client != nil {
+			_ = fwd.client.Close()
+		}
+	}
+	if canceling && cancel != nil {
 		cancel()
 	}
 	return nil

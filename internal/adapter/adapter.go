@@ -34,6 +34,20 @@ type PortMapping struct {
 	RemotePort uint16
 }
 
+func (m PortMapping) destHost() string {
+	if m.RemoteHost == "" {
+		return "localhost"
+	}
+	return m.RemoteHost
+}
+
+func (m PortMapping) destPort() uint16 {
+	if m.RemotePort != 0 {
+		return m.RemotePort
+	}
+	return m.LocalPort
+}
+
 type TailcatAdapter interface {
 	// StartPipeServe begins an ephemeral server; emits EventReady with Address, then EventData/Closed/Error.
 	StartPipeServe(ctx context.Context, sessionID string) (<-chan Event, error)
