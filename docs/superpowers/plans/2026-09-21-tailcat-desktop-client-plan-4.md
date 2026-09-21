@@ -53,40 +53,40 @@ Out of scope: Android; perfect system Liquid Glass APIs; tracking every future u
 
 - Kinds and fake StartSSHServe / StartSSHClient / StartSOCKS / StartExitNode / StartExec
 - Fake addresses deterministic; danger flags surfaced in Session metadata or options
-- [ ] Commit `feat: session and adapter stubs for Plan 4 modes`
+- [x] Commit `feat: session and adapter stubs for Plan 4 modes`
 
 ### Task 2: Service + danger confirmations (TDD)
 
 - Service methods; refuse no-auth-ssh without explicit `confirmDangerous: true` (or equivalent)
-- [ ] Commit `feat: service methods and danger gates for SSH SOCKS exit exec`
+- [x] Commit `feat: service methods and danger gates for SSH SOCKS exit exec`
 
 ### Task 3: Wails bindings
 
 - Expose new APIs; regenerate bindings
-- [ ] Commit `feat: Wails bindings for Plan 4`
+- [x] Commit `feat: Wails bindings for Plan 4`
 
 ### Task 4: UI — Services (SSH serve, exit-node, exec) + Connect (SSH client, SOCKS)
 
 - Glass forms; i18n keys for all new strings (en + zh-CN)
 - Danger modal for no-auth-ssh
-- [ ] Commit `feat: UI for SSH SOCKS exit-node exec`
+- [x] Commit `feat: UI for SSH SOCKS exit-node exec`
 
 ### Task 5: Keys — DERP / region settings
 
 - Persist app settings for region / derpmap URL; pass into adapter starts where library supports
-- [ ] Commit `feat: DERP region settings in Keys`
+- [x] Commit `feat: DERP region settings in Keys`
 
 ### Task 6: System tray
 
 - Tray icon when app running; menu: Open, list/count active sessions if cheap, Quit
 - Document macOS/Windows notes; Linux best-effort
-- [ ] Commit `feat: system tray for running sessions`
+- [x] Commit `feat: system tray for running sessions`
 
 ### Task 7: Real adapter + docs
 
 - Wire pinned Tailcat APIs; `go test ./...` + frontend build green
 - Update plans README; Diagnostics “not yet wired” cleared for these modes
-- [ ] Open PR `Plan 4: SSH SOCKS exit-node exec DERP tray`
+- [x] Open PR `Plan 4: SSH SOCKS exit-node exec DERP tray`
 
 ## Acceptance
 
