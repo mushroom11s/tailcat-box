@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent } from "react";
 import { ClipboardSetText, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
+import VoiceNote from "../components/VoiceNote";
 import { useI18n } from "../i18n";
 import { localizeChatError, systemText } from "../lib/chatText";
+import { startVoiceCapture, type VoiceCapture } from "../lib/voiceCapture";
 import { hasWailsBindings, selectFiles } from "../lib/wails";
 
 export type ChatMessage = {
@@ -18,6 +20,8 @@ export type ChatMessage = {
   ttlSec?: number;
   preview?: string;
   fileId?: string;
+  duration?: number;
+  audio?: string;
 };
 
 export type ChatTransfer = {
@@ -39,6 +43,10 @@ type Props = {
   roomError: string;
   onConnect: (addr: string) => Promise<void>;
   onSend: (body: string, burn: boolean, ttlSec: number) => Promise<void>;
+  onSendVoice?: (mime: string, durationSec: number, audio: Uint8Array, burn: boolean, ttlSec: number) => Promise<void>;
+  startCapture?: () => Promise<VoiceCapture>;
+  canPlayMime?: (mime: string) => boolean;
+  decodeVoice?: (mime: string, audio: string) => Promise<string | null>;
   onSendPath?: (path: string, burn: boolean, ttlSec: number) => Promise<string>;
   onSendBrowserFile?: (file: File, burn: boolean, ttlSec: number) => Promise<string>;
   onDiscard?: (id: string) => Promise<void>;
@@ -83,6 +91,10 @@ export default function ChatPage({
   roomError,
   onConnect,
   onSend,
+  onSendVoice,
+  startCapture,
+  canPlayMime,
+  decodeVoice,
   onSendPath,
   onSendBrowserFile,
   onDiscard,
@@ -100,6 +112,12 @@ export default function ChatPage({
   const [notice, setNotice] = useState("");
   const [burnMode, setBurnMode] = useState("off");
   const [viewer, setViewer] = useState<{ id: string; left: number | null } | null>(null);
+  const [recording, setRecording] = useState(false);
+  const captureRef = useRef<VoiceCapture | null>(null);
+  const holdRef = useRef<number | null>(null);
+  const pendingRef = useRef(false);
+  const stopEarlyRef = useRef(false);
+  const recordSource = useRef<"button" | "enter" | null>(null);
   burnRef.current = burnMode;
 
   async function reportStatus(status: string): Promise<void> {
@@ -245,12 +263,122 @@ export default function ChatPage({
     }
   }
 
+  useEffect(() => {
+    return () => {
+      if (holdRef.current != null) {
+        window.clearTimeout(holdRef.current);
+      }
+      void captureRef.current?.stop();
+      captureRef.current = null;
+    };
+  }, []);
+
+  async function beginRecording(source: "button" | "enter"): Promise<void> {
+    if (pendingRef.current || captureRef.current) {
+      return;
+    }
+    if (!peer) {
+      peerRef.current?.focus();
+      return;
+    }
+    pendingRef.current = true;
+    stopEarlyRef.current = false;
+    recordSource.current = source;
+    try {
+      const capture = await (startCapture ?? startVoiceCapture)();
+      if (stopEarlyRef.current) {
+        await capture.stop();
+        recordSource.current = null;
+        return;
+      }
+      captureRef.current = capture;
+      setRecording(true);
+    } catch (err) {
+      recordSource.current = null;
+      const message = err instanceof Error ? err.message : String(err);
+      setInline(localizeChatError(message, t) || message);
+    } finally {
+      pendingRef.current = false;
+    }
+  }
+
+  async function finishRecording(): Promise<void> {
+    const capture = captureRef.current;
+    captureRef.current = null;
+    recordSource.current = null;
+    setRecording(false);
+    if (!capture) {
+      return;
+    }
+    try {
+      const take = await capture.stop();
+      if (take.audio.length === 0) {
+        return;
+      }
+      const choice = burnChoice(burnRef.current);
+      await onSendVoice?.(take.mime, take.durationSec, take.audio, choice.burn, choice.ttl);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setInline(localizeChatError(message, t) || message);
+    }
+  }
+
+  function requestStop(): void {
+    if (pendingRef.current && !captureRef.current) {
+      stopEarlyRef.current = true;
+      return;
+    }
+    void finishRecording();
+  }
+
   function onComposerKey(e: KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key !== "Enter" || e.shiftKey) {
       return;
     }
     e.preventDefault();
-    void send();
+    if (e.repeat) {
+      return;
+    }
+    if (draft.trim()) {
+      void send();
+      return;
+    }
+    if (holdRef.current != null) {
+      return;
+    }
+    holdRef.current = window.setTimeout(() => {
+      holdRef.current = null;
+      void beginRecording("enter");
+    }, 100);
+  }
+
+  function onComposerKeyUp(e: KeyboardEvent<HTMLTextAreaElement>): void {
+    if (e.key !== "Enter" || e.shiftKey) {
+      return;
+    }
+    if (holdRef.current != null) {
+      window.clearTimeout(holdRef.current);
+      holdRef.current = null;
+      return;
+    }
+    if (recordSource.current === "enter") {
+      requestStop();
+    }
+  }
+
+  function onMicDown(e: PointerEvent<HTMLButtonElement> | ReactMouseEvent<HTMLButtonElement>): void {
+    if (e.button !== 0) {
+      return;
+    }
+    e.preventDefault();
+    if ("pointerId" in e) {
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // Pointer capture is unavailable in some test environments.
+      }
+    }
+    void beginRecording("button");
   }
 
   async function attach(): Promise<void> {
@@ -355,6 +483,8 @@ export default function ChatPage({
                   }
                 }}
                 onDelete={() => onDiscard?.(msg.id)}
+                canPlayMime={canPlayMime}
+                decodeVoice={decodeVoice}
               />
             </article>
           ),
@@ -384,12 +514,30 @@ export default function ChatPage({
       </div>
       <div className="field">
         <label htmlFor="chat-composer">{t("chatMessageLabel")}</label>
-        <textarea id="chat-composer" value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onComposerKey} />
+        <textarea
+          id="chat-composer"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={onComposerKey}
+          onKeyUp={onComposerKeyUp}
+        />
       </div>
       {notice ? <p>{notice}</p> : null}
       <div className="row">
         <button className="btn" type="button" onClick={() => attach()}>
           {t("chatAttach")}
+        </button>
+        <button
+          className="btn"
+          type="button"
+          aria-pressed={recording}
+          onPointerDown={onMicDown}
+          onMouseDown={onMicDown}
+          onPointerUp={() => requestStop()}
+          onMouseUp={() => requestStop()}
+          onPointerCancel={() => requestStop()}
+        >
+          {recording ? t("chatRecording") : t("chatRecord")}
         </button>
         <button className="btn" type="button" onClick={() => send()}>
           {t("send")}
@@ -415,6 +563,8 @@ function BubbleBody({
   onClose,
   onSave,
   onDelete,
+  canPlayMime,
+  decodeVoice,
 }: {
   msg: ChatMessage;
   caps: string[];
@@ -424,10 +574,49 @@ function BubbleBody({
   onClose: () => Promise<void>;
   onSave: () => Promise<void>;
   onDelete: () => Promise<void> | void;
+  canPlayMime?: (mime: string) => boolean;
+  decodeVoice?: (mime: string, audio: string) => Promise<string | null>;
 }) {
   const { t } = useI18n();
   const inboundBurn = msg.burn && msg.direction === "in";
   const image = (msg.mime ?? "").startsWith("image/");
+  if (msg.type === "voice") {
+    if (inboundBurn && !open) {
+      return (
+        <div className="chat-actions">
+          <span>{t("chatBurnCollapsed")}</span>
+          <button className="btn" type="button" onClick={onOpen}>
+            {t("chatPlay")}
+          </button>
+        </div>
+      );
+    }
+    return (
+      <>
+        <VoiceNote
+          mime={msg.mime ?? ""}
+          audio={msg.audio ?? ""}
+          autoPlay={msg.direction === "in"}
+          onEnded={() => {
+            if (inboundBurn && !msg.ttlSec) {
+              void onClose();
+            }
+          }}
+          canPlayMime={canPlayMime}
+          decodeVoice={decodeVoice}
+        />
+        {open && left != null ? <p>{left}</p> : null}
+        {open ? (
+          <div className="chat-actions">
+            <button className="btn" type="button" onClick={() => void onClose()}>
+              {t("chatClose")}
+            </button>
+          </div>
+        ) : null}
+        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} onDelete={onDelete} /> : null}
+      </>
+    );
+  }
   if (msg.type === "text" && !inboundBurn) {
     return (
       <>

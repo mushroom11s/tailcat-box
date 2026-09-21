@@ -1,6 +1,7 @@
 import {
   ConnectChatPeer as bindConnectChatPeer,
   CreateKey as bindCreateKey,
+  DecodeChatVoice as bindDecodeChatVoice,
   DeleteKey as bindDeleteKey,
   DiscardChatMessage as bindDiscardChatMessage,
   DialPipe as bindDialPipe,
@@ -20,6 +21,7 @@ import {
   SaveChatFile as bindSaveChatFile,
   SendChatFile as bindSendChatFile,
   SendChatText as bindSendChatText,
+  SendChatVoice as bindSendChatVoice,
   StartChatRoom as bindStartChatRoom,
   StartCopy as bindStartCopy,
   StartFilesServe as bindStartFilesServe,
@@ -617,6 +619,39 @@ export async function connectChatPeer(addr: string): Promise<void> {
     return;
   }
   await fakeConnectChatPeer(addr);
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+export async function sendChatVoice(
+  mime: string,
+  durationSec: number,
+  audio: Uint8Array,
+  burn = false,
+  ttlSec = 0,
+): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSendChatVoice(mime, durationSec, bytesToBase64(audio), burn, ttlSec);
+    return;
+  }
+  await browserChat.sendVoice(mime, durationSec, audio, burn, ttlSec);
+}
+
+export async function decodeChatVoice(mime: string, audioBase64: string): Promise<string> {
+  if (hasWailsBindings()) {
+    return (await bindDecodeChatVoice(mime, audioBase64)) ?? "";
+  }
+  if (mime.includes("wav")) {
+    return audioBase64;
+  }
+  throw new Error("Cannot play this voice message.");
 }
 
 export async function sendChatText(body: string, burn = false, ttlSec = 0): Promise<void> {

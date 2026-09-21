@@ -55,6 +55,8 @@ type Message struct {
 	Burn      bool   `json:"burn,omitempty"`
 	TTLSec    int    `json:"ttlSec,omitempty"`
 	Preview   string `json:"preview,omitempty"`
+	Duration  int    `json:"duration,omitempty"`
+	Audio     string `json:"audio,omitempty"`
 }
 
 type Service struct {
@@ -306,6 +308,8 @@ func (s *Service) onInbound(sessionID string, ev adapter.ChatEvent) {
 		s.onFileChunk(sessionID, meta, payload)
 	case "file-offset":
 		s.deliverOffset(stringField(meta, "id"), asInt(meta["offset"]))
+	case "voice":
+		s.onVoice(sessionID, meta, payload)
 	default:
 		return
 	}

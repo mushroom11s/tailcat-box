@@ -23,6 +23,8 @@ export function localizeChatError(message: string, t: (key: MessageKey) => strin
       return t("chatAddrError");
     case "Could not reach peer. Check the address and that they are online.":
       return t("chatUnreachable");
+    case "Microphone access was denied.":
+      return t("chatMicDenied");
     case "room is starting":
       return "";
     default:

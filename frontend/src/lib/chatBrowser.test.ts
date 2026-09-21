@@ -26,4 +26,32 @@ describe("browser hub", () => {
     const same = await hub.restart("sess-4", `{"fake":"k1"}`);
     expect(same.address).toBe(restarted.address);
   });
+
+  it("sends a voice note and echoes it from the fake peer", async () => {
+    const hub = createBrowserHub();
+    await hub.start("sess-voice", "");
+    await hub.connect("tc:fake-echo");
+    const events: Array<{ Kind: string; Data?: string }> = [];
+    hub.onEvent((ev) => events.push(ev));
+    await hub.sendVoice("audio/webm;codecs=opus", 0, Uint8Array.from([1, 2]), true, 5);
+    const messages = events
+      .filter((ev) => ev.Kind === "message")
+      .map((ev) => JSON.parse(ev.Data ?? "{}") as { direction: string; type: string; duration: number; burn?: boolean; audio: string });
+    expect(messages).toEqual([
+      expect.objectContaining({ direction: "out", type: "voice", duration: 1, burn: true, audio: messages[0]?.audio }),
+      expect.objectContaining({ direction: "in", type: "voice", duration: 1, burn: true, audio: messages[0]?.audio }),
+    ]);
+    expect(messages[0]?.audio).toBe(btoa("\u0001\u0002"));
+  });
+
+  it("lets an official peer accept a voice note without answering", async () => {
+    const hub = createBrowserHub();
+    await hub.start("sess-official", "");
+    await hub.connect("tc:fake-official");
+    const events: Array<{ Kind: string; Data?: string }> = [];
+    hub.onEvent((ev) => events.push(ev));
+    await hub.sendVoice("audio/pcm;rate=48000;channels=1", 3, Uint8Array.from([0, 1]), false, 0);
+    const messages = events.filter((ev) => ev.Kind === "message").map((ev) => JSON.parse(ev.Data ?? "{}") as { direction: string });
+    expect(messages).toEqual([expect.objectContaining({ direction: "out", type: "voice", duration: 3 })]);
+  });
 });

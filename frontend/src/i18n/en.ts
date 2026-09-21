@@ -273,6 +273,12 @@ export const en = {
   chatReplacedQueue: "Replaced the queued file.",
   chatFileVerify: "File failed verification.",
   chatResend: "Resend",
+  chatRecord: "Record voice note",
+  chatRecording: "Recording",
+  chatVoiceReceived: "Voice received — tap play",
+  chatVoiceUnplayable: "Cannot play this voice message.",
+  chatMicDenied: "Microphone access was denied.",
+  chatPlay: "Play",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -12,6 +12,8 @@ export type BrowserMessage = {
   ttlSec?: number;
   preview?: string;
   fileId?: string;
+  duration?: number;
+  audio?: string;
 };
 
 export type BrowserFile = {
@@ -197,6 +199,41 @@ export function createBrowserHub() {
       emit({ Kind: "message", SessionID: sessionID, Data: JSON.stringify(out) });
       if (peer === "tc:fake-echo") {
         const inbound = message("in", "text", "echo");
+        emit({ Kind: "message", SessionID: sessionID, Data: JSON.stringify(inbound) });
+      }
+    },
+    async sendVoice(mime: string, duration: number, audio: Uint8Array, burn = false, ttl = 0) {
+      if (!peer) {
+        throw new Error("no peer");
+      }
+      if (peer !== "tc:fake-echo" && peer !== "tc:fake-official" && peer !== "tc:fake-box" && peer !== "tc:fake-resume") {
+        throw new Error("Could not reach peer. Check the address and that they are online.");
+      }
+      const ttlSec = burn ? Math.max(0, Math.min(30, ttl)) : 0;
+      const dur = Math.max(1, Math.round(duration) || 1);
+      let binary = "";
+      audio.forEach((b) => {
+        binary += String.fromCharCode(b);
+      });
+      const encoded = btoa(binary);
+      const out = message("out", "voice", "");
+      out.mime = mime;
+      out.duration = dur;
+      out.audio = encoded;
+      if (burn) {
+        out.burn = true;
+        out.ttlSec = ttlSec;
+      }
+      emit({ Kind: "message", SessionID: sessionID, Data: JSON.stringify(out) });
+      if (peer === "tc:fake-echo") {
+        const inbound = message("in", "voice", "");
+        inbound.mime = mime;
+        inbound.duration = dur;
+        inbound.audio = encoded;
+        if (burn) {
+          inbound.burn = true;
+          inbound.ttlSec = ttlSec;
+        }
         emit({ Kind: "message", SessionID: sessionID, Data: JSON.stringify(inbound) });
       }
     },

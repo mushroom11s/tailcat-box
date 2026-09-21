@@ -20,6 +20,7 @@ import {
   sendChatFile,
   sendChatFileBytes,
   sendChatText,
+  sendChatVoice,
   setNetworkSettings,
   startChatRoom,
   startPing,
@@ -325,6 +326,7 @@ export default function App() {
             roomError={roomError}
             onConnect={connectChatPeer}
             onSend={sendChatText}
+            onSendVoice={sendChatVoice}
             onSendPath={sendChatFile}
             onSendBrowserFile={sendChatFileBytes}
             onDiscard={discardChatMessage}

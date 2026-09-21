@@ -337,6 +337,16 @@ func (a *App) SendChatFile(path string, burn bool, ttlSec int) (string, error) {
 	return a.chat.SendFile(path, burn, ttlSec)
 }
 
+// SendChatVoice sends a port 103 voice note. Burn follows the composer choice.
+func (a *App) SendChatVoice(mime string, durationSec int, audio []byte, burn bool, ttlSec int) error {
+	return a.chat.SendVoice(mime, durationSec, audio, burn, ttlSec)
+}
+
+// DecodeChatVoice turns a voice payload the webview cannot play into WAV bytes.
+func (a *App) DecodeChatVoice(mime string, audio []byte) ([]byte, error) {
+	return chat.DecodeVoiceWAV(mime, audio)
+}
+
 func (a *App) DiscardChatMessage(id string) error {
 	return a.chat.Discard(id)
 }

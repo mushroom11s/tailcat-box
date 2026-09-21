@@ -275,4 +275,10 @@ export const zhCN = {
   chatReplacedQueue: "已替换排队中的文件。",
   chatFileVerify: "文件校验失败。",
   chatResend: "重新发送",
+  chatRecord: "按住说话",
+  chatRecording: "正在录音",
+  chatVoiceReceived: "收到语音，点一下播放",
+  chatVoiceUnplayable: "这条语音没法播放。",
+  chatMicDenied: "没有麦克风权限。",
+  chatPlay: "播放",
 } as const satisfies Record<MessageKey, string>;

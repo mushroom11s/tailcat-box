@@ -10,6 +10,10 @@ export function CreateKey(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateKey'](arg1, arg2, arg3);
 }
 
+export function DecodeChatVoice(arg1, arg2) {
+  return window['go']['main']['App']['DecodeChatVoice'](arg1, arg2);
+}
+
 export function DeleteKey(arg1) {
   return window['go']['main']['App']['DeleteKey'](arg1);
 }
@@ -88,6 +92,10 @@ export function SendChatFile(arg1, arg2, arg3) {
 
 export function SendChatText(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendChatText'](arg1, arg2, arg3);
+}
+
+export function SendChatVoice(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SendChatVoice'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SetLaunchAtLogin(arg1) {

@@ -9,6 +9,8 @@ export function ConnectChatPeer(arg1:string):Promise<void>;
 
 export function CreateKey(arg1:string,arg2:boolean,arg3:string):Promise<string>;
 
+export function DecodeChatVoice(arg1:string,arg2:string):Promise<string>;
+
 export function DeleteKey(arg1:string):Promise<void>;
 
 export function DiscardChatMessage(arg1:string):Promise<void>;
@@ -48,6 +50,8 @@ export function SelectFiles(arg1:string):Promise<Array<string>>;
 export function SendChatFile(arg1:string,arg2:boolean,arg3:number):Promise<string>;
 
 export function SendChatText(arg1:string,arg2:boolean,arg3:number):Promise<void>;
+
+export function SendChatVoice(arg1:string,arg2:number,arg3:string,arg4:boolean,arg5:number):Promise<void>;
 
 export function SetLaunchAtLogin(arg1:boolean):Promise<main.SystemInfo>;
 
