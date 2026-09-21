@@ -520,7 +520,11 @@ async function fakeStartSOCKS(addr: string, listen: string): Promise<Session> {
     if (!current) {
       return;
     }
-    if (![...fake.peers.values()].includes(addr) && !addr.startsWith("tc:fake-port-")) {
+    if (
+      ![...fake.peers.values()].includes(addr) &&
+      !addr.startsWith("tc:fake-port-") &&
+      !addr.startsWith("tc:fake-exit-")
+    ) {
       current.Status = "error";
       current.Err = "unknown fake serve";
       emitFake({ SessionID: current.ID, Kind: "error", Err: current.Err });
