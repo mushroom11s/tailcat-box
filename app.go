@@ -138,3 +138,39 @@ func (a *App) StopSession(id string) error {
 func (a *App) ListSessions() []session.Session {
 	return a.svc.List()
 }
+
+// StartRecv starts a write-only receive inbox (CLI `recv`).
+func (a *App) StartRecv(inboxDir string, acceptDirs bool) (session.Session, error) {
+	return a.svc.StartRecv(inboxDir, acceptDirs)
+}
+
+// StartCopy sends local files to a peer (CLI `cp`).
+func (a *App) StartCopy(addr string, localPaths []string, remotePath string) (session.Session, error) {
+	return a.svc.StartCopy(addr, localPaths, remotePath)
+}
+
+// StartFilesServe serves a directory over SFTP (CLI `serve files`).
+func (a *App) StartFilesServe(rootDir string, mode string) (session.Session, error) {
+	return a.svc.StartFilesServe(rootDir, adapter.FilesServeOpts{Mode: adapter.FileServeMode(mode)})
+}
+
+// ListRemote lists a remote path on a files peer (CLI `ls`).
+func (a *App) ListRemote(addr string, path string) ([]adapter.FileEntry, error) {
+	return a.svc.ListRemote(addr, path)
+}
+
+// SelectDirectory opens a native folder picker when a window is available.
+func (a *App) SelectDirectory(title string) (string, error) {
+	if a.ctx == nil {
+		return "", fmt.Errorf("directory picker requires a running window")
+	}
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
+}
+
+// SelectFiles opens a native multi-file picker when a window is available.
+func (a *App) SelectFiles(title string) ([]string, error) {
+	if a.ctx == nil {
+		return nil, fmt.Errorf("file picker requires a running window")
+	}
+	return runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
+}

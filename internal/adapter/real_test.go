@@ -38,3 +38,20 @@ func TestRealPortServeRequiresMappings(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestRealFilesValidation(t *testing.T) {
+	r := adapter.NewReal()
+	ctx := context.Background()
+	if _, err := r.StartFilesServe(ctx, "s", "", adapter.FilesServeOpts{}); err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("files serve err=%v", err)
+	}
+	if _, err := r.StartRecv(ctx, "s", "", false); err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("recv err=%v", err)
+	}
+	if _, err := r.StartCopy(ctx, "s", "", nil, "."); err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("copy err=%v", err)
+	}
+	if _, err := r.ListRemote(ctx, "", "."); err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("ls err=%v", err)
+	}
+}

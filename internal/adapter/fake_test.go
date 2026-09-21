@@ -202,3 +202,107 @@ func TestFakeParseAndResolve(t *testing.T) {
 		t.Fatal("expected empty parse error")
 	}
 }
+
+func TestFakeRecvReadyAndDrop(t *testing.T) {
+	f := adapter.NewFake()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	ch, err := f.StartRecv(ctx, "r1", t.TempDir(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case ev := <-ch:
+		if ev.Kind != adapter.EventReady {
+			t.Fatalf("%+v", ev)
+		}
+		want := "tc:fake-recv-r1"
+		if ev.Address != want {
+			t.Fatalf("address=%q want=%q", ev.Address, want)
+		}
+	case <-ctx.Done():
+		t.Fatal("timeout ready")
+	}
+	select {
+	case ev := <-ch:
+		if ev.Kind != adapter.EventData {
+			t.Fatalf("drop event=%+v", ev)
+		}
+		if ev.Data == "" {
+			t.Fatal("expected drop notification")
+		}
+	case <-ctx.Done():
+		t.Fatal("timeout drop")
+	}
+}
+
+func TestFakeFilesServeAndListAndCopy(t *testing.T) {
+	f := adapter.NewFake()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	serveCh, err := f.StartFilesServe(ctx, "fs1", t.TempDir(), adapter.FilesServeOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var addr string
+	select {
+	case ev := <-serveCh:
+		if ev.Kind != adapter.EventReady {
+			t.Fatalf("%+v", ev)
+		}
+		addr = ev.Address
+		if addr != "tc:fake-files-fs1" {
+			t.Fatalf("address=%q", addr)
+		}
+	case <-ctx.Done():
+		t.Fatal("timeout ready")
+	}
+
+	entries, err := f.ListRemote(ctx, addr, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) < 2 {
+		t.Fatalf("entries=%+v", entries)
+	}
+	var sawFile, sawDir bool
+	for _, e := range entries {
+		if e.Name == "hello.txt" && !e.IsDir {
+			sawFile = true
+		}
+		if e.Name == "photos" && e.IsDir {
+			sawDir = true
+		}
+	}
+	if !sawFile || !sawDir {
+		t.Fatalf("entries=%+v", entries)
+	}
+
+	copyCh, err := f.StartCopy(ctx, "c1", addr, []string{"/tmp/a.txt"}, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := collectUntilClosed(t, ctx, copyCh)
+	var progress bool
+	var closed bool
+	for _, ev := range events {
+		if ev.Kind == adapter.EventData && ev.Data != "" {
+			progress = true
+		}
+		if ev.Kind == adapter.EventClosed {
+			closed = true
+		}
+	}
+	if !progress || !closed {
+		t.Fatalf("copy events=%+v", events)
+	}
+}
+
+func TestFakeListRemoteUnknownServe(t *testing.T) {
+	f := adapter.NewFake()
+	if _, err := f.ListRemote(context.Background(), "tc:unknown", "."); err == nil {
+		t.Fatal("expected error")
+	}
+}

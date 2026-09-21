@@ -9,15 +9,19 @@ import (
 )
 
 type Fake struct {
-	mu    sync.Mutex
-	stops map[string]chan struct{}
-	ports map[string]string // sessionID -> tc:fake-port-<id>
+	mu     sync.Mutex
+	stops  map[string]chan struct{}
+	ports  map[string]string // sessionID -> tc:fake-port-<id>
+	files  map[string]string // sessionID -> tc:fake-files-<id> or tc:fake-recv-<id>
+	drops  map[string]int
 }
 
 func NewFake() *Fake {
 	return &Fake{
 		stops: make(map[string]chan struct{}),
 		ports: make(map[string]string),
+		files: make(map[string]string),
+		drops: make(map[string]int),
 	}
 }
 
@@ -33,6 +37,7 @@ func (f *Fake) untrack(sessionID string) {
 	f.mu.Lock()
 	delete(f.stops, sessionID)
 	delete(f.ports, sessionID)
+	delete(f.files, sessionID)
 	f.mu.Unlock()
 }
 

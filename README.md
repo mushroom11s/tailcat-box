@@ -6,18 +6,21 @@ Full-featured desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/t
 
 **Plan 2 status: complete.** Services can serve TCP port mappings; Connect can forward local ports and browse a served HTTP port; Keys & Addresses can create/list/delete named keys and parse/resolve addresses; Diagnostics can ping (including until-direct).
 
+**Plan 3 status: complete.** Files can recv into an inbox, send/copy to a peer, serve a directory over SFTP, and list remote paths (fake + real adapter). Session lists stay visually stable across poll refreshes.
+
 - Shell: [Wails](https://wails.io) v2 (Go + React + TypeScript)
 - Engine: embedded `github.com/tailscale/tailcat` (UI never imports Tailcat types)
 - UI: Apple-inspired / Liquid Glass style (CSS blur/translucency; light/dark)
 - Android: planned later (not v1)
 
-Plans 3–4 (files, SSH, SOCKS, exit-node, exec, tray) are not implemented.
+Plan 4 (SSH, SOCKS, exit-node, exec, tray) is not implemented.
 
 ## Docs
 
 - [Design spec](docs/superpowers/specs/2026-09-21-tailcat-desktop-client-design.md)
 - [Plan 1: Foundation vertical slice](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-1.md)
 - [Plan 2: Ports, keys, ping](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-2.md)
+- [Plan 3: Files](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-3.md)
 - [Plans index](docs/superpowers/plans/README.md)
 
 ## Prerequisites
@@ -49,8 +52,8 @@ TAILCAT_ADAPTER=fake wails dev
 
 | Mode | How | Behavior |
 | --- | --- | --- |
-| **Real** (default) | `wails dev` / `wails build` | Serve prints a `tc…` address; Connect dials TCP port **1** (same port as bare `tailcat <addr>`). Port serve proxies mapped TCP ports; forward/browse listen on localhost; ping uses disco pings (DERP then direct when possible). Parse/resolve call the library. |
-| **Fake** | `TAILCAT_ADAPTER=fake` | Pipe address is `tc:fake-<sessionID>`; port serve is `tc:fake-port-<sessionID>`; dial replies with `echo:<payload>`; ping emits DERP then direct `EventData` lines. Parse returns stub JSON; resolve returns `tc:fake-resolved`. No network. |
+| **Real** (default) | `wails dev` / `wails build` | Serve prints a `tc…` address; Connect dials TCP port **1** (same port as bare `tailcat <addr>`). Port serve proxies mapped TCP ports; forward/browse listen on localhost; ping uses disco pings (DERP then direct when possible). Files recv/serve use SFTP on TCP port **22** (`SSHConnHandler` + `FileService`); copy/ls speak SFTP over that port. Parse/resolve call the library. |
+| **Fake** | `TAILCAT_ADAPTER=fake` | Pipe address is `tc:fake-<sessionID>`; port serve is `tc:fake-port-<sessionID>`; dial replies with `echo:<payload>`; ping emits DERP then direct `EventData` lines. Recv is `tc:fake-recv-<sessionID>` and emits a drop notification; files serve is `tc:fake-files-<sessionID>`; copy emits progress then closes; ls returns stub `hello.txt` and `photos/`. Parse returns stub JSON; resolve returns `tc:fake-resolved`. No network. |
 
 `vite` / `npm run dev` without Wails has no Go bindings. The UI then uses an in-browser fake that matches the Go fake, and shows an “In-browser fake adapter” chip.
 
@@ -156,11 +159,31 @@ Manual on **macOS or Windows** (cannot be fully exercised as a native Wails wind
 - [ ] Diagnostics → ping with until-direct → EventData log shows progress lines
 - [ ] Repeat port/forward/ping with the real adapter (default) on a normal network
 
+## Plan 3 acceptance
+
+Automated (this repo / CI-friendly):
+
+- [x] `go test ./...` without the `integration` tag
+- [x] Fake adapter env override (`TAILCAT_ADAPTER=fake`)
+- [x] Real adapter compiles; default is `NewReal()`
+- [x] Frontend `npm run build`
+- [x] Isolation: only `internal/adapter` imports `github.com/tailscale/tailcat`
+- [x] Recv / copy / files-serve / list-remote on the fake path
+- [x] Session list order is stable across repeated `List()` polls
+- [x] Windows-safe `npm run build` (Node writes `dist/.keep`; no `touch`)
+
+Manual on **macOS or Windows** (cannot be fully exercised as a native Wails window on a headless Linux agent):
+
+- [ ] Files → Start recv inbox → address visible; drop notification / progress on fake
+- [ ] Files → Start files serve → Copy address → List remote shows entries; Send a local file
+- [ ] Services → files-serve shortcut; multi-row session list stays still while polling
+- [ ] Repeat recv/serve/copy with the real adapter (default) on a normal network
+
 ## Layout
 
 - `main.go` / `app.go` — Wails entry and JS bindings
 - `internal/session` — session state machine
-- `internal/service` — StartPipeServe / DialPipe / StartPortServe / StartForward / StartBrowse / StartPing / ParseAddr / ResolveAddr / Stop / List / Events
+- `internal/service` — StartPipeServe / DialPipe / StartPortServe / StartForward / StartBrowse / StartPing / StartRecv / StartCopy / StartFilesServe / ListRemote / ParseAddr / ResolveAddr / Stop / List / Events
 - `internal/store` — named key files (`*.private.json`)
 - `internal/adapter` — `TailcatAdapter` plus fake and real implementations
-- `frontend/` — glass shell, Connect, Services, Keys, Diagnostics
+- `frontend/` — glass shell, Connect, Services, Files, Keys, Diagnostics

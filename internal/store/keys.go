@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -62,6 +63,12 @@ func (s *Store) List() ([]KeyInfo, error) {
 			out = append(out, k)
 		}
 	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Source != out[j].Source {
+			return out[i].Source < out[j].Source
+		}
+		return out[i].Name < out[j].Name
+	})
 	return out, nil
 }
 
