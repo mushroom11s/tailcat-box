@@ -2,6 +2,7 @@ import {
   ConnectChatPeer as bindConnectChatPeer,
   CreateKey as bindCreateKey,
   DeleteKey as bindDeleteKey,
+  DiscardChatMessage as bindDiscardChatMessage,
   DialPipe as bindDialPipe,
   GetNetworkSettings as bindGetNetworkSettings,
   ListKeys as bindListKeys,
@@ -14,7 +15,10 @@ import {
   StartPipeServe as bindStartPipeServe,
   StartPortServe as bindStartPortServe,
   StartRecv as bindStartRecv,
+  ResendChatFile as bindResendChatFile,
   RestartChatRoom as bindRestartChatRoom,
+  SaveChatFile as bindSaveChatFile,
+  SendChatFile as bindSendChatFile,
   SendChatText as bindSendChatText,
   StartChatRoom as bindStartChatRoom,
   StartCopy as bindStartCopy,
@@ -615,12 +619,46 @@ export async function connectChatPeer(addr: string): Promise<void> {
   await fakeConnectChatPeer(addr);
 }
 
-export async function sendChatText(body: string): Promise<void> {
+export async function sendChatText(body: string, burn = false, ttlSec = 0): Promise<void> {
   if (hasWailsBindings()) {
-    await bindSendChatText(body);
+    await bindSendChatText(body, burn, ttlSec);
     return;
   }
-  await fakeSendChatText(body);
+  await fakeSendChatText(body, burn, ttlSec);
+}
+
+export async function sendChatFile(path: string, burn = false, ttlSec = 0): Promise<string> {
+  if (hasWailsBindings()) {
+    return (await bindSendChatFile(path, burn, ttlSec)) ?? "";
+  }
+  throw new Error("file picker requires a running window");
+}
+
+export async function sendChatFileBytes(file: File, burn = false, ttlSec = 0): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return browserChat.sendFile({ name: file.name, mime: file.type || "application/octet-stream", bytes }, burn, ttlSec);
+}
+
+export async function discardChatMessage(id: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindDiscardChatMessage(id);
+    return;
+  }
+  browserChat.discard(id);
+}
+
+export async function resendChatFile(id: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindResendChatFile(id);
+    return;
+  }
+  await browserChat.resend(id);
+}
+
+export async function saveChatFile(id: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSaveChatFile(id);
+  }
 }
 
 export async function restartChatRoom(keyName: string): Promise<Session> {
@@ -748,8 +786,8 @@ async function fakeConnectChatPeer(addr: string): Promise<void> {
   await browserChat.connect(addr);
 }
 
-async function fakeSendChatText(body: string): Promise<void> {
-  await browserChat.sendText(body);
+async function fakeSendChatText(body: string, burn: boolean, ttlSec: number): Promise<void> {
+  await browserChat.sendText(body, burn, ttlSec);
 }
 
 async function fakeRestartChatRoom(keyName: string): Promise<Session> {

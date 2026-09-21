@@ -54,12 +54,12 @@ describe("phase 1 chat shell", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("echo")).toBeTruthy();
     expect(screen.queryByText("hi")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Attach" })).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Chat" }));
     expect(screen.getByText(copied)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Attach" })).toBeNull();
   });
 
   it("keeps the draft when send fails and inserts a newline on Shift+Enter", async () => {

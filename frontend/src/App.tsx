@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import ChatPage, { type ChatMessage } from "./pages/ChatPage";
+import ChatPage, { type ChatMessage, type ChatTransfer } from "./pages/ChatPage";
 import SettingsPage from "./pages/SettingsPage";
 import { sameKeys, sameSessions } from "./lib/snapshot";
 import { useI18n } from "./i18n";
@@ -8,12 +8,17 @@ import {
   connectChatPeer,
   createKey,
   deleteKey,
+  discardChatMessage,
   getNetworkSettings,
   hasWailsBindings,
   listKeys,
   listSessions,
   onTailcatEvent,
+  resendChatFile,
   restartChatRoom,
+  saveChatFile,
+  sendChatFile,
+  sendChatFileBytes,
   sendChatText,
   setNetworkSettings,
   startChatRoom,
@@ -77,11 +82,14 @@ export default function App() {
   const [version, setVersion] = useState("");
   const [chatAddress, setChatAddress] = useState("");
   const [chatPeer, setChatPeer] = useState("");
+  const [chatCaps, setChatCaps] = useState<string[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [transfers, setTransfers] = useState<ChatTransfer[]>([]);
   const [roomError, setRoomError] = useState("");
   const [roomKey, setRoomKey] = useState("");
   const [appliedRoom, setAppliedRoom] = useState({ key: "", region: "", derp: "" });
   const roomKeyRef = useRef("");
+  const peerRef = useRef("");
   const netRef = useRef({ region: "", derp: "" });
   netRef.current = { region, derp: derpMapURL };
   const fallback = !hasWailsBindings();
@@ -135,8 +143,15 @@ export default function App() {
         }
       } else if (ev.Kind === "peer" && ev.Data) {
         try {
-          const data = JSON.parse(ev.Data) as { address?: string };
-          setChatPeer(data.address ?? "");
+          const data = JSON.parse(ev.Data) as { address?: string; caps?: string[] };
+          const next = data.address ?? "";
+          if (Array.isArray(data.caps)) {
+            setChatCaps(data.caps);
+          } else if (next !== peerRef.current) {
+            setChatCaps([]);
+          }
+          peerRef.current = next;
+          setChatPeer(next);
         } catch {
           // ignore malformed event data
         }
@@ -145,8 +160,36 @@ export default function App() {
         if (msg) {
           setChatMessages((prev) => (prev.some((item) => item.id === msg.id) ? prev : [...prev, msg]));
           if (msg.code === "room-restarted") {
+            peerRef.current = "";
             setChatPeer("");
+            setChatCaps([]);
           }
+        }
+      } else if (ev.Kind === "transfer" && ev.Data) {
+        try {
+          const tr = JSON.parse(ev.Data) as ChatTransfer;
+          if (tr.id) {
+            setTransfers((prev) => {
+              const index = prev.findIndex((item) => item.id === tr.id);
+              if (index < 0) {
+                return [...prev, tr];
+              }
+              const next = prev.slice();
+              next[index] = tr;
+              return next;
+            });
+          }
+        } catch {
+          // ignore malformed event data
+        }
+      } else if (ev.Kind === "discard" && ev.Data) {
+        try {
+          const data = JSON.parse(ev.Data) as { id?: string };
+          if (data.id) {
+            setChatMessages((prev) => prev.filter((item) => item.id !== data.id));
+          }
+        } catch {
+          // ignore malformed event data
         }
       }
       void refresh();
@@ -276,10 +319,17 @@ export default function App() {
           <ChatPage
             address={address}
             peer={chatPeer}
+            caps={chatCaps}
             messages={chatMessages}
+            transfers={transfers}
             roomError={roomError}
             onConnect={connectChatPeer}
             onSend={sendChatText}
+            onSendPath={sendChatFile}
+            onSendBrowserFile={sendChatFileBytes}
+            onDiscard={discardChatMessage}
+            onResend={resendChatFile}
+            onSave={saveChatFile}
             onRetry={retryRoom}
           />
         ) : (

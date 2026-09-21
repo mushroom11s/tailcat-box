@@ -10,6 +10,8 @@ export function systemText(code: string | undefined, body: string, t: (key: Mess
       return t("chatRoomRestarted");
     case "bad-frame":
       return t("chatBadFrame");
+    case "file-verify":
+      return t("chatFileVerify");
     default:
       return body;
   }

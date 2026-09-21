@@ -11,6 +11,8 @@ export function CreateKey(arg1:string,arg2:boolean,arg3:string):Promise<string>;
 
 export function DeleteKey(arg1:string):Promise<void>;
 
+export function DiscardChatMessage(arg1:string):Promise<void>;
+
 export function DialPipe(arg1:string,arg2:string):Promise<session.Session>;
 
 export function GetClientInfo():Promise<main.ClientInfo>;
@@ -31,15 +33,21 @@ export function ParseAddr(arg1:string):Promise<string>;
 
 export function RecordUpdateCheck():Promise<main.ClientInfo>;
 
+export function ResendChatFile(arg1:string):Promise<void>;
+
 export function ResolveAddr(arg1:string):Promise<string>;
 
 export function RestartChatRoom(arg1:string):Promise<session.Session>;
+
+export function SaveChatFile(arg1:string):Promise<void>;
 
 export function SelectDirectory(arg1:string):Promise<string>;
 
 export function SelectFiles(arg1:string):Promise<Array<string>>;
 
-export function SendChatText(arg1:string):Promise<void>;
+export function SendChatFile(arg1:string,arg2:boolean,arg3:number):Promise<string>;
+
+export function SendChatText(arg1:string,arg2:boolean,arg3:number):Promise<void>;
 
 export function SetLaunchAtLogin(arg1:boolean):Promise<main.SystemInfo>;
 

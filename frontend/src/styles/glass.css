@@ -842,6 +842,29 @@ textarea {
   font-size: 12px;
   opacity: 0.75;
 }
+.chat-page {
+  --wails-drop-target: drop;
+}
+.chat-badge,
+.chat-transfer,
+.chat-file-meta {
+  font-size: 13px;
+}
+.chat-file img,
+.chat-viewer img {
+  display: block;
+  max-width: min(280px, 100%);
+  border-radius: 12px;
+}
+.chat-viewer {
+  margin-top: 8px;
+}
+.chat-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
 
 @media (max-width: 760px) {
   .shell {

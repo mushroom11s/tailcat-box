@@ -14,6 +14,10 @@ export function DeleteKey(arg1) {
   return window['go']['main']['App']['DeleteKey'](arg1);
 }
 
+export function DiscardChatMessage(arg1) {
+  return window['go']['main']['App']['DiscardChatMessage'](arg1);
+}
+
 export function DialPipe(arg1, arg2) {
   return window['go']['main']['App']['DialPipe'](arg1, arg2);
 }
@@ -54,12 +58,20 @@ export function RecordUpdateCheck() {
   return window['go']['main']['App']['RecordUpdateCheck']();
 }
 
+export function ResendChatFile(arg1) {
+  return window['go']['main']['App']['ResendChatFile'](arg1);
+}
+
 export function ResolveAddr(arg1) {
   return window['go']['main']['App']['ResolveAddr'](arg1);
 }
 
 export function RestartChatRoom(arg1) {
   return window['go']['main']['App']['RestartChatRoom'](arg1);
+}
+
+export function SaveChatFile(arg1) {
+  return window['go']['main']['App']['SaveChatFile'](arg1);
 }
 
 export function SelectDirectory(arg1) {
@@ -70,8 +82,12 @@ export function SelectFiles(arg1) {
   return window['go']['main']['App']['SelectFiles'](arg1);
 }
 
-export function SendChatText(arg1) {
-  return window['go']['main']['App']['SendChatText'](arg1);
+export function SendChatFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SendChatFile'](arg1, arg2, arg3);
+}
+
+export function SendChatText(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SendChatText'](arg1, arg2, arg3);
 }
 
 export function SetLaunchAtLogin(arg1) {
