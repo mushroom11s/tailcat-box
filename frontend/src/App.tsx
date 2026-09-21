@@ -20,12 +20,17 @@ import {
   resolveAddr,
   startBrowse,
   startCopy,
+  startExec,
+  startExitNode,
   startFilesServe,
   startForward,
   startPing,
   startPipeServe,
   startPortServe,
   startRecv,
+  startSOCKS,
+  startSSHClient,
+  startSSHServe,
   stopSession,
   type FileEntry,
   type KeyInfo,
@@ -192,6 +197,9 @@ export default function App() {
               })
             }
             onStartFiles={(dir, mode) => void run(() => startFilesServe(dir, mode))}
+            onStartSSH={(noAuth, keys, confirm) => void run(() => startSSHServe(noAuth, keys, confirm))}
+            onStartExitNode={() => void run(startExitNode)}
+            onStartExec={(command) => void run(() => startExec(command))}
             onStop={(id) => void run(() => stopSession(id))}
           />
         ) : null}
@@ -208,6 +216,8 @@ export default function App() {
               })
             }
             onBrowse={(addr) => void run(() => startBrowse(addr))}
+            onSSH={(addr, command, user, identity) => void run(() => startSSHClient(addr, command, user, identity))}
+            onSOCKS={(addr, listen) => void run(() => startSOCKS(addr, listen))}
             onStop={(id) => void run(() => stopSession(id))}
           />
         ) : null}
