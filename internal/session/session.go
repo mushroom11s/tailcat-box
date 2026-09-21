@@ -37,6 +37,7 @@ type Session struct {
 	Address   string
 	CreatedAt time.Time
 	Err       string
+	Progress  string
 }
 
 func New(kind Kind) *Session {
