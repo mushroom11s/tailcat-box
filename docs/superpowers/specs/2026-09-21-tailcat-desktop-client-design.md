@@ -1,7 +1,7 @@
 # Tailcat Desktop Client — Design Spec
 
 **Date:** 2026-09-21  
-**Status:** Draft for user review. Plan 1 foundation slice (pipe serve + dial) is implemented in-tree.  
+**Status:** Plans 1–4 implemented this toolbox. The product goal and primary navigation are superseded by [Tailcat Box (猫砂盆)](2026-09-22-tailcat-box-chat-design.md). This document stays as the record of the shipped Connect / Services / Files / Keys / Diagnostics design.  
 **Product working name:** Tailcat Desktop Client (Mac & Windows)
 
 ## 1. Goal

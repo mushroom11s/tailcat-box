@@ -19,6 +19,7 @@ Full-featured desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/t
 ## Docs
 
 - [Design spec](docs/superpowers/specs/2026-09-21-tailcat-desktop-client-design.md)
+- [Tailcat Box chat design](docs/superpowers/specs/2026-09-22-tailcat-box-chat-design.md)
 - [Plan 1: Foundation vertical slice](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-1.md)
 - [Plan 2: Ports, keys, ping](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-2.md)
 - [Plan 3: Files](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-3.md)
