@@ -68,3 +68,5 @@ export function GetSystemInfo():Promise<main.SystemInfo>;
 export function RecordUpdateCheck():Promise<main.ClientInfo>;
 
 export function SetLaunchAtLogin(arg1:boolean):Promise<main.SystemInfo>;
+
+export function SetUILocale(arg1:string):Promise<void>;

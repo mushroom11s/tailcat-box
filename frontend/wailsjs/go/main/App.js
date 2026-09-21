@@ -129,3 +129,7 @@ export function RecordUpdateCheck() {
 export function SetLaunchAtLogin(arg1) {
   return window['go']['main']['App']['SetLaunchAtLogin'](arg1);
 }
+
+export function SetUILocale(arg1) {
+  return window['go']['main']['App']['SetUILocale'](arg1);
+}

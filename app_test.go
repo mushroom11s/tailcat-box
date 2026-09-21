@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -381,6 +382,47 @@ func TestAppSettingsBindings(t *testing.T) {
 	if !again.LaunchAtLogin {
 		t.Fatal("launch-at-login not reloaded")
 	}
+}
+
+func TestProductTitle(t *testing.T) {
+	if got := productTitle("en"); got != "Tailcat Box" {
+		t.Fatalf("en=%q", got)
+	}
+	if got := productTitle("zh-CN"); got != "猫砂盆" {
+		t.Fatalf("zh-CN=%q", got)
+	}
+	if got := productTitle("zh"); got != "猫砂盆" {
+		t.Fatalf("zh=%q", got)
+	}
+	if got := productTitle(""); got != "Tailcat Box" {
+		t.Fatalf("empty=%q", got)
+	}
+}
+
+func TestChooseConfigDir(t *testing.T) {
+	next := filepath.Join("/cfg", "tailcat-box")
+	legacy := filepath.Join("/cfg", "tailcat-desktop-client")
+	none := func(string) bool { return false }
+	if got := chooseConfigDir("/cfg", "tailcat-box", "tailcat-desktop-client", none); got != next {
+		t.Fatalf("new install=%q", got)
+	}
+	legacyOnly := func(path string) bool { return path == legacy }
+	if got := chooseConfigDir("/cfg", "tailcat-box", "tailcat-desktop-client", legacyOnly); got != legacy {
+		t.Fatalf("legacy install=%q", got)
+	}
+	both := func(string) bool { return true }
+	if got := chooseConfigDir("/cfg", "tailcat-box", "tailcat-desktop-client", both); got != next {
+		t.Fatalf("both present=%q", got)
+	}
+}
+
+func TestSetUILocaleWithoutWindow(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	t.Setenv("TAILCAT_SETTINGS_DIR", t.TempDir())
+	a := NewApp()
+	a.SetUILocale("zh-CN")
+	a.SetUILocale("en")
 }
 
 func TestMaybeRecordDailyUpdateCheck(t *testing.T) {

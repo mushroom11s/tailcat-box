@@ -8,6 +8,7 @@ import SettingsPage from "./pages/SettingsPage";
 import { parsePortMappings } from "./lib/ports";
 import { sameKeys, sameSessions } from "./lib/snapshot";
 import { useI18n } from "./i18n";
+import iconUrl from "./assets/icon.png";
 import {
   createKey,
   deleteKey,
@@ -151,9 +152,9 @@ export default function App() {
     <div className="shell">
       <aside className="glass sidebar">
         <div className="brand">
-          <div className="brand-mark" aria-hidden="true" />
+          <img className="brand-mark" src={iconUrl} alt="" />
           <div>
-            <h1>Tailcat</h1>
+            <h1>{t("productName")}</h1>
             <p>{t("brandTagline")}</p>
           </div>
         </div>
