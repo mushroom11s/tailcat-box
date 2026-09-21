@@ -11,6 +11,12 @@ import {
   StartPing as bindStartPing,
   StartPipeServe as bindStartPipeServe,
   StartPortServe as bindStartPortServe,
+  StartRecv as bindStartRecv,
+  StartCopy as bindStartCopy,
+  StartFilesServe as bindStartFilesServe,
+  ListRemote as bindListRemote,
+  SelectDirectory as bindSelectDirectory,
+  SelectFiles as bindSelectFiles,
   StopSession as bindStopSession,
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
@@ -23,6 +29,7 @@ export type Session = {
   Address: string;
   CreatedAt: string;
   Err: string;
+  Progress: string;
 };
 
 export type TailcatEvent = {
@@ -45,6 +52,14 @@ export type KeyInfo = {
   Client: boolean;
   Address: string;
   Source: string;
+};
+
+export type FileEntry = {
+  Name: string;
+  IsDir: boolean;
+  Size: number;
+  Mode: string;
+  ModTime: string;
 };
 
 const TAILCAT_EVENT = "tailcat:event";
@@ -76,6 +91,7 @@ function asSession(s: session.Session): Session {
     Address: s.Address ?? "",
     CreatedAt: created,
     Err: s.Err ?? "",
+    Progress: s.Progress ?? "",
   };
 }
 
@@ -103,6 +119,7 @@ type FakeState = {
   listeners: Array<(ev: TailcatEvent) => void>;
   serveStops: Map<string, () => void>;
   ports: Map<string, string>;
+  files: Map<string, string>;
 };
 
 const fake: FakeState = {
@@ -111,6 +128,7 @@ const fake: FakeState = {
   listeners: [],
   serveStops: new Map(),
   ports: new Map(),
+  files: new Map(),
 };
 
 function newID(): string {
@@ -120,6 +138,12 @@ function newID(): string {
 }
 
 function emitFake(ev: TailcatEvent): void {
+  if (ev.Kind === "data" && ev.Data) {
+    const current = fake.sessions.find((s) => s.ID === ev.SessionID);
+    if (current) {
+      current.Progress = ev.Data;
+    }
+  }
   for (const listener of fake.listeners) {
     listener(ev);
   }
@@ -142,6 +166,7 @@ function newSess(kind: string, address = ""): Session {
     Address: address,
     CreatedAt: new Date().toISOString(),
     Err: "",
+    Progress: "",
   };
   upsertFake(sess);
   return sess;
@@ -345,6 +370,105 @@ async function fakeDeleteKey(name: string): Promise<void> {
   fake.keys.splice(idx, 1);
 }
 
+async function fakeStartRecv(inboxDir: string): Promise<Session> {
+  if (!inboxDir.trim()) {
+    throw new Error("inbox directory is required");
+  }
+  const sess = newSess("recv");
+  const addr = "tc:fake-recv-" + sess.ID;
+  fake.files.set(sess.ID, addr);
+  const timer = later(() => {
+    const current = fake.sessions.find((s) => s.ID === sess.ID);
+    if (!current || current.Status === "stopped") {
+      return;
+    }
+    current.Status = "running";
+    current.Address = addr;
+    emitFake({ SessionID: current.ID, Kind: "ready", Address: addr });
+    window.setTimeout(() => {
+      const live = fake.sessions.find((s) => s.ID === sess.ID);
+      if (!live || live.Status === "stopped") {
+        return;
+      }
+      emitFake({ SessionID: live.ID, Kind: "data", Data: "received drop.txt" });
+    }, 10);
+  });
+  fake.serveStops.set(sess.ID, () => window.clearTimeout(timer));
+  return { ...sess };
+}
+
+async function fakeStartFilesServe(rootDir: string): Promise<Session> {
+  if (!rootDir.trim()) {
+    throw new Error("directory is required");
+  }
+  const sess = newSess("files_serve");
+  const addr = "tc:fake-files-" + sess.ID;
+  fake.files.set(sess.ID, addr);
+  keepRunning(sess, addr);
+  return { ...sess };
+}
+
+function knownFakeFiles(addr: string): boolean {
+  return [...fake.files.values()].includes(addr);
+}
+
+async function fakeStartCopy(addr: string, localPaths: string[], remotePath: string): Promise<Session> {
+  const sess = newSess("copy", addr);
+  later(() => {
+    const current = fake.sessions.find((s) => s.ID === sess.ID);
+    if (!current) {
+      return;
+    }
+    if (!knownFakeFiles(addr)) {
+      current.Status = "error";
+      current.Err = "unknown fake files serve";
+      emitFake({ SessionID: current.ID, Kind: "error", Err: current.Err });
+      return;
+    }
+    if (localPaths.length === 0) {
+      current.Status = "error";
+      current.Err = "at least one local path is required";
+      emitFake({ SessionID: current.ID, Kind: "error", Err: current.Err });
+      return;
+    }
+    current.Status = "running";
+    emitFake({
+      SessionID: current.ID,
+      Kind: "data",
+      Data: `copied ${localPaths.length}/${localPaths.length} to ${remotePath || "."}`,
+    });
+    current.Status = "stopped";
+    emitFake({ SessionID: current.ID, Kind: "closed" });
+  });
+  return { ...sess };
+}
+
+async function fakeListRemote(addr: string): Promise<FileEntry[]> {
+  if (!knownFakeFiles(addr)) {
+    throw new Error("unknown fake files serve");
+  }
+  return [
+    { Name: "hello.txt", IsDir: false, Size: 12, Mode: "-rw-r--r--", ModTime: "1970-01-01T00:00:00Z" },
+    { Name: "photos", IsDir: true, Size: 0, Mode: "drwxr-xr-x", ModTime: "1970-01-01T00:00:00Z" },
+  ];
+}
+
+function asFileEntry(e: adapter.FileEntry): FileEntry {
+  const mod =
+    typeof e.ModTime === "string"
+      ? e.ModTime
+      : e.ModTime != null
+        ? String(e.ModTime)
+        : "";
+  return {
+    Name: e.Name,
+    IsDir: Boolean(e.IsDir),
+    Size: e.Size ?? 0,
+    Mode: e.Mode ?? "",
+    ModTime: mod,
+  };
+}
+
 export async function startPipeServe(): Promise<Session> {
   if (hasWailsBindings()) {
     return asSession(await bindStartPipeServe());
@@ -422,6 +546,50 @@ export async function deleteKey(name: string): Promise<void> {
     return;
   }
   await fakeDeleteKey(name);
+}
+
+export async function startRecv(inboxDir: string, acceptDirs: boolean): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindStartRecv(inboxDir, acceptDirs));
+  }
+  return fakeStartRecv(inboxDir);
+}
+
+export async function startCopy(addr: string, localPaths: string[], remotePath: string): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindStartCopy(addr, localPaths, remotePath));
+  }
+  return fakeStartCopy(addr, localPaths, remotePath);
+}
+
+export async function startFilesServe(rootDir: string, mode: string): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindStartFilesServe(rootDir, mode));
+  }
+  return fakeStartFilesServe(rootDir);
+}
+
+export async function listRemote(addr: string, path: string): Promise<FileEntry[]> {
+  if (hasWailsBindings()) {
+    const list = await bindListRemote(addr, path);
+    return (list ?? []).map(asFileEntry);
+  }
+  return fakeListRemote(addr);
+}
+
+export async function selectDirectory(title: string): Promise<string> {
+  if (hasWailsBindings()) {
+    return bindSelectDirectory(title);
+  }
+  throw new Error("directory picker requires a running window");
+}
+
+export async function selectFiles(title: string): Promise<string[]> {
+  if (hasWailsBindings()) {
+    const list = await bindSelectFiles(title);
+    return list ?? [];
+  }
+  throw new Error("file picker requires a running window");
 }
 
 export async function stopSession(id: string): Promise<void> {

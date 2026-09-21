@@ -30,4 +30,16 @@ export function StartPipeServe():Promise<session.Session>;
 
 export function StartPortServe(arg1:Array<adapter.PortMapping>):Promise<session.Session>;
 
+export function StartRecv(arg1:string,arg2:boolean):Promise<session.Session>;
+
+export function StartCopy(arg1:string,arg2:Array<string>,arg3:string):Promise<session.Session>;
+
+export function StartFilesServe(arg1:string,arg2:string):Promise<session.Session>;
+
+export function ListRemote(arg1:string,arg2:string):Promise<Array<adapter.FileEntry>>;
+
+export function SelectDirectory(arg1:string):Promise<string>;
+
+export function SelectFiles(arg1:string):Promise<Array<string>>;
+
 export function StopSession(arg1:string):Promise<void>;

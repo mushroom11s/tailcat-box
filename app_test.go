@@ -164,3 +164,66 @@ waitReady:
 		t.Fatal(err)
 	}
 }
+
+func TestAppPlan3Bindings(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	a := NewApp()
+	inbox := t.TempDir()
+	root := t.TempDir()
+
+	recv, err := a.StartRecv(inbox, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recv.Kind != session.KindRecv {
+		t.Fatalf("kind=%s", recv.Kind)
+	}
+
+	serve, err := a.StartFilesServe(root, "ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if serve.Kind != session.KindFilesServe {
+		t.Fatalf("kind=%s", serve.Kind)
+	}
+
+	var addr string
+	deadline := time.After(2 * time.Second)
+waitReady:
+	for {
+		for _, item := range a.ListSessions() {
+			if item.ID == serve.ID && item.Status == session.StatusRunning && item.Address != "" {
+				addr = item.Address
+				break waitReady
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("files serve never ready: %+v", a.ListSessions())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+
+	entries, err := a.ListRemote(addr, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected listing")
+	}
+
+	cp, err := a.StartCopy(addr, []string{"hello.txt"}, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cp.Kind != session.KindCopy {
+		t.Fatalf("kind=%s", cp.Kind)
+	}
+
+	if _, err := a.SelectDirectory("Inbox"); err == nil {
+		t.Fatal("expected picker error without a window")
+	}
+	if _, err := a.SelectFiles("Send"); err == nil {
+		t.Fatal("expected picker error without a window")
+	}
+}

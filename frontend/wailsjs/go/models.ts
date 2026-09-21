@@ -17,6 +17,28 @@ export namespace adapter {
 	    }
 	}
 
+	export class FileEntry {
+	    Name: string;
+	    IsDir: boolean;
+	    Size: number;
+	    Mode: string;
+	    // Go type: time
+	    ModTime: any;
+
+	    static createFrom(source: any = {}) {
+	        return new FileEntry(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Name = source["Name"];
+	        this.IsDir = source["IsDir"];
+	        this.Size = source["Size"];
+	        this.Mode = source["Mode"];
+	        this.ModTime = source["ModTime"];
+	    }
+	}
+
 }
 
 export namespace session {
@@ -29,6 +51,7 @@ export namespace session {
 	    // Go type: time
 	    CreatedAt: any;
 	    Err: string;
+	    Progress: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Session(source);
@@ -42,6 +65,7 @@ export namespace session {
 	        this.Address = source["Address"];
 	        this.CreatedAt = this.convertValues(source["CreatedAt"], null);
 	        this.Err = source["Err"];
+	        this.Progress = source["Progress"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

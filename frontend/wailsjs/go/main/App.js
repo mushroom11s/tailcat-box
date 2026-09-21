@@ -54,6 +54,30 @@ export function StartPortServe(arg1) {
   return window['go']['main']['App']['StartPortServe'](arg1);
 }
 
+export function StartRecv(arg1, arg2) {
+  return window['go']['main']['App']['StartRecv'](arg1, arg2);
+}
+
+export function StartCopy(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartCopy'](arg1, arg2, arg3);
+}
+
+export function StartFilesServe(arg1, arg2) {
+  return window['go']['main']['App']['StartFilesServe'](arg1, arg2);
+}
+
+export function ListRemote(arg1, arg2) {
+  return window['go']['main']['App']['ListRemote'](arg1, arg2);
+}
+
+export function SelectDirectory(arg1) {
+  return window['go']['main']['App']['SelectDirectory'](arg1);
+}
+
+export function SelectFiles(arg1) {
+  return window['go']['main']['App']['SelectFiles'](arg1);
+}
+
 export function StopSession(arg1) {
   return window['go']['main']['App']['StopSession'](arg1);
 }
