@@ -6,13 +6,14 @@ Full-featured desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/t
 
 **Plan 2 status: complete.** Services can serve TCP port mappings; Connect can forward local ports and browse a served HTTP port; Keys & Addresses can create/list/delete named keys and parse/resolve addresses; Diagnostics can ping (including until-direct).
 
-**Plan 3 status: complete.** Files can recv into an inbox, send/copy to a peer, serve a directory over SFTP, and list remote paths (fake + real adapter). Session lists stay visually stable across poll refreshes.
+**Plan 3 status: complete.** Files can recv into an inbox, send/copy to a peer, serve a directory over SFTP, and list remote paths (fake + real adapter). Session lists stay visually stable across poll refreshes. The main pane uses a thin glass scrollbar (light/dark). UI chrome is English or 简体中文 (`zh-CN`) from the language switcher (Settings or sidebar as in current UI; persisted; defaults from the OS/browser locale).
 
 **Plan 4 status: complete.** Services can serve keyed SSH, no-auth SSH (with a typed CONFIRM gate), exit-node, and per-connection exec. Connect can run an SSH command and start a SOCKS5 proxy. Keys can persist DERP region / map URL. A tray/menu offers Open + Quit (native tray on macOS/Windows; Linux uses the app menu).
 
 - Shell: [Wails](https://wails.io) v2 (Go + React + TypeScript)
 - Engine: embedded `github.com/tailscale/tailcat` (UI never imports Tailcat types)
-- UI: Apple-inspired / Liquid Glass style (CSS blur/translucency; light/dark)
+- UI: Apple-inspired / Liquid Glass style (CSS blur/translucency; light/dark; thin glass scrollbars)
+- i18n: English + 简体中文 (`zh-CN`); language switcher next to theme (Settings or sidebar as in current UI); `localStorage` `tailcat-locale`
 - Android: planned later (not v1)
 
 ## Docs
