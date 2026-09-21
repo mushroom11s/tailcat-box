@@ -668,8 +668,8 @@ textarea {
 
 .chip-toggle {
   appearance: none;
-  border: 1px solid var(--glass-border);
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+  background: var(--glass-bg-strong);
   color: var(--muted);
   border-radius: 999px;
   padding: 2px 10px;
