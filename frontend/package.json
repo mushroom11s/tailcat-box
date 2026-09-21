@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && touch dist/.keep",
+    "build": "tsc && vite build && node -e \"require('fs').writeFileSync('dist/.keep','')\"",
     "preview": "vite preview"
   },
   "dependencies": {
