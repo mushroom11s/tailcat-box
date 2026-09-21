@@ -20,6 +20,15 @@ function kindLabel(kind: string): string {
   if (kind === "ping") {
     return "Ping";
   }
+  if (kind === "recv") {
+    return "Recv inbox";
+  }
+  if (kind === "copy") {
+    return "Copy";
+  }
+  if (kind === "files_serve") {
+    return "Files serve";
+  }
   return kind;
 }
 
@@ -67,6 +76,7 @@ export default function SessionCard({ session, onStop }: Props) {
         </div>
       </div>
       {session.Address ? <p className="address">{session.Address}</p> : <p className="empty">No address yet</p>}
+      {session.Progress ? <p className="progress">{session.Progress}</p> : null}
       {session.Err ? <p className="err">{session.Err}</p> : null}
     </article>
   );

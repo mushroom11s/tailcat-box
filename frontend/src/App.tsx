@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ConnectPage from "./pages/ConnectPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
+import FilesPage from "./pages/FilesPage";
 import KeysPage from "./pages/KeysPage";
 import ServicesPage from "./pages/ServicesPage";
 import { parsePortMappings } from "./lib/ports";
@@ -11,30 +12,35 @@ import {
   dialPipe,
   hasWailsBindings,
   listKeys,
+  listRemote,
   listSessions,
   onTailcatEvent,
   parseAddr,
   resolveAddr,
   startBrowse,
+  startCopy,
+  startFilesServe,
   startForward,
   startPing,
   startPipeServe,
   startPortServe,
+  startRecv,
   stopSession,
+  type FileEntry,
   type KeyInfo,
   type Session,
   type TailcatEvent,
 } from "./lib/wails";
 
-type Page = "connect" | "services" | "keys" | "diagnostics";
+type Page = "connect" | "services" | "files" | "keys" | "diagnostics";
 type Theme = "system" | "light" | "dark";
 
 const THEME_KEY = "tailcat-theme";
 
-const NAV: Array<{ id: Page | "files"; label: string; available: boolean }> = [
+const NAV: Array<{ id: Page; label: string; available: boolean }> = [
   { id: "connect", label: "Connect", available: true },
   { id: "services", label: "Services", available: true },
-  { id: "files", label: "Files", available: false },
+  { id: "files", label: "Files", available: true },
   { id: "keys", label: "Keys & Addresses", available: true },
   { id: "diagnostics", label: "Diagnostics", available: true },
 ];
@@ -62,6 +68,7 @@ export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [events, setEvents] = useState<TailcatEvent[]>([]);
+  const [listing, setListing] = useState<FileEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [parseResult, setParseResult] = useState("");
@@ -137,7 +144,7 @@ export default function App() {
               title={item.available ? undefined : "Plan 3+"}
               onClick={() => {
                 if (item.available) {
-                  setPage(item.id as Page);
+                  setPage(item.id);
                   setError("");
                 }
               }}
@@ -175,6 +182,7 @@ export default function App() {
                 await startPortServe(parsePortMappings(spec));
               })
             }
+            onStartFiles={(dir, mode) => void run(() => startFilesServe(dir, mode))}
             onStop={(id) => void run(() => stopSession(id))}
           />
         ) : null}
@@ -191,6 +199,23 @@ export default function App() {
               })
             }
             onBrowse={(addr) => void run(() => startBrowse(addr))}
+            onStop={(id) => void run(() => stopSession(id))}
+          />
+        ) : null}
+        {page === "files" ? (
+          <FilesPage
+            sessions={sessions}
+            listing={listing}
+            busy={busy}
+            error={error}
+            onRecv={(dir, acceptDirs) => void run(() => startRecv(dir, acceptDirs))}
+            onSend={(addr, paths, remote) => void run(() => startCopy(addr, paths, remote))}
+            onServe={(dir, mode) => void run(() => startFilesServe(dir, mode))}
+            onList={(addr, path) =>
+              void run(async () => {
+                setListing(await listRemote(addr, path));
+              })
+            }
             onStop={(id) => void run(() => stopSession(id))}
           />
         ) : null}
