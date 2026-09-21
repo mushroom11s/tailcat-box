@@ -1,32 +1,41 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ConnectPage from "./pages/ConnectPage";
+import DiagnosticsPage from "./pages/DiagnosticsPage";
+import KeysPage from "./pages/KeysPage";
 import ServicesPage from "./pages/ServicesPage";
 import { parsePortMappings } from "./lib/ports";
 import {
+  createKey,
+  deleteKey,
   dialPipe,
   hasWailsBindings,
+  listKeys,
   listSessions,
   onTailcatEvent,
+  parseAddr,
+  resolveAddr,
   startBrowse,
   startForward,
+  startPing,
   startPipeServe,
   startPortServe,
   stopSession,
+  type KeyInfo,
   type Session,
   type TailcatEvent,
 } from "./lib/wails";
 
-type Page = "connect" | "services";
+type Page = "connect" | "services" | "keys" | "diagnostics";
 type Theme = "system" | "light" | "dark";
 
 const THEME_KEY = "tailcat-theme";
 
-const NAV: Array<{ id: Page | "files" | "keys" | "diagnostics"; label: string; available: boolean }> = [
+const NAV: Array<{ id: Page | "files"; label: string; available: boolean }> = [
   { id: "connect", label: "Connect", available: true },
   { id: "services", label: "Services", available: true },
   { id: "files", label: "Files", available: false },
-  { id: "keys", label: "Keys & Addresses", available: false },
-  { id: "diagnostics", label: "Diagnostics", available: false },
+  { id: "keys", label: "Keys & Addresses", available: true },
+  { id: "diagnostics", label: "Diagnostics", available: true },
 ];
 
 function applyTheme(theme: Theme): void {
@@ -50,14 +59,18 @@ export default function App() {
   const [page, setPage] = useState<Page>("services");
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [events, setEvents] = useState<TailcatEvent[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [parseResult, setParseResult] = useState("");
+  const [resolveResult, setResolveResult] = useState("");
   const fallback = !hasWailsBindings();
 
   const refresh = useCallback(async () => {
     try {
       setSessions(await listSessions());
+      setKeys(await listKeys());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -118,7 +131,7 @@ export default function App() {
               type="button"
               className={`nav-btn ${page === item.id ? "active" : ""}`}
               disabled={!item.available}
-              title={item.available ? undefined : "Plan 2+"}
+              title={item.available ? undefined : "Plan 3+"}
               onClick={() => {
                 if (item.available) {
                   setPage(item.id as Page);
@@ -127,7 +140,7 @@ export default function App() {
               }}
             >
               {item.label}
-              {!item.available ? <span className="nav-hint">Plan 2+</span> : null}
+              {!item.available ? <span className="nav-hint">Plan 3+</span> : null}
             </button>
           ))}
         </nav>
@@ -161,7 +174,8 @@ export default function App() {
             }
             onStop={(id) => void run(() => stopSession(id))}
           />
-        ) : (
+        ) : null}
+        {page === "connect" ? (
           <ConnectPage
             sessions={sessions}
             echo={echo}
@@ -176,7 +190,38 @@ export default function App() {
             onBrowse={(addr) => void run(() => startBrowse(addr))}
             onStop={(id) => void run(() => stopSession(id))}
           />
-        )}
+        ) : null}
+        {page === "keys" ? (
+          <KeysPage
+            keys={keys}
+            busy={busy}
+            error={error}
+            parseResult={parseResult}
+            resolveResult={resolveResult}
+            onCreate={(name, client, region) => void run(() => createKey(name, client, region))}
+            onDelete={(name) => void run(() => deleteKey(name))}
+            onParse={(raw) =>
+              void run(async () => {
+                setParseResult(await parseAddr(raw));
+              })
+            }
+            onResolve={(raw) =>
+              void run(async () => {
+                setResolveResult(await resolveAddr(raw));
+              })
+            }
+          />
+        ) : null}
+        {page === "diagnostics" ? (
+          <DiagnosticsPage
+            sessions={sessions}
+            events={events}
+            busy={busy}
+            error={error}
+            onPing={(addr, untilDirect) => void run(() => startPing(addr, untilDirect))}
+            onStop={(id) => void run(() => stopSession(id))}
+          />
+        ) : null}
       </main>
     </div>
   );
