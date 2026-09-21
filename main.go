@@ -17,9 +17,9 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "tailcat-desktop-client",
-		Width:  1024,
-		Height: 768,
+		Title:  "Tailcat",
+		Width:  1100,
+		Height: 760,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
