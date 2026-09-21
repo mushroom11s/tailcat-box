@@ -584,6 +584,18 @@ textarea {
   overflow: auto;
 }
 
+.cap-list {
+  margin: 0 0 16px;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: left;
+}
+
+.cap-list li {
+  margin: 4px 0;
+}
+
 .keys {
   display: flex;
   flex-direction: column;

@@ -34,6 +34,7 @@ import {
   startSSHClient,
   startSSHServe,
   stopSession,
+  tailcatVersion,
   type FileEntry,
   type KeyInfo,
   type Session,
@@ -84,6 +85,7 @@ export default function App() {
   const [resolveResult, setResolveResult] = useState("");
   const [region, setRegion] = useState("");
   const [derpMapURL, setDerpMapURL] = useState("");
+  const [version, setVersion] = useState("");
   const fallback = !hasWailsBindings();
 
   const refresh = useCallback(async () => {
@@ -91,10 +93,12 @@ export default function App() {
       const nextSessions = await listSessions();
       const nextKeys = await listKeys();
       const net = await getNetworkSettings();
+      const ver = await tailcatVersion();
       setSessions((prev) => (sameSessions(prev, nextSessions) ? prev : nextSessions));
       setKeys((prev) => (sameKeys(prev, nextKeys) ? prev : nextKeys));
       setRegion((prev) => (prev === net.Region ? prev : net.Region));
       setDerpMapURL((prev) => (prev === net.DERPMapURL ? prev : net.DERPMapURL));
+      setVersion((prev) => (prev === ver ? prev : ver));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -275,6 +279,7 @@ export default function App() {
             events={events}
             busy={busy}
             error={error}
+            version={version}
             onPing={(addr, untilDirect) => void run(() => startPing(addr, untilDirect))}
             onStop={(id) => void run(() => stopSession(id))}
           />

@@ -101,6 +101,7 @@ func (r *Real) runFileServer(ctx context.Context, sessionID, rootDir string, mod
 	}
 
 	srv := &tailcat.Server{Logf: func(string, ...any) {}}
+	r.applyServerNet(ctx, srv)
 	handler := srv.SSHConnHandler(tailcat.SSHOptions{
 		Files: &tailcat.FileService{Dir: abs, Mode: mode},
 	})
@@ -158,7 +159,7 @@ func (r *Real) StartCopy(ctx context.Context, sessionID string, peerAddr string,
 			r.mu.Unlock()
 		}()
 
-		sf, cleanup, err := dialSFTP(ctx, peerAddr)
+		sf, cleanup, err := r.dialSFTP(ctx, peerAddr)
 		if err != nil {
 			ch <- Event{SessionID: sessionID, Kind: EventError, Err: err.Error()}
 			return
@@ -198,7 +199,7 @@ func (r *Real) ListRemote(ctx context.Context, peerAddr string, remotePath strin
 	if remotePath == "" {
 		remotePath = "."
 	}
-	sf, cleanup, err := dialSFTP(ctx, peerAddr)
+	sf, cleanup, err := r.dialSFTP(ctx, peerAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -263,9 +264,8 @@ func requireExistingDir(dir, label string) error {
 	return nil
 }
 
-func dialSFTP(ctx context.Context, addr string) (*sftp.Client, func(), error) {
-	cl := tailcat.NewClient(tailcat.Addr(addr))
-	cl.Logf = func(string, ...any) {}
+func (r *Real) dialSFTP(ctx context.Context, addr string) (*sftp.Client, func(), error) {
+	cl := r.newClient(addr)
 	conn, err := cl.DialTCPPort(ctx, FilesPort)
 	if err != nil {
 		_ = cl.Close()

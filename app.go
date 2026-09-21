@@ -236,6 +236,11 @@ func (a *App) SetNetworkSettings(region string, derpMapURL string) error {
 	return nil
 }
 
+// TailcatVersion reports the compiled github.com/tailscale/tailcat module version.
+func (a *App) TailcatVersion() string {
+	return adapter.TailcatVersion()
+}
+
 // SelectDirectory opens a native folder picker when a window is available.
 func (a *App) SelectDirectory(title string) (string, error) {
 	if a.ctx == nil {

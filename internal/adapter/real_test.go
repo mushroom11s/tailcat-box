@@ -55,3 +55,25 @@ func TestRealFilesValidation(t *testing.T) {
 		t.Fatalf("ls err=%v", err)
 	}
 }
+
+func TestRealPlan4Validation(t *testing.T) {
+	r := adapter.NewReal()
+	ctx := context.Background()
+	if _, err := r.StartSSHServe(ctx, "s", adapter.SSHServeOpts{}); err == nil || !strings.Contains(err.Error(), "authorized keys") {
+		t.Fatalf("ssh serve err=%v", err)
+	}
+	if _, err := r.StartSSHClient(ctx, "s", "", adapter.SSHClientOpts{}); err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("ssh client err=%v", err)
+	}
+	if _, err := r.StartSOCKS(ctx, "s", "", ""); err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("socks err=%v", err)
+	}
+	if _, err := r.StartExec(ctx, "s", nil); err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("exec err=%v", err)
+	}
+	r.SetNetworkOpts(adapter.NetworkOpts{Region: "1", DERPMapURL: "https://example.test/derpmap.json"})
+	got := r.NetworkOpts()
+	if got.Region != "1" || got.DERPMapURL == "" {
+		t.Fatalf("%+v", got)
+	}
+}

@@ -102,6 +102,7 @@ func (r *Real) runPortServe(ctx context.Context, sessionID string, run *serveRun
 			}
 		},
 	}
+	r.applyServerNet(ctx, srv)
 	if err := srv.Start(); err != nil {
 		send(Event{SessionID: sessionID, Kind: EventError, Err: err.Error()})
 		return
@@ -170,8 +171,7 @@ func (r *Real) startForward(ctx context.Context, sessionID string, serverAddr st
 			close(ch)
 		}()
 
-		cl := tailcat.NewClient(tailcat.Addr(serverAddr))
-		cl.Logf = func(string, ...any) {}
+		cl := r.newClient(serverAddr)
 		run.client = cl
 
 		var addrs []string
@@ -275,8 +275,7 @@ func (r *Real) StartPing(ctx context.Context, sessionID string, addr string, unt
 			r.mu.Unlock()
 		}()
 
-		cl := tailcat.NewClient(tailcat.Addr(addr))
-		cl.Logf = func(string, ...any) {}
+		cl := r.newClient(addr)
 		defer cl.Close()
 
 		deadline := time.Now().Add(timeout)

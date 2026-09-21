@@ -25,6 +25,7 @@ import {
   StartExitNode as bindStartExitNode,
   StartExec as bindStartExec,
   StopSession as bindStopSession,
+  TailcatVersion as bindTailcatVersion,
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { adapter, session, store } from "../../wailsjs/go/models";
@@ -753,6 +754,13 @@ export async function listSessions(): Promise<Session[]> {
     return (list ?? []).map(asSession);
   }
   return fakeListSessions();
+}
+
+export async function tailcatVersion(): Promise<string> {
+  if (hasWailsBindings()) {
+    return bindTailcatVersion();
+  }
+  return "fake";
 }
 
 export function onTailcatEvent(callback: (ev: TailcatEvent) => void): () => void {

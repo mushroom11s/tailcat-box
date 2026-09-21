@@ -325,4 +325,7 @@ waitExit:
 	if settings.Region != "nyc" || settings.DERPMapURL != "https://example.test/derpmap.json" {
 		t.Fatalf("%+v", settings)
 	}
+	if v := a.TailcatVersion(); v == "" || v == "unknown" {
+		t.Fatalf("version=%q", v)
+	}
 }

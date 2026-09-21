@@ -81,8 +81,8 @@ export default function KeysPage({
       <h2>{t("keysTitle")}</h2>
       <p className="lede">{t("keysLede")}</p>
 
-      <h3 className="kind">DERP / region</h3>
-      <p className="lede">Used by later serve and client sessions (CLI --region and --derpmap-url). Empty region means auto.</p>
+      <h3 className="kind">{t("derpRegion")}</h3>
+      <p className="lede">{t("derpLede")}</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -90,7 +90,7 @@ export default function KeysPage({
         }}
       >
         <div className="field">
-          <label htmlFor="net-region">Region (ID, code, or name; empty = auto)</label>
+          <label htmlFor="net-region">{t("regionLabel")}</label>
           <input
             id="net-region"
             value={netRegion}
@@ -100,7 +100,7 @@ export default function KeysPage({
           />
         </div>
         <div className="field">
-          <label htmlFor="net-derp">DERP map URL</label>
+          <label htmlFor="net-derp">{t("derpMapURL")}</label>
           <input
             id="net-derp"
             value={netDERP}
@@ -111,7 +111,7 @@ export default function KeysPage({
         </div>
         <div className="row">
           <button className="btn" type="submit" disabled={busy}>
-            Save network settings
+            {t("saveNetwork")}
           </button>
         </div>
       </form>

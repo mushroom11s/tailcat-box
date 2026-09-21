@@ -56,4 +56,6 @@ export function GetNetworkSettings():Promise<store.Settings>;
 
 export function SetNetworkSettings(arg1:string,arg2:string):Promise<void>;
 
+export function TailcatVersion():Promise<string>;
+
 export function StopSession(arg1:string):Promise<void>;

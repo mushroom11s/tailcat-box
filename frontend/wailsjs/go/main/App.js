@@ -106,6 +106,10 @@ export function SetNetworkSettings(arg1, arg2) {
   return window['go']['main']['App']['SetNetworkSettings'](arg1, arg2);
 }
 
+export function TailcatVersion() {
+  return window['go']['main']['App']['TailcatVersion']();
+}
+
 export function StopSession(arg1) {
   return window['go']['main']['App']['StopSession'](arg1);
 }
