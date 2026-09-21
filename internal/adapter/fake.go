@@ -9,11 +9,13 @@ import (
 )
 
 type Fake struct {
-	mu     sync.Mutex
-	stops  map[string]chan struct{}
-	ports  map[string]string // sessionID -> tc:fake-port-<id>
-	files  map[string]string // sessionID -> tc:fake-files-<id> or tc:fake-recv-<id>
-	drops  map[string]int
+	mu      sync.Mutex
+	stops   map[string]chan struct{}
+	ports   map[string]string // sessionID -> tc:fake-port-<id>
+	files   map[string]string // sessionID -> tc:fake-files-<id> or tc:fake-recv-<id>
+	peers   map[string]string // sessionID -> ssh/exit/exec fake address
+	drops   map[string]int
+	netOpts NetworkOpts
 }
 
 func NewFake() *Fake {
@@ -21,6 +23,7 @@ func NewFake() *Fake {
 		stops: make(map[string]chan struct{}),
 		ports: make(map[string]string),
 		files: make(map[string]string),
+		peers: make(map[string]string),
 		drops: make(map[string]int),
 	}
 }
@@ -38,6 +41,7 @@ func (f *Fake) untrack(sessionID string) {
 	delete(f.stops, sessionID)
 	delete(f.ports, sessionID)
 	delete(f.files, sessionID)
+	delete(f.peers, sessionID)
 	f.mu.Unlock()
 }
 

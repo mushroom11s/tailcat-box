@@ -69,6 +69,25 @@ func (o FilesServeOpts) mode() FileServeMode {
 	return o.Mode
 }
 
+// SSHServeOpts matches CLI `serve ssh` / `serve no-auth-ssh`.
+type SSHServeOpts struct {
+	NoAuth         bool
+	AuthorizedKeys string // path or authorized_keys text; ignored when NoAuth
+}
+
+// SSHClientOpts matches CLI `tailcat ssh`.
+type SSHClientOpts struct {
+	User     string
+	Command  string
+	Identity string // optional private key path
+}
+
+// NetworkOpts is CLI `--region` / `--derpmap-url` for adapter starts.
+type NetworkOpts struct {
+	Region     string // ID, code, name substring, or empty/"auto"
+	DERPMapURL string
+}
+
 type FileEntry struct {
 	Name    string
 	IsDir   bool
@@ -102,5 +121,18 @@ type TailcatAdapter interface {
 	StartFilesServe(ctx context.Context, sessionID string, rootDir string, opts FilesServeOpts) (<-chan Event, error)
 	// ListRemote lists path on a files/recv/ssh peer (CLI `ls`).
 	ListRemote(ctx context.Context, peerAddr string, path string) ([]FileEntry, error)
+	// StartSSHServe starts an SSH server. NoAuth is CLI `no-auth-ssh`; otherwise AuthorizedKeys is required.
+	StartSSHServe(ctx context.Context, sessionID string, opts SSHServeOpts) (<-chan Event, error)
+	// StartSSHClient dials SSH on port 22 and runs command (empty command uses a short identity check).
+	StartSSHClient(ctx context.Context, sessionID string, serverAddr string, opts SSHClientOpts) (<-chan Event, error)
+	// StartSOCKS listens locally as a SOCKS5 proxy toward serverAddr.
+	StartSOCKS(ctx context.Context, sessionID string, serverAddr string, listen string) (<-chan Event, error)
+	// StartExitNode serves as an exit node (CLI `serve exit-node`).
+	StartExitNode(ctx context.Context, sessionID string) (<-chan Event, error)
+	// StartExec runs argv for each incoming connection (CLI `serve exec`).
+	StartExec(ctx context.Context, sessionID string, argv []string) (<-chan Event, error)
+	// SetNetworkOpts stores region / DERP map URL used by subsequent starts.
+	SetNetworkOpts(opts NetworkOpts)
+	NetworkOpts() NetworkOpts
 	Stop(sessionID string) error
 }

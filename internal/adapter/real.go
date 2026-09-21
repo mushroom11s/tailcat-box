@@ -22,6 +22,7 @@ type Real struct {
 	serves   map[string]*serveRun
 	forwards map[string]*forwardRun
 	cancels  map[string]context.CancelFunc
+	net      NetworkOpts
 }
 
 type serveRun struct {
