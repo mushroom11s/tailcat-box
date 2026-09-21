@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useI18n, type Locale } from "../i18n";
 import {
   getClientInfo,
@@ -16,28 +16,16 @@ type Props = {
   onTheme: (theme: Theme) => void;
 };
 
-function formatUptime(startedAt: string, t: (key: "unitDay" | "unitHour" | "unitMinute" | "unitSecond") => string): string {
+function formatUptime(startedAt: string): string {
   const start = Date.parse(startedAt);
   if (!Number.isFinite(start)) {
     return "—";
   }
-  let secs = Math.max(0, Math.floor((Date.now() - start) / 1000));
-  const days = Math.floor(secs / 86400);
-  secs %= 86400;
-  const hours = Math.floor(secs / 3600);
-  secs %= 3600;
-  const mins = Math.floor(secs / 60);
-  secs %= 60;
-  const parts: string[] = [];
-  if (days > 0) {
-    parts.push(`${days}${t("unitDay")}`);
-  }
-  if (days > 0 || hours > 0) {
-    parts.push(`${hours}${t("unitHour")}`);
-  }
-  parts.push(`${mins}${t("unitMinute")}`);
-  parts.push(`${secs}${t("unitSecond")}`);
-  return parts.join(" ");
+  const ms = Math.max(0, Date.now() - start);
+  const hours = Math.floor(ms / 3600000);
+  const minutes = Math.floor((ms % 3600000) / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function formatChecked(iso: string, locale: Locale, neverLabel: string): string {
@@ -51,11 +39,78 @@ function formatChecked(iso: string, locale: Locale, neverLabel: string): string 
   return d.toLocaleString(locale === "zh-CN" ? "zh-CN" : "en-US");
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function BoardIcon() {
   return (
-    <div className="glass info-row">
-      <span className="info-label">{label}</span>
-      <span className="info-value">{value || "—"}</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+        d="M7 4v3M12 4v3M17 4v3M7 17v3M12 17v3M17 17v3M5 7h14v10H5z"
+      />
+      <rect x="8.5" y="10" width="3" height="3" rx="0.5" fill="currentColor" />
+      <rect x="12.5" y="10" width="3" height="4" rx="0.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.25" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="12" cy="8.25" r="1" fill="currentColor" />
+      <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" d="M12 11.25v5" />
+    </svg>
+  );
+}
+
+function InfoCard({
+  title,
+  icon,
+  tone,
+  action,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  tone: "warning" | "danger";
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <article className="glass info-card">
+      <header className="info-card-head">
+        <div className="info-card-title">
+          <span className={`info-card-icon ${tone}`}>{icon}</span>
+          <h3>{title}</h3>
+        </div>
+        {action ? <div className="info-card-action">{action}</div> : null}
+      </header>
+      <div className="info-card-body">{children}</div>
+    </article>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  mono,
+  children,
+}: {
+  label: string;
+  value?: string;
+  mono?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="info-card-row">
+      <span className="info-card-label">{label}</span>
+      {children ? (
+        <span className="info-card-value">{children}</span>
+      ) : (
+        <span className={`info-card-value${mono ? " mono" : ""}`}>{value || "—"}</span>
+      )}
     </div>
   );
 }
@@ -129,8 +184,8 @@ export default function SettingsPage({ theme, onTheme }: Props) {
     }
   }
 
-  const uptime = client ? formatUptime(client.StartedAt, t) : "—";
   void now;
+  const uptime = client ? formatUptime(client.StartedAt) : "—";
 
   const goOnline = system?.NetworkOnline;
   const online = goOnline ?? browserOnline;
@@ -181,43 +236,45 @@ export default function SettingsPage({ theme, onTheme }: Props) {
         </div>
       </div>
 
-      <h3 className="kind settings-block">{t("clientInfoTitle")}</h3>
-      <div className="info-list">
-        <InfoRow label={t("uptime")} value={uptime} />
-        <InfoRow label={t("appVersion")} value={client?.AppVersion ?? "—"} />
-        <InfoRow label={t("tailcatVersion")} value={client?.TailcatVersion ?? "—"} />
-        <InfoRow
-          label={t("lastUpdateCheck")}
-          value={formatChecked(client?.LastUpdateCheck ?? "", locale, t("never"))}
-        />
-      </div>
-      <div className="row" style={{ marginTop: 12 }}>
-        <button className="btn" type="button" disabled={busy} onClick={() => void onCheckNow()}>
-          {t("checkNow")}
-        </button>
-      </div>
-      <p className="note">{t("updateCheckHint")}</p>
+      <div className="settings-cards">
+        <InfoCard
+          title={t("clientInfoTitle")}
+          icon={<BoardIcon />}
+          tone="warning"
+          action={
+            <button className="btn-link" type="button" disabled={busy} onClick={() => void onCheckNow()}>
+              {t("checkNow")}
+            </button>
+          }
+        >
+          <InfoRow label={t("uptime")} value={uptime} mono />
+          <InfoRow label={t("appVersion")} value={client?.AppVersion ?? "—"} mono />
+          <InfoRow label={t("tailcatVersion")} value={client?.TailcatVersion ?? "—"} mono />
+          <InfoRow
+            label={t("lastUpdateCheck")}
+            value={formatChecked(client?.LastUpdateCheck ?? "", locale, t("never"))}
+          />
+          <p className="info-card-note">{t("updateCheckHint")}</p>
+        </InfoCard>
 
-      <h3 className="kind settings-block">{t("systemInfoTitle")}</h3>
-      <div className="info-list">
-        <InfoRow label={t("osVersion")} value={system?.OSVersion ?? "—"} />
-        <div className="glass info-row">
-          <span className="info-label">{t("launchAtLogin")}</span>
-          <span className="info-value">
-            <label className="check settings-switch">
-              <input
-                type="checkbox"
-                checked={Boolean(system?.LaunchAtLogin)}
-                disabled={busy || !system}
-                onChange={(e) => void onToggleLaunch(e.target.checked)}
-              />
+        <InfoCard title={t("systemInfoTitle")} icon={<InfoIcon />} tone="danger">
+          <InfoRow label={t("osVersion")} value={system?.OSVersion ?? "—"} />
+          <InfoRow label={t("launchAtLogin")}>
+            <button
+              type="button"
+              className={`chip-toggle${system?.LaunchAtLogin ? " on" : ""}`}
+              disabled={busy || !system}
+              onClick={() => void onToggleLaunch(!system?.LaunchAtLogin)}
+            >
               {system?.LaunchAtLogin ? t("on") : t("off")}
-            </label>
-          </span>
-        </div>
-        <InfoRow label={t("networkStatus")} value={system ? networkValue : "—"} />
+            </button>
+          </InfoRow>
+          <InfoRow label={t("networkStatus")} value={system ? networkValue : "—"} />
+          {system && !system.LaunchAtLoginSupported ? (
+            <p className="info-card-note">{t("launchAtLoginNote")}</p>
+          ) : null}
+        </InfoCard>
       </div>
-      {system && !system.LaunchAtLoginSupported ? <p className="note">{t("launchAtLoginNote")}</p> : null}
 
       {error ? <p className="err">{error}</p> : null}
     </section>
