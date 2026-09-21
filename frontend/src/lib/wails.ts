@@ -17,6 +17,11 @@ import {
   ListRemote as bindListRemote,
   SelectDirectory as bindSelectDirectory,
   SelectFiles as bindSelectFiles,
+  StartSSHServe as bindStartSSHServe,
+  StartSSHClient as bindStartSSHClient,
+  StartSOCKS as bindStartSOCKS,
+  StartExitNode as bindStartExitNode,
+  StartExec as bindStartExec,
   StopSession as bindStopSession,
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
@@ -26,10 +31,11 @@ export type Session = {
   ID: string;
   Kind: string;
   Status: string;
-  Address: string;
-  CreatedAt: string;
-  Err: string;
-  Progress: string;
+	Address: string;
+	CreatedAt: string;
+	Err: string;
+	Progress: string;
+	Dangerous: boolean;
 };
 
 export type TailcatEvent = {
@@ -92,6 +98,7 @@ function asSession(s: session.Session): Session {
     CreatedAt: created,
     Err: s.Err ?? "",
     Progress: s.Progress ?? "",
+    Dangerous: Boolean(s.Dangerous),
   };
 }
 
@@ -120,6 +127,7 @@ type FakeState = {
   serveStops: Map<string, () => void>;
   ports: Map<string, string>;
   files: Map<string, string>;
+  peers: Map<string, string>;
 };
 
 const fake: FakeState = {
@@ -129,6 +137,7 @@ const fake: FakeState = {
   serveStops: new Map(),
   ports: new Map(),
   files: new Map(),
+  peers: new Map(),
 };
 
 function newID(): string {
@@ -167,6 +176,7 @@ function newSess(kind: string, address = ""): Session {
     CreatedAt: new Date().toISOString(),
     Err: "",
     Progress: "",
+    Dangerous: false,
   };
   upsertFake(sess);
   return sess;
@@ -453,6 +463,80 @@ async function fakeListRemote(addr: string): Promise<FileEntry[]> {
   ];
 }
 
+async function fakeStartSSHServe(noAuth: boolean, authorizedKeys: string): Promise<Session> {
+  if (!noAuth && !authorizedKeys.trim()) {
+    throw new Error("authorized keys are required for keyed SSH (or use no-auth with confirmation)");
+  }
+  const sess = newSess("ssh_serve");
+  sess.Dangerous = noAuth;
+  upsertFake(sess);
+  const addr = noAuth ? "tc:fake-noauth-ssh-" + sess.ID : "tc:fake-ssh-" + sess.ID;
+  fake.peers.set(sess.ID, addr);
+  keepRunning(sess, addr);
+  return { ...sess };
+}
+
+async function fakeStartSSHClient(addr: string, command: string, user: string): Promise<Session> {
+  const sess = newSess("ssh_client", addr);
+  later(() => {
+    const current = fake.sessions.find((s) => s.ID === sess.ID);
+    if (!current) {
+      return;
+    }
+    if (![...fake.peers.values()].includes(addr) || (!addr.startsWith("tc:fake-ssh-") && !addr.startsWith("tc:fake-noauth-ssh-"))) {
+      current.Status = "error";
+      current.Err = "unknown fake ssh serve";
+      emitFake({ SessionID: current.ID, Kind: "error", Err: current.Err });
+      return;
+    }
+    const cmd = command.trim() || "whoami";
+    emitFake({ SessionID: current.ID, Kind: "data", Data: `ssh ${user || "tailcat"}@${addr}: ${cmd}` });
+    current.Status = "stopped";
+    emitFake({ SessionID: current.ID, Kind: "closed" });
+  });
+  return { ...sess };
+}
+
+async function fakeStartExitNode(): Promise<Session> {
+  const sess = newSess("exit_node");
+  const addr = "tc:fake-exit-" + sess.ID;
+  fake.peers.set(sess.ID, addr);
+  keepRunning(sess, addr);
+  return { ...sess };
+}
+
+async function fakeStartSOCKS(addr: string, listen: string): Promise<Session> {
+  const sess = newSess("socks", addr);
+  later(() => {
+    const current = fake.sessions.find((s) => s.ID === sess.ID);
+    if (!current) {
+      return;
+    }
+    if (![...fake.peers.values()].includes(addr) && !addr.startsWith("tc:fake-port-")) {
+      current.Status = "error";
+      current.Err = "unknown fake serve";
+      emitFake({ SessionID: current.ID, Kind: "error", Err: current.Err });
+      return;
+    }
+    current.Status = "running";
+    current.Address = listen.trim() && !listen.endsWith(":0") ? `socks5h://${listen}` : "socks5h://127.0.0.1:1080";
+    emitFake({ SessionID: current.ID, Kind: "ready", Address: current.Address, Data: current.Address });
+  });
+  fake.serveStops.set(sess.ID, () => undefined);
+  return { ...sess };
+}
+
+async function fakeStartExec(command: string): Promise<Session> {
+  if (!command.trim()) {
+    throw new Error("command is required");
+  }
+  const sess = newSess("exec");
+  const addr = "tc:fake-exec-" + sess.ID;
+  fake.peers.set(sess.ID, addr);
+  keepRunning(sess, addr);
+  return { ...sess };
+}
+
 function asFileEntry(e: adapter.FileEntry): FileEntry {
   const mod =
     typeof e.ModTime === "string"
@@ -575,6 +659,44 @@ export async function listRemote(addr: string, path: string): Promise<FileEntry[
     return (list ?? []).map(asFileEntry);
   }
   return fakeListRemote(addr);
+}
+
+export async function startSSHServe(noAuth: boolean, authorizedKeys: string, confirmDangerous: boolean): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindStartSSHServe(noAuth, authorizedKeys, confirmDangerous));
+  }
+  if (noAuth && !confirmDangerous) {
+    throw new Error("no-auth SSH requires explicit confirmation: anyone with the address gets a shell");
+  }
+  return fakeStartSSHServe(noAuth, authorizedKeys);
+}
+
+export async function startSSHClient(addr: string, command: string, user: string, identity: string): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindStartSSHClient(addr, command, user, identity));
+  }
+  return fakeStartSSHClient(addr, command, user);
+}
+
+export async function startSOCKS(addr: string, listen: string): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindStartSOCKS(addr, listen));
+  }
+  return fakeStartSOCKS(addr, listen);
+}
+
+export async function startExitNode(): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindStartExitNode());
+  }
+  return fakeStartExitNode();
+}
+
+export async function startExec(command: string): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindStartExec(command));
+  }
+  return fakeStartExec(command);
 }
 
 export async function selectDirectory(title: string): Promise<string> {

@@ -42,4 +42,14 @@ export function SelectDirectory(arg1:string):Promise<string>;
 
 export function SelectFiles(arg1:string):Promise<Array<string>>;
 
+export function StartSSHServe(arg1:boolean,arg2:string,arg3:boolean):Promise<session.Session>;
+
+export function StartSSHClient(arg1:string,arg2:string,arg3:string,arg4:string):Promise<session.Session>;
+
+export function StartSOCKS(arg1:string,arg2:string):Promise<session.Session>;
+
+export function StartExitNode():Promise<session.Session>;
+
+export function StartExec(arg1:string):Promise<session.Session>;
+
 export function StopSession(arg1:string):Promise<void>;

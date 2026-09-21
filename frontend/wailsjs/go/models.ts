@@ -52,6 +52,7 @@ export namespace session {
 	    CreatedAt: any;
 	    Err: string;
 	    Progress: string;
+	    Dangerous: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Session(source);
@@ -66,6 +67,7 @@ export namespace session {
 	        this.CreatedAt = this.convertValues(source["CreatedAt"], null);
 	        this.Err = source["Err"];
 	        this.Progress = source["Progress"];
+	        this.Dangerous = source["Dangerous"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

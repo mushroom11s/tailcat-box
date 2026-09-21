@@ -159,6 +159,31 @@ func (a *App) ListRemote(addr string, path string) ([]adapter.FileEntry, error) 
 	return a.svc.ListRemote(addr, path)
 }
 
+// StartSSHServe starts keyed SSH or no-auth SSH. no-auth requires confirmDangerous.
+func (a *App) StartSSHServe(noAuth bool, authorizedKeys string, confirmDangerous bool) (session.Session, error) {
+	return a.svc.StartSSHServe(adapter.SSHServeOpts{NoAuth: noAuth, AuthorizedKeys: authorizedKeys}, confirmDangerous)
+}
+
+// StartSSHClient dials SSH on a Tailcat peer and runs command (default whoami).
+func (a *App) StartSSHClient(addr string, command string, user string, identity string) (session.Session, error) {
+	return a.svc.StartSSHClient(addr, adapter.SSHClientOpts{Command: command, User: user, Identity: identity})
+}
+
+// StartSOCKS starts a local SOCKS5 proxy toward addr.
+func (a *App) StartSOCKS(addr string, listen string) (session.Session, error) {
+	return a.svc.StartSOCKS(addr, listen)
+}
+
+// StartExitNode serves as a Tailcat exit node.
+func (a *App) StartExitNode() (session.Session, error) {
+	return a.svc.StartExitNode()
+}
+
+// StartExec runs command for each incoming connection (CLI `serve exec`).
+func (a *App) StartExec(command string) (session.Session, error) {
+	return a.svc.StartExec(strings.Fields(command))
+}
+
 // SelectDirectory opens a native folder picker when a window is available.
 func (a *App) SelectDirectory(title string) (string, error) {
 	if a.ctx == nil {

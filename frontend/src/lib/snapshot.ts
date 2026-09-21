@@ -13,7 +13,8 @@ export function sameSessions(a: Session[], b: Session[]): boolean {
       x.Status !== y.Status ||
       x.Address !== y.Address ||
       x.Err !== y.Err ||
-      x.Progress !== y.Progress
+      x.Progress !== y.Progress ||
+      x.Dangerous !== y.Dangerous
     ) {
       return false;
     }
