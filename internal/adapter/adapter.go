@@ -134,5 +134,8 @@ type TailcatAdapter interface {
 	// SetNetworkOpts stores region / DERP map URL used by subsequent starts.
 	SetNetworkOpts(opts NetworkOpts)
 	NetworkOpts() NetworkOpts
+	// GeneratePrivateKeyJSON returns key material stored with a named key.
+	// Real returns tailcat.PrivateKey JSON. Fake returns unique {"fake":"..."} JSON.
+	GeneratePrivateKeyJSON() (string, error)
 	Stop(sessionID string) error
 }

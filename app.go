@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
+
+	"encoding/json"
 
 	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/appinfo"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/autostart"
+	"github.com/mushroom11s/tailcat-desktop-client/internal/chat"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/service"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/settings"
@@ -27,13 +31,15 @@ const (
 
 // App is the Wails-bound application. The UI talks only to these methods.
 type App struct {
-	ctx       context.Context
-	svc       *service.Service
-	keys      *store.Store
-	tray      *tray.Controller
-	trayIcon  []byte
-	settings  *settings.Store
-	startedAt time.Time
+	ctx        context.Context
+	svc        *service.Service
+	svcAdapter adapter.TailcatAdapter
+	chat       *chat.Service
+	keys       *store.Store
+	tray       *tray.Controller
+	trayIcon   []byte
+	settings   *settings.Store
+	startedAt  time.Time
 }
 
 // ClientInfo is desktop-client metadata shown on Settings.
@@ -53,11 +59,13 @@ type SystemInfo struct {
 	NetworkSummary         string
 }
 
-func newAdapter() adapter.TailcatAdapter {
+func newAdapters() (adapter.TailcatAdapter, adapter.ChatAdapter) {
 	if strings.EqualFold(os.Getenv("TAILCAT_ADAPTER"), "fake") {
-		return adapter.NewFake()
+		f := adapter.NewFake()
+		return f, f
 	}
-	return adapter.NewReal()
+	r := adapter.NewReal()
+	return r, r
 }
 
 func newKeyStore() *store.Store {
@@ -95,15 +103,18 @@ func newSettingsStore() *settings.Store {
 // for offline UI demos and tests.
 func NewApp() *App {
 	keys := newKeyStore()
-	svc := service.New(newAdapter())
+	ad, chatAd := newAdapters()
+	svc := service.New(ad)
 	if settings, err := keys.LoadSettings(); err == nil {
 		svc.SetNetworkOpts(adapter.NetworkOpts{Region: settings.Region, DERPMapURL: settings.DERPMapURL})
 	}
 	return &App{
-		svc:       svc,
-		keys:      keys,
-		settings:  newSettingsStore(),
-		startedAt: time.Now(),
+		svc:        svc,
+		svcAdapter: ad,
+		chat:       chat.New(chatAd),
+		keys:       keys,
+		settings:   newSettingsStore(),
+		startedAt:  time.Now(),
 	}
 }
 
@@ -144,7 +155,7 @@ func (a *App) quitApp() {
 
 func (a *App) activeSessionCount() int {
 	n := 0
-	for _, sess := range a.svc.List() {
+	for _, sess := range a.ListSessions() {
 		if sess.Status != session.StatusStopped {
 			n++
 		}
@@ -153,14 +164,22 @@ func (a *App) activeSessionCount() int {
 }
 
 func (a *App) forwardEvents() {
-	for ev := range a.svc.Events() {
+	emit := func(ev adapter.Event) {
 		if a.tray != nil {
 			a.tray.Refresh()
 		}
 		if a.ctx == nil {
-			continue
+			return
 		}
 		runtime.EventsEmit(a.ctx, tailcatEventName, ev)
+	}
+	go func() {
+		for ev := range a.svc.Events() {
+			emit(ev)
+		}
+	}()
+	for ev := range a.chat.Events() {
+		emit(ev)
 	}
 }
 
@@ -216,7 +235,11 @@ func (a *App) ListKeys() ([]store.KeyInfo, error) {
 
 // CreateKey generates and saves a named key.
 func (a *App) CreateKey(name string, client bool, region string) (string, error) {
-	return a.keys.Create(name, store.CreateOpts{Client: client, Region: region})
+	material, err := a.svcAdapter.GeneratePrivateKeyJSON()
+	if err != nil {
+		return "", err
+	}
+	return a.keys.Create(name, store.CreateOpts{Client: client, Region: region, PrivateKeyJSON: material})
 }
 
 // DeleteKey removes a named key from the app key directory.
@@ -231,7 +254,82 @@ func (a *App) StopSession(id string) error {
 
 // ListSessions returns a snapshot of all sessions.
 func (a *App) ListSessions() []session.Session {
-	return a.svc.List()
+	out := a.svc.List()
+	if a.chat != nil {
+		if sess, ok := a.chat.Session(); ok {
+			out = append(out, sess)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if !out[i].CreatedAt.Equal(out[j].CreatedAt) {
+			return out[i].CreatedAt.Before(out[j].CreatedAt)
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
+}
+
+func roomKeyMaterial(raw []byte) (string, error) {
+	var wrap struct {
+		PrivateKey json.RawMessage `json:"PrivateKey"`
+		Private    json.RawMessage `json:"Private"`
+	}
+	if err := json.Unmarshal(raw, &wrap); err != nil {
+		return "", fmt.Errorf("saved key is not a Tailcat private key")
+	}
+	if len(wrap.PrivateKey) > 0 && string(wrap.PrivateKey) != "null" {
+		return string(wrap.PrivateKey), nil
+	}
+	if len(wrap.Private) > 0 && string(wrap.Private) != "null" {
+		return string(raw), nil
+	}
+	return "", fmt.Errorf("saved key is not a Tailcat private key")
+}
+
+func (a *App) chatOpts(keyName string) (chat.StartOpts, error) {
+	net := a.svc.NetworkOpts()
+	opts := chat.StartOpts{Region: net.Region, DERPMapURL: net.DERPMapURL, KeyName: strings.TrimSpace(keyName)}
+	if opts.KeyName == "" {
+		return opts, nil
+	}
+	raw, err := a.keys.ReadRaw(opts.KeyName)
+	if err != nil {
+		return chat.StartOpts{}, err
+	}
+	material, err := roomKeyMaterial(raw)
+	if err != nil {
+		return chat.StartOpts{}, err
+	}
+	opts.PrivateKeyJSON = material
+	return opts, nil
+}
+
+func (a *App) StartChatRoom() (session.Session, error) {
+	opts, err := a.chatOpts("")
+	if err != nil {
+		return session.Session{}, err
+	}
+	return a.chat.Start(opts)
+}
+
+func (a *App) ConnectChatPeer(addr string) error {
+	return a.chat.Connect(addr)
+}
+
+func (a *App) SendChatText(body string) error {
+	return a.chat.SendText(body)
+}
+
+func (a *App) RestartChatRoom(keyName string) (session.Session, error) {
+	opts, err := a.chatOpts(keyName)
+	if err != nil {
+		return session.Session{}, err
+	}
+	return a.chat.Restart(opts)
+}
+
+func (a *App) StopChatRoom() error {
+	return a.chat.Stop()
 }
 
 // StartRecv starts a write-only receive inbox (CLI `recv`).

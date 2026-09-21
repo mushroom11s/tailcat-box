@@ -22,7 +22,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:             "Tailcat",
+		Title:             "Tailcat Box",
 		Width:             1100,
 		Height:            760,
 		HideWindowOnClose: true,
@@ -44,7 +44,7 @@ func main() {
 
 func (a *App) applicationMenu() *menu.Menu {
 	m := menu.NewMenu()
-	appMenu := m.AddSubmenu("Tailcat")
+	appMenu := m.AddSubmenu("Tailcat Box")
 	appMenu.AddText("Open", nil, func(_ *menu.CallbackData) {
 		a.showWindow()
 	})

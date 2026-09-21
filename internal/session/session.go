@@ -24,6 +24,7 @@ const (
 	KindSOCKS      Kind = "socks"
 	KindExitNode   Kind = "exit_node"
 	KindExec       Kind = "exec"
+	KindChat       Kind = "chat"
 )
 
 type Status string
