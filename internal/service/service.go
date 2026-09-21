@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
 )
+
+const defaultPingTimeout = 10 * time.Second
 
 type Service struct {
 	ad       adapter.TailcatAdapter
@@ -26,8 +29,9 @@ func New(ad adapter.TailcatAdapter) *Service {
 	}
 }
 
-func (s *Service) StartPipeServe() (session.Session, error) {
-	sess := session.New(session.KindPipeServe)
+func (s *Service) start(kind session.Kind, addr string, run func(ctx context.Context, id string) (<-chan adapter.Event, error)) (session.Session, error) {
+	sess := session.New(kind)
+	sess.Address = addr
 
 	s.mu.Lock()
 	s.sessions[sess.ID] = sess
@@ -35,7 +39,7 @@ func (s *Service) StartPipeServe() (session.Session, error) {
 	s.cancels[sess.ID] = cancel
 	s.mu.Unlock()
 
-	ch, err := s.ad.StartPipeServe(ctx, sess.ID)
+	ch, err := run(ctx, sess.ID)
 	if err != nil {
 		cancel()
 		s.mu.Lock()
@@ -49,28 +53,40 @@ func (s *Service) StartPipeServe() (session.Session, error) {
 	return *sess, nil
 }
 
+func (s *Service) StartPipeServe() (session.Session, error) {
+	return s.start(session.KindPipeServe, "", func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartPipeServe(ctx, id)
+	})
+}
+
 func (s *Service) DialPipe(addr string, payload string) (session.Session, error) {
-	sess := session.New(session.KindPipeDial)
-	sess.Address = addr
+	return s.start(session.KindPipeDial, addr, func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.DialPipe(ctx, id, addr, payload)
+	})
+}
 
-	s.mu.Lock()
-	s.sessions[sess.ID] = sess
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancels[sess.ID] = cancel
-	s.mu.Unlock()
+func (s *Service) StartPortServe(mappings []adapter.PortMapping) (session.Session, error) {
+	return s.start(session.KindPortServe, "", func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartPortServe(ctx, id, mappings)
+	})
+}
 
-	ch, err := s.ad.DialPipe(ctx, sess.ID, addr, payload)
-	if err != nil {
-		cancel()
-		s.mu.Lock()
-		delete(s.sessions, sess.ID)
-		delete(s.cancels, sess.ID)
-		s.mu.Unlock()
-		return session.Session{}, err
-	}
+func (s *Service) StartForward(addr string, mappings []adapter.PortMapping) (session.Session, error) {
+	return s.start(session.KindForward, addr, func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartForward(ctx, id, addr, mappings)
+	})
+}
 
-	go s.consume(sess.ID, ch)
-	return *sess, nil
+func (s *Service) StartBrowse(addr string) (session.Session, error) {
+	return s.start(session.KindBrowse, addr, func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartBrowse(ctx, id, addr)
+	})
+}
+
+func (s *Service) StartPing(addr string, untilDirect bool) (session.Session, error) {
+	return s.start(session.KindPing, addr, func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartPing(ctx, id, addr, untilDirect, defaultPingTimeout)
+	})
 }
 
 func (s *Service) Stop(sessionID string) error {
