@@ -2,6 +2,7 @@ import {
   CreateKey as bindCreateKey,
   DeleteKey as bindDeleteKey,
   DialPipe as bindDialPipe,
+  GetNetworkSettings as bindGetNetworkSettings,
   ListKeys as bindListKeys,
   ListSessions as bindListSessions,
   ParseAddr as bindParseAddr,
@@ -17,6 +18,7 @@ import {
   ListRemote as bindListRemote,
   SelectDirectory as bindSelectDirectory,
   SelectFiles as bindSelectFiles,
+  SetNetworkSettings as bindSetNetworkSettings,
   StartSSHServe as bindStartSSHServe,
   StartSSHClient as bindStartSSHClient,
   StartSOCKS as bindStartSOCKS,
@@ -58,6 +60,11 @@ export type KeyInfo = {
   Client: boolean;
   Address: string;
   Source: string;
+};
+
+export type NetworkSettings = {
+  Region: string;
+  DERPMapURL: string;
 };
 
 export type FileEntry = {
@@ -630,6 +637,24 @@ export async function deleteKey(name: string): Promise<void> {
     return;
   }
   await fakeDeleteKey(name);
+}
+
+let fakeSettings: NetworkSettings = { Region: "", DERPMapURL: "" };
+
+export async function getNetworkSettings(): Promise<NetworkSettings> {
+  if (hasWailsBindings()) {
+    const s = await bindGetNetworkSettings();
+    return { Region: s.Region ?? "", DERPMapURL: s.DERPMapURL ?? "" };
+  }
+  return { ...fakeSettings };
+}
+
+export async function setNetworkSettings(region: string, derpMapURL: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSetNetworkSettings(region, derpMapURL);
+    return;
+  }
+  fakeSettings = { Region: region, DERPMapURL: derpMapURL };
 }
 
 export async function startRecv(inboxDir: string, acceptDirs: boolean): Promise<Session> {

@@ -230,6 +230,7 @@ waitReady:
 
 func TestAppPlan4Bindings(t *testing.T) {
 	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
 	a := NewApp()
 
 	if _, err := a.StartSSHServe(true, "", false); err == nil {
@@ -312,5 +313,16 @@ waitExit:
 
 	if _, err := a.StartExec(""); err == nil {
 		t.Fatal("expected empty exec error")
+	}
+
+	if err := a.SetNetworkSettings("nyc", "https://example.test/derpmap.json"); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := a.GetNetworkSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.Region != "nyc" || settings.DERPMapURL != "https://example.test/derpmap.json" {
+		t.Fatalf("%+v", settings)
 	}
 }

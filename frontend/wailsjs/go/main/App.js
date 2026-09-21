@@ -98,6 +98,14 @@ export function StartExec(arg1) {
   return window['go']['main']['App']['StartExec'](arg1);
 }
 
+export function GetNetworkSettings() {
+  return window['go']['main']['App']['GetNetworkSettings']();
+}
+
+export function SetNetworkSettings(arg1, arg2) {
+  return window['go']['main']['App']['SetNetworkSettings'](arg1, arg2);
+}
+
 export function StopSession(arg1) {
   return window['go']['main']['App']['StopSession'](arg1);
 }

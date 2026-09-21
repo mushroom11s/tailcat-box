@@ -100,3 +100,25 @@ func TestCreateRejectsBadName(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestSettingsRoundTrip(t *testing.T) {
+	s := store.New(t.TempDir())
+	got, err := s.LoadSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Region != "" || got.DERPMapURL != "" {
+		t.Fatalf("empty default %+v", got)
+	}
+	want := store.Settings{Region: "nyc", DERPMapURL: "https://example.test/derpmap.json"}
+	if err := s.SaveSettings(want); err != nil {
+		t.Fatal(err)
+	}
+	got, err = s.LoadSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("got=%+v want=%+v", got, want)
+	}
+}

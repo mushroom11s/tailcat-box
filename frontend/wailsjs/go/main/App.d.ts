@@ -52,4 +52,8 @@ export function StartExitNode():Promise<session.Session>;
 
 export function StartExec(arg1:string):Promise<session.Session>;
 
+export function GetNetworkSettings():Promise<store.Settings>;
+
+export function SetNetworkSettings(arg1:string,arg2:string):Promise<void>;
+
 export function StopSession(arg1:string):Promise<void>;

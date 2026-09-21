@@ -47,9 +47,14 @@ func newKeyStore() *store.Store {
 // The default adapter is the embedded Tailcat library; set TAILCAT_ADAPTER=fake
 // for offline UI demos and tests.
 func NewApp() *App {
+	keys := newKeyStore()
+	svc := service.New(newAdapter())
+	if settings, err := keys.LoadSettings(); err == nil {
+		svc.SetNetworkOpts(adapter.NetworkOpts{Region: settings.Region, DERPMapURL: settings.DERPMapURL})
+	}
 	return &App{
-		svc:  service.New(newAdapter()),
-		keys: newKeyStore(),
+		svc:  svc,
+		keys: keys,
 	}
 }
 
@@ -182,6 +187,21 @@ func (a *App) StartExitNode() (session.Session, error) {
 // StartExec runs command for each incoming connection (CLI `serve exec`).
 func (a *App) StartExec(command string) (session.Session, error) {
 	return a.svc.StartExec(strings.Fields(command))
+}
+
+// GetNetworkSettings returns persisted region / DERP map URL.
+func (a *App) GetNetworkSettings() (store.Settings, error) {
+	return a.keys.LoadSettings()
+}
+
+// SetNetworkSettings persists region / DERP map URL and applies them to the adapter.
+func (a *App) SetNetworkSettings(region string, derpMapURL string) error {
+	settings := store.Settings{Region: strings.TrimSpace(region), DERPMapURL: strings.TrimSpace(derpMapURL)}
+	if err := a.keys.SaveSettings(settings); err != nil {
+		return err
+	}
+	a.svc.SetNetworkOpts(adapter.NetworkOpts{Region: settings.Region, DERPMapURL: settings.DERPMapURL})
+	return nil
 }
 
 // SelectDirectory opens a native folder picker when a window is available.

@@ -182,6 +182,14 @@ func (s *Service) StartExec(argv []string) (session.Session, error) {
 	})
 }
 
+func (s *Service) SetNetworkOpts(opts adapter.NetworkOpts) {
+	s.ad.SetNetworkOpts(opts)
+}
+
+func (s *Service) NetworkOpts() adapter.NetworkOpts {
+	return s.ad.NetworkOpts()
+}
+
 func requireDir(dir, label string) error {
 	dir = strings.TrimSpace(dir)
 	if dir == "" {

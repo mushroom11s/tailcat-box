@@ -11,6 +11,7 @@ import {
   createKey,
   deleteKey,
   dialPipe,
+  getNetworkSettings,
   hasWailsBindings,
   listKeys,
   listRemote,
@@ -18,6 +19,7 @@ import {
   onTailcatEvent,
   parseAddr,
   resolveAddr,
+  setNetworkSettings,
   startBrowse,
   startCopy,
   startExec,
@@ -80,14 +82,19 @@ export default function App() {
   const [error, setError] = useState("");
   const [parseResult, setParseResult] = useState("");
   const [resolveResult, setResolveResult] = useState("");
+  const [region, setRegion] = useState("");
+  const [derpMapURL, setDerpMapURL] = useState("");
   const fallback = !hasWailsBindings();
 
   const refresh = useCallback(async () => {
     try {
       const nextSessions = await listSessions();
       const nextKeys = await listKeys();
+      const net = await getNetworkSettings();
       setSessions((prev) => (sameSessions(prev, nextSessions) ? prev : nextSessions));
       setKeys((prev) => (sameKeys(prev, nextKeys) ? prev : nextKeys));
+      setRegion((prev) => (prev === net.Region ? prev : net.Region));
+      setDerpMapURL((prev) => (prev === net.DERPMapURL ? prev : net.DERPMapURL));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -245,6 +252,8 @@ export default function App() {
             error={error}
             parseResult={parseResult}
             resolveResult={resolveResult}
+            region={region}
+            derpMapURL={derpMapURL}
             onCreate={(name, client, region) => void run(() => createKey(name, client, region))}
             onDelete={(name) => void run(() => deleteKey(name))}
             onParse={(raw) =>
@@ -257,6 +266,7 @@ export default function App() {
                 setResolveResult(await resolveAddr(raw));
               })
             }
+            onSaveNetwork={(nextRegion, nextDERP) => void run(() => setNetworkSettings(nextRegion, nextDERP))}
           />
         ) : null}
         {page === "diagnostics" ? (
