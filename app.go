@@ -6,24 +6,51 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
+	"github.com/mushroom11s/tailcat-desktop-client/internal/appinfo"
+	"github.com/mushroom11s/tailcat-desktop-client/internal/autostart"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/service"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
+	"github.com/mushroom11s/tailcat-desktop-client/internal/settings"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/store"
+	"github.com/mushroom11s/tailcat-desktop-client/internal/sysinfo"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/tray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const tailcatEventName = "tailcat:event"
+const (
+	tailcatEventName    = "tailcat:event"
+	updateCheckInterval = 24 * time.Hour
+)
 
 // App is the Wails-bound application. The UI talks only to these methods.
 type App struct {
-	ctx      context.Context
-	svc      *service.Service
-	keys     *store.Store
-	tray     *tray.Controller
-	trayIcon []byte
+	ctx       context.Context
+	svc       *service.Service
+	keys      *store.Store
+	tray      *tray.Controller
+	trayIcon  []byte
+	settings  *settings.Store
+	startedAt time.Time
+}
+
+// ClientInfo is desktop-client metadata shown on Settings.
+type ClientInfo struct {
+	StartedAt       string
+	AppVersion      string
+	TailcatVersion  string
+	LastUpdateCheck string
+}
+
+// SystemInfo is host metadata shown on Settings.
+type SystemInfo struct {
+	OSVersion              string
+	LaunchAtLogin          bool
+	LaunchAtLoginSupported bool
+	NetworkOnline          bool
+	NetworkSummary         string
 }
 
 func newAdapter() adapter.TailcatAdapter {
@@ -46,6 +73,23 @@ func newKeyStore() *store.Store {
 	return s
 }
 
+func newSettingsStore() *settings.Store {
+	dir := os.Getenv("TAILCAT_SETTINGS_DIR")
+	if dir == "" {
+		conf, err := os.UserConfigDir()
+		if err != nil {
+			dir = "settings"
+		} else {
+			dir = filepath.Join(conf, "tailcat-desktop-client")
+		}
+	}
+	s, err := settings.Load(dir)
+	if err != nil {
+		return settings.New(dir)
+	}
+	return s
+}
+
 // NewApp creates a new App application struct.
 // The default adapter is the embedded Tailcat library; set TAILCAT_ADAPTER=fake
 // for offline UI demos and tests.
@@ -56,8 +100,10 @@ func NewApp() *App {
 		svc.SetNetworkOpts(adapter.NetworkOpts{Region: settings.Region, DERPMapURL: settings.DERPMapURL})
 	}
 	return &App{
-		svc:  svc,
-		keys: keys,
+		svc:       svc,
+		keys:      keys,
+		settings:  newSettingsStore(),
+		startedAt: time.Now(),
 	}
 }
 
@@ -68,6 +114,18 @@ func (a *App) startup(ctx context.Context) {
 	a.tray = tray.New(a.showWindow, a.quitApp, a.activeSessionCount)
 	a.tray.Start(a.trayIcon)
 	go a.forwardEvents()
+	go a.maybeRecordDailyUpdateCheck()
+}
+
+func (a *App) maybeRecordDailyUpdateCheck() {
+	if a.settings == nil {
+		return
+	}
+	_, last := a.settings.Snapshot()
+	if !last.IsZero() && time.Since(last) < updateCheckInterval {
+		return
+	}
+	_, _ = a.RecordUpdateCheck()
 }
 
 func (a *App) showWindow() {
@@ -255,4 +313,70 @@ func (a *App) SelectFiles(title string) ([]string, error) {
 		return nil, fmt.Errorf("file picker requires a running window")
 	}
 	return runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
+}
+
+// GetClientInfo returns uptime start time, app version, Tailcat module version, and last update check.
+func (a *App) GetClientInfo() ClientInfo {
+	info := ClientInfo{
+		StartedAt:      a.startedAt.UTC().Format(time.RFC3339),
+		AppVersion:     appinfo.ClientVersion(),
+		TailcatVersion: appinfo.TailcatVersion(),
+	}
+	if a.settings != nil {
+		_, last := a.settings.Snapshot()
+		if !last.IsZero() {
+			info.LastUpdateCheck = last.UTC().Format(time.RFC3339)
+		}
+	}
+	return info
+}
+
+// RecordUpdateCheck stores the current time as the last Tailcat version inspection.
+func (a *App) RecordUpdateCheck() (ClientInfo, error) {
+	if a.settings == nil {
+		return a.GetClientInfo(), fmt.Errorf("settings store is not available")
+	}
+	if err := a.settings.SetLastUpdateCheck(time.Now()); err != nil {
+		return a.GetClientInfo(), err
+	}
+	return a.GetClientInfo(), nil
+}
+
+// GetSystemInfo returns OS version, launch-at-login state, and a local network summary.
+func (a *App) GetSystemInfo() SystemInfo {
+	return a.systemInfo()
+}
+
+// SetLaunchAtLogin updates the persisted preference and, on macOS/Windows, the OS login item.
+func (a *App) SetLaunchAtLogin(enabled bool) (SystemInfo, error) {
+	if autostart.Supported() {
+		if err := autostart.SetEnabled(enabled); err != nil {
+			return a.systemInfo(), err
+		}
+	}
+	if a.settings != nil {
+		if err := a.settings.SetLaunchAtLogin(enabled); err != nil {
+			return a.systemInfo(), err
+		}
+	}
+	return a.systemInfo(), nil
+}
+
+func (a *App) systemInfo() SystemInfo {
+	net := sysinfo.Network()
+	info := SystemInfo{
+		OSVersion:              sysinfo.OSVersion(),
+		LaunchAtLoginSupported: autostart.Supported(),
+		NetworkOnline:          net.Online,
+		NetworkSummary:         net.Summary,
+	}
+	if a.settings != nil {
+		info.LaunchAtLogin, _ = a.settings.Snapshot()
+	}
+	if autostart.Supported() {
+		if enabled, err := autostart.Enabled(); err == nil {
+			info.LaunchAtLogin = enabled
+		}
+	}
+	return info
 }

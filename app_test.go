@@ -318,14 +318,85 @@ waitExit:
 	if err := a.SetNetworkSettings("nyc", "https://example.test/derpmap.json"); err != nil {
 		t.Fatal(err)
 	}
-	settings, err := a.GetNetworkSettings()
+	netSettings, err := a.GetNetworkSettings()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.Region != "nyc" || settings.DERPMapURL != "https://example.test/derpmap.json" {
-		t.Fatalf("%+v", settings)
+	if netSettings.Region != "nyc" || netSettings.DERPMapURL != "https://example.test/derpmap.json" {
+		t.Fatalf("%+v", netSettings)
 	}
 	if v := a.TailcatVersion(); v == "" || v == "unknown" {
 		t.Fatalf("version=%q", v)
+	}
+}
+
+func TestAppSettingsBindings(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_SETTINGS_DIR", t.TempDir())
+	a := NewApp()
+
+	info := a.GetClientInfo()
+	if info.AppVersion == "" {
+		t.Fatal("empty app version")
+	}
+	if info.TailcatVersion == "" || info.TailcatVersion == "unknown" {
+		t.Fatalf("tailcat version=%q", info.TailcatVersion)
+	}
+	if info.StartedAt == "" {
+		t.Fatal("empty started at")
+	}
+	if info.LastUpdateCheck != "" {
+		t.Fatalf("expected no last check, got %q", info.LastUpdateCheck)
+	}
+
+	updated, err := a.RecordUpdateCheck()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.LastUpdateCheck == "" {
+		t.Fatal("expected last update check timestamp")
+	}
+
+	reloaded := NewApp()
+	if reloaded.GetClientInfo().LastUpdateCheck != updated.LastUpdateCheck {
+		t.Fatalf("persisted check=%q want %q", reloaded.GetClientInfo().LastUpdateCheck, updated.LastUpdateCheck)
+	}
+
+	sys := a.GetSystemInfo()
+	if sys.OSVersion == "" {
+		t.Fatal("empty OS version")
+	}
+	if sys.NetworkSummary == "" {
+		t.Fatal("empty network summary")
+	}
+
+	sys, err = a.SetLaunchAtLogin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sys.LaunchAtLogin {
+		t.Fatal("expected launch-at-login preference to persist")
+	}
+	again := NewApp().GetSystemInfo()
+	if !again.LaunchAtLogin {
+		t.Fatal("launch-at-login not reloaded")
+	}
+}
+
+func TestMaybeRecordDailyUpdateCheck(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_SETTINGS_DIR", t.TempDir())
+	a := NewApp()
+	if a.GetClientInfo().LastUpdateCheck != "" {
+		t.Fatal("expected empty last check before watcher")
+	}
+	a.maybeRecordDailyUpdateCheck()
+	first := a.GetClientInfo().LastUpdateCheck
+	if first == "" {
+		t.Fatal("expected daily check to record a timestamp")
+	}
+	a.maybeRecordDailyUpdateCheck()
+	if a.GetClientInfo().LastUpdateCheck != first {
+		t.Fatal("should not rewrite last check within 24h")
 	}
 }
