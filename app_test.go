@@ -429,7 +429,7 @@ func TestChatRoomEchoAndRestartKey(t *testing.T) {
 	if err := a.ConnectChatPeer("tc:fake-echo"); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.SendChatText("hi"); err != nil {
+	if err := a.SendChatText("hi", false, 0); err != nil {
 		t.Fatal(err)
 	}
 	deadline = time.After(2 * time.Second)

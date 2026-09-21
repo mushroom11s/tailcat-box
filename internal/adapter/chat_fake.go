@@ -110,7 +110,9 @@ func (r *fakeRoom) SendEnvelope(ctx context.Context, port uint16, frame []byte) 
 		return ctx.Err()
 	default:
 	}
-	if peer == "tc:fake-echo" {
+	r.owner.record(peer, port, frame)
+	switch peer {
+	case "tc:fake-echo":
 		if port == 101 {
 			reply, err := packFrame(map[string]any{"type": "text"}, []byte("echo"))
 			if err != nil {
@@ -119,8 +121,126 @@ func (r *fakeRoom) SendEnvelope(ctx context.Context, port uint16, frame []byte) 
 			return r.owner.deliver(r.addr, 101, reply)
 		}
 		return nil
+	case "tc:fake-official":
+		return nil
+	case "tc:fake-box":
+		return r.owner.replyHello(r.addr, frame, "tc:fake-box", []string{"burn", "resume"})
+	case "tc:fake-resume":
+		return r.owner.replyResume(r.addr, frame)
+	default:
+		return r.owner.deliver(peer, port, frame)
 	}
-	return r.owner.deliver(peer, port, frame)
+}
+
+func (f *Fake) record(peer string, port uint16, frame []byte) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.captured = append(f.captured, CapturedFrame{Peer: peer, Port: port, Frame: append([]byte(nil), frame...)})
+}
+
+func (f *Fake) FramesTo(peer string) []CapturedFrame {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []CapturedFrame
+	for _, frame := range f.captured {
+		if frame.Peer == peer {
+			out = append(out, frame)
+		}
+	}
+	return out
+}
+
+func (f *Fake) replyHello(from string, frame []byte, replyTo string, caps []string) error {
+	meta, _, err := unpackFrame(frame)
+	if err != nil {
+		return nil
+	}
+	if meta["type"] != "hello" {
+		return nil
+	}
+	reply, err := packFrame(map[string]any{"type": "hello", "replyTo": replyTo, "caps": caps}, nil)
+	if err != nil {
+		return err
+	}
+	return f.deliver(from, 100, reply)
+}
+
+func (f *Fake) replyResume(from string, frame []byte) error {
+	meta, payload, err := unpackFrame(frame)
+	if err != nil {
+		return err
+	}
+	switch meta["type"] {
+	case "hello":
+		return f.replyHello(from, frame, "tc:fake-resume", []string{"resume"})
+	case "file-begin":
+		id, _ := meta["id"].(string)
+		f.mu.Lock()
+		offset := len(f.resumeData[id])
+		f.mu.Unlock()
+		reply, err := packFrame(map[string]any{"type": "file-offset", "id": id, "offset": offset}, nil)
+		if err != nil {
+			return err
+		}
+		return f.deliver(from, 100, reply)
+	case "file-chunk":
+		id, _ := meta["id"].(string)
+		off := int(asInt64(meta["offset"]))
+		f.mu.Lock()
+		if f.resumeData == nil {
+			f.resumeData = map[string][]byte{}
+		}
+		if f.resumeDrops == nil {
+			f.resumeDrops = map[string]int{}
+		}
+		cur := f.resumeData[id]
+		if off <= len(cur) {
+			start := len(cur) - off
+			if start < len(payload) {
+				cur = append(cur, payload[start:]...)
+			}
+			f.resumeData[id] = cur
+		}
+		drop := f.resumeDrops[id] == 0
+		if drop {
+			f.resumeDrops[id] = 1
+		}
+		f.mu.Unlock()
+		if drop {
+			return fmt.Errorf("chunk dropped")
+		}
+		return nil
+	default:
+		return nil
+	}
+}
+
+func asInt64(v any) int64 {
+	switch n := v.(type) {
+	case float64:
+		return int64(n)
+	case int:
+		return int64(n)
+	case int64:
+		return n
+	default:
+		return 0
+	}
+}
+
+func unpackFrame(frame []byte) (map[string]any, []byte, error) {
+	if len(frame) < 8 || string(frame[:4]) != "TCH1" {
+		return nil, nil, fmt.Errorf("bad magic")
+	}
+	n := binary.BigEndian.Uint32(frame[4:8])
+	if uint64(n) > uint64(len(frame)-8) {
+		return nil, nil, fmt.Errorf("length overrun")
+	}
+	var meta map[string]any
+	if err := json.Unmarshal(frame[8:8+n], &meta); err != nil {
+		return nil, nil, err
+	}
+	return meta, append([]byte(nil), frame[8+int(n):]...), nil
 }
 
 func (f *Fake) deliver(addr string, port uint16, frame []byte) error {

@@ -108,14 +108,27 @@ func NewApp() *App {
 	if settings, err := keys.LoadSettings(); err == nil {
 		svc.SetNetworkOpts(adapter.NetworkOpts{Region: settings.Region, DERPMapURL: settings.DERPMapURL})
 	}
+	chatSvc := chat.New(chatAd)
+	chatSvc.SetDataDir(chatDataDir())
 	return &App{
 		svc:        svc,
 		svcAdapter: ad,
-		chat:       chat.New(chatAd),
+		chat:       chatSvc,
 		keys:       keys,
 		settings:   newSettingsStore(),
 		startedAt:  time.Now(),
 	}
+}
+
+func chatDataDir() string {
+	if dir := os.Getenv("TAILCAT_CHAT_DIR"); dir != "" {
+		return dir
+	}
+	conf, err := os.UserConfigDir()
+	if err != nil {
+		return filepath.Join(".", "tailcat-desktop-client")
+	}
+	return filepath.Join(conf, "tailcat-desktop-client")
 }
 
 // startup is called when the app starts. The context is saved
@@ -316,8 +329,32 @@ func (a *App) ConnectChatPeer(addr string) error {
 	return a.chat.Connect(addr)
 }
 
-func (a *App) SendChatText(body string) error {
-	return a.chat.SendText(body)
+func (a *App) SendChatText(body string, burn bool, ttlSec int) error {
+	return a.chat.SendTextBurn(body, burn, ttlSec)
+}
+
+func (a *App) SendChatFile(path string, burn bool, ttlSec int) (string, error) {
+	return a.chat.SendFile(path, burn, ttlSec)
+}
+
+func (a *App) DiscardChatMessage(id string) error {
+	return a.chat.Discard(id)
+}
+
+func (a *App) ResendChatFile(id string) error {
+	_, err := a.chat.Resend(id)
+	return err
+}
+
+func (a *App) SaveChatFile(id string) error {
+	if a.ctx == nil {
+		return fmt.Errorf("save dialog requires a running window")
+	}
+	dest, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{DefaultFilename: a.chat.FileName(id)})
+	if err != nil || dest == "" {
+		return err
+	}
+	return a.chat.CopyFile(id, dest)
 }
 
 func (a *App) RestartChatRoom(keyName string) (session.Session, error) {

@@ -45,20 +45,39 @@ type Message struct {
 	Direction string `json:"direction"`
 	Type      string `json:"type"`
 	Code      string `json:"code,omitempty"`
-	Body      string `json:"body"`
+	Body      string `json:"body,omitempty"`
 	At        string `json:"at"`
+	Name      string `json:"name,omitempty"`
+	Mime      string `json:"mime,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+	Path      string `json:"path,omitempty"`
+	FileID    string `json:"fileId,omitempty"`
+	Burn      bool   `json:"burn,omitempty"`
+	TTLSec    int    `json:"ttlSec,omitempty"`
+	Preview   string `json:"preview,omitempty"`
 }
 
 type Service struct {
-	ad       adapter.ChatAdapter
-	mu       sync.Mutex
-	sess     *session.Session
-	room     adapter.Room
-	cancel   context.CancelFunc
-	peer     string
-	messages []Message
-	ui       chan adapter.Event
-	opening  bool
+	ad             adapter.ChatAdapter
+	mu             sync.Mutex
+	sess           *session.Session
+	room           adapter.Room
+	cancel         context.CancelFunc
+	peer           string
+	peerCaps       []string
+	messages       []Message
+	ui             chan adapter.Event
+	opening        bool
+	dataDir        string
+	sending        bool
+	queued         *fileJob
+	failed         map[string]*fileJob
+	transfers      []Transfer
+	offsetWait     map[string]chan int64
+	offsetWaitFor  time.Duration
+	sendMu         sync.Mutex
+	transferCancel context.CancelFunc
+	roomCtx        context.Context
 }
 
 func New(ad adapter.ChatAdapter) *Service {
@@ -116,7 +135,11 @@ func (s *Service) Restart(opts StartOpts) (session.Session, error) {
 }
 
 func (s *Service) Stop() error {
+	s.mu.Lock()
+	dir := s.dataDir
+	s.mu.Unlock()
 	s.shutdown(true)
+	_ = sweepChatDir(dir, partialDirName)
 	return nil
 }
 
@@ -127,7 +150,15 @@ func (s *Service) shutdown(markStopped bool) {
 	sess := s.sess
 	s.room = nil
 	s.cancel = nil
+	s.roomCtx = nil
 	s.peer = ""
+	s.peerCaps = nil
+	s.sending = false
+	s.queued = nil
+	if s.transferCancel != nil {
+		s.transferCancel()
+		s.transferCancel = nil
+	}
 	s.mu.Unlock()
 	if cancel != nil {
 		cancel()
@@ -150,6 +181,7 @@ func (s *Service) open(opts StartOpts, restarted bool) (session.Session, error) 
 	s.peer = ""
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
+	s.roomCtx = ctx
 	var restartedMsg *Message
 	if restarted {
 		msg := newMessage("system", "system", codeRoomRestarted, bodyRoomRestarted)
@@ -200,6 +232,9 @@ func (s *Service) Connect(addr string) error {
 		s.messages = append(s.messages, msg)
 		changed = &msg
 	}
+	if s.peer != addr {
+		s.peerCaps = nil
+	}
 	s.peer = addr
 	local := s.sess.Address
 	room := s.room
@@ -211,13 +246,11 @@ func (s *Service) Connect(addr string) error {
 	if err := room.SetPeer(addr); err != nil {
 		return fmt.Errorf("%s", errUnreachable)
 	}
-	frame, err := Pack(map[string]any{"type": "hello", "replyTo": local}, nil)
+	frame, err := Pack(map[string]any{"type": "hello", "replyTo": local, "caps": []string{"burn", "resume"}}, nil)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	if err := room.SendEnvelope(ctx, portControl, frame); err != nil {
+	if err := s.dial(context.Background(), room, portControl, frame); err != nil {
 		return fmt.Errorf("%s", errUnreachable)
 	}
 	s.emitPeer(sid, addr, nil)
@@ -225,28 +258,7 @@ func (s *Service) Connect(addr string) error {
 }
 
 func (s *Service) SendText(body string) error {
-	if strings.TrimSpace(body) == "" {
-		return nil
-	}
-	s.mu.Lock()
-	if s.peer == "" || s.room == nil {
-		s.mu.Unlock()
-		return fmt.Errorf("no peer")
-	}
-	room := s.room
-	sid := s.sess.ID
-	s.mu.Unlock()
-	frame, err := Pack(map[string]any{"type": "text"}, []byte(body))
-	if err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	if err := room.SendEnvelope(ctx, portText, frame); err != nil {
-		return fmt.Errorf("%s", errUnreachable)
-	}
-	s.addText(sid, "out", body)
-	return nil
+	return s.SendTextBurn(body, false, 0)
 }
 
 func (s *Service) readLoop(room adapter.Room, sessionID string) {
@@ -284,7 +296,16 @@ func (s *Service) onInbound(sessionID string, ev adapter.ChatEvent) {
 	case "hello":
 		s.onHello(sessionID, meta)
 	case "text":
-		s.addText(sessionID, "in", string(payload))
+		burn, ttl := readBurn(meta)
+		s.addText(sessionID, "in", string(payload), burn, ttl)
+	case "file":
+		s.onWholeFile(sessionID, meta, payload)
+	case "file-begin":
+		s.onFileBegin(meta)
+	case "file-chunk":
+		s.onFileChunk(sessionID, meta, payload)
+	case "file-offset":
+		s.deliverOffset(stringField(meta, "id"), asInt(meta["offset"]))
 	default:
 		return
 	}
@@ -295,9 +316,12 @@ func (s *Service) onHello(sessionID string, meta map[string]any) {
 	if !strings.HasPrefix(replyTo, "tc") {
 		return
 	}
+	caps := capsOf(meta)
 	s.mu.Lock()
 	if replyTo == s.peer {
+		s.peerCaps = caps
 		s.mu.Unlock()
+		s.emitPeer(sessionID, replyTo, caps)
 		return
 	}
 	room := s.room
@@ -308,6 +332,7 @@ func (s *Service) onHello(sessionID string, meta map[string]any) {
 		changed = &msg
 	}
 	s.peer = replyTo
+	s.peerCaps = caps
 	hear := newMessage("system", "system", codeHearMeow, bodyHearMeow)
 	s.messages = append(s.messages, hear)
 	s.mu.Unlock()
@@ -321,8 +346,12 @@ func (s *Service) onHello(sessionID string, meta map[string]any) {
 	s.emitPeer(sessionID, replyTo, capsOf(meta))
 }
 
-func (s *Service) addText(sessionID, direction, body string) {
+func (s *Service) addText(sessionID, direction, body string, burn bool, ttl int) {
 	msg := newMessage(direction, "text", "", body)
+	if burn {
+		msg.Burn = true
+		msg.TTLSec = clampTTL(ttl)
+	}
 	s.mu.Lock()
 	s.messages = append(s.messages, msg)
 	s.mu.Unlock()

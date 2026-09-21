@@ -12,7 +12,9 @@ import (
 	"tailscale.com/tailcfg"
 )
 
-const maxChatFrame = 1 << 20
+// maxChatFrame bounds one inbound chat stream. Phase 2 raised the phase 1
+// 1 MiB cap so a whole-file envelope can arrive intact.
+const maxChatFrame = 64 << 20
 
 type realRoom struct {
 	real   *Real

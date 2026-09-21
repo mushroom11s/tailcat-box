@@ -130,7 +130,7 @@ func TestHelloOnceAndTextBothWays(t *testing.T) {
 	}
 }
 
-func TestConnectHelloOmitsCaps(t *testing.T) {
+func TestConnectHelloAdvertisesBurnAndResume(t *testing.T) {
 	mem := newMemAdapter()
 	svc := New(mem)
 	if _, err := svc.Start(StartOpts{}); err != nil {
@@ -150,8 +150,9 @@ func TestConnectHelloOmitsCaps(t *testing.T) {
 	if meta["type"] != "hello" || meta["replyTo"] == "" {
 		t.Fatalf("meta=%v", meta)
 	}
-	if _, ok := meta["caps"]; ok {
-		t.Fatalf("caps present: %v", meta)
+	caps, ok := meta["caps"].([]any)
+	if !ok || len(caps) != 2 || caps[0] != "burn" || caps[1] != "resume" {
+		t.Fatalf("caps=%v", meta["caps"])
 	}
 }
 
@@ -262,6 +263,7 @@ type memAdapter struct {
 	mu   sync.Mutex
 	sent []sentFrame
 	room *memRoom
+	gate chan struct{}
 }
 
 func newMemAdapter() *memAdapter { return &memAdapter{} }
@@ -295,6 +297,13 @@ func (r *memRoom) Close() error              { return nil }
 func (r *memRoom) SendEnvelope(ctx context.Context, port uint16, frame []byte) error {
 	if r.peer == "tc:not-a-real-peer" {
 		return fmt.Errorf("dial failed")
+	}
+	if r.mem.gate != nil && port == portFiles {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-r.mem.gate:
+		}
 	}
 	r.mem.mu.Lock()
 	r.mem.sent = append(r.mem.sent, sentFrame{port: port, frame: append([]byte(nil), frame...)})
