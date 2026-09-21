@@ -8,6 +8,18 @@ function kindLabel(kind: string): string {
   if (kind === "pipe_dial") {
     return "Pipe dial";
   }
+  if (kind === "port_serve") {
+    return "Port serve";
+  }
+  if (kind === "forward") {
+    return "Forward";
+  }
+  if (kind === "browse") {
+    return "Browse";
+  }
+  if (kind === "ping") {
+    return "Ping";
+  }
   return kind;
 }
 

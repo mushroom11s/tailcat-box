@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ConnectPage from "./pages/ConnectPage";
 import ServicesPage from "./pages/ServicesPage";
+import { parsePortMappings } from "./lib/ports";
 import {
   dialPipe,
   hasWailsBindings,
   listSessions,
   onTailcatEvent,
+  startBrowse,
+  startForward,
   startPipeServe,
+  startPortServe,
   stopSession,
   type Session,
   type TailcatEvent,
@@ -149,7 +153,12 @@ export default function App() {
             sessions={sessions}
             busy={busy}
             error={error}
-            onStart={() => void run(startPipeServe)}
+            onStartPipe={() => void run(startPipeServe)}
+            onStartPorts={(spec) =>
+              void run(async () => {
+                await startPortServe(parsePortMappings(spec));
+              })
+            }
             onStop={(id) => void run(() => stopSession(id))}
           />
         ) : (
@@ -159,6 +168,12 @@ export default function App() {
             busy={busy}
             error={error}
             onSend={(addr, payload) => void run(() => dialPipe(addr, payload))}
+            onForward={(addr, spec) =>
+              void run(async () => {
+                await startForward(addr, parsePortMappings(spec));
+              })
+            }
+            onBrowse={(addr) => void run(() => startBrowse(addr))}
             onStop={(id) => void run(() => stopSession(id))}
           />
         )}
