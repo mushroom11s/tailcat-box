@@ -29,6 +29,9 @@ export PATH="$PATH:$GOBIN_DIR"
 
 if ! command -v wails >/dev/null 2>&1 || [ "$(wails version 2>/dev/null | head -1)" != "$WAILS_VERSION" ]; then
   log "Installing Wails CLI ${WAILS_VERSION}"
+  # Wails v2.16 requires Go >= 1.25. With GOTOOLCHAIN=auto (the default), this
+  # `go install` transparently fetches and caches the newer toolchain, which is
+  # then baked into the environment build so later builds never re-download it.
   go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
 else
   log "Wails CLI ${WAILS_VERSION} already present"
@@ -61,6 +64,9 @@ if [ -f frontend/package.json ]; then
 fi
 
 log "Environment ready"
-printf 'Go:    %s\n' "$(go version)"
-printf 'Node:  %s\n' "$(node --version)"
-printf 'Wails: %s\n' "$(wails version 2>/dev/null | head -1)"
+# Base Go; Wails builds use GOTOOLCHAIN=auto, which selects the >=1.25 toolchain
+# cached above when a module requires it.
+printf 'Go:         %s\n' "$(go version)"
+printf 'Node:       %s\n' "$(node --version)"
+printf 'Wails:      %s\n' "$(wails version 2>/dev/null | head -1)"
+printf 'WebKit2GTK: %s\n' "$(pkg-config --modversion webkit2gtk-4.1 2>/dev/null)"
