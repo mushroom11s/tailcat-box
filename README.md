@@ -211,4 +211,4 @@ Manual on **macOS or Windows** (cannot be fully exercised as a native Wails wind
 - `internal/store` — named key files (`*.private.json`) and `settings.json` (region / DERP map URL)
 - `internal/adapter` — `TailcatAdapter` plus fake and real implementations
 - `internal/tray` — Open / session count / Quit (native systray on macOS/Windows; stub + app menu on Linux)
-- `frontend/` — glass shell, Connect, Services, Files, Keys, Diagnostics
+- `frontend/` — glass shell, Connect, Services, Files, Keys, Diagnostics, Settings
