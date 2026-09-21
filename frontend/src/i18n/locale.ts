@@ -51,6 +51,16 @@ export function kindMessageKey(kind: string): MessageKey | null {
       return "kindCopy";
     case "files_serve":
       return "kindFilesServe";
+    case "ssh_serve":
+      return "kindSSHServe";
+    case "ssh_client":
+      return "kindSSHClient";
+    case "socks":
+      return "kindSOCKS";
+    case "exit_node":
+      return "kindExitNode";
+    case "exec":
+      return "kindExec";
     default:
       return null;
   }

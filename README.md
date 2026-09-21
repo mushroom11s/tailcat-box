@@ -8,12 +8,12 @@ Full-featured desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/t
 
 **Plan 3 status: complete.** Files can recv into an inbox, send/copy to a peer, serve a directory over SFTP, and list remote paths (fake + real adapter). Session lists stay visually stable across poll refreshes.
 
+**Plan 4 status: complete.** Services can serve keyed SSH, no-auth SSH (with a typed CONFIRM gate), exit-node, and per-connection exec. Connect can run an SSH command and start a SOCKS5 proxy. Keys can persist DERP region / map URL. A tray/menu offers Open + Quit (native tray on macOS/Windows; Linux uses the app menu).
+
 - Shell: [Wails](https://wails.io) v2 (Go + React + TypeScript)
 - Engine: embedded `github.com/tailscale/tailcat` (UI never imports Tailcat types)
 - UI: Apple-inspired / Liquid Glass style (CSS blur/translucency; light/dark)
 - Android: planned later (not v1)
-
-Plan 4 (SSH, SOCKS, exit-node, exec, tray) is not implemented.
 
 ## Docs
 
@@ -21,6 +21,7 @@ Plan 4 (SSH, SOCKS, exit-node, exec, tray) is not implemented.
 - [Plan 1: Foundation vertical slice](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-1.md)
 - [Plan 2: Ports, keys, ping](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-2.md)
 - [Plan 3: Files](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-3.md)
+- [Plan 4: SSH, SOCKS, exit-node, exec, DERP, tray](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-4.md)
 - [Plans index](docs/superpowers/plans/README.md)
 
 ## Prerequisites
@@ -52,8 +53,8 @@ TAILCAT_ADAPTER=fake wails dev
 
 | Mode | How | Behavior |
 | --- | --- | --- |
-| **Real** (default) | `wails dev` / `wails build` | Serve prints a `tc…` address; Connect dials TCP port **1** (same port as bare `tailcat <addr>`). Port serve proxies mapped TCP ports; forward/browse listen on localhost; ping uses disco pings (DERP then direct when possible). Files recv/serve use SFTP on TCP port **22** (`SSHConnHandler` + `FileService`); copy/ls speak SFTP over that port. Parse/resolve call the library. |
-| **Fake** | `TAILCAT_ADAPTER=fake` | Pipe address is `tc:fake-<sessionID>`; port serve is `tc:fake-port-<sessionID>`; dial replies with `echo:<payload>`; ping emits DERP then direct `EventData` lines. Recv is `tc:fake-recv-<sessionID>` and emits a drop notification; files serve is `tc:fake-files-<sessionID>`; copy emits progress then closes; ls returns stub `hello.txt` and `photos/`. Parse returns stub JSON; resolve returns `tc:fake-resolved`. No network. |
+| **Real** (default) | `wails dev` / `wails build` | Serve prints a `tc…` address; Connect dials TCP port **1** (same port as bare `tailcat <addr>`). Port serve proxies mapped TCP ports; forward/browse listen on localhost; ping uses disco pings (DERP then direct when possible). Files recv/serve use SFTP on TCP port **22** (`SSHConnHandler` + `FileService`); copy/ls speak SFTP over that port. SSH serve uses port **22** (`SSHConnHandler`); SSH client runs a command over that port. SOCKS listens locally and dials via the peer (including exit-node IPs). Exit-node sets `OnTCPForward` / `OnUDPForward`. Exec uses `ExecConnHandler`. Parse/resolve call the library. Region / DERP map URL from Keys are applied to subsequent starts. |
+| **Fake** | `TAILCAT_ADAPTER=fake` | Pipe address is `tc:fake-<sessionID>`; port serve is `tc:fake-port-<sessionID>`; dial replies with `echo:<payload>`; ping emits DERP then direct `EventData` lines. Recv is `tc:fake-recv-<sessionID>` and emits a drop notification; files serve is `tc:fake-files-<sessionID>`; copy emits progress then closes; ls returns stub `hello.txt` and `photos/`. SSH serve is `tc:fake-ssh-<id>` or `tc:fake-noauth-ssh-<id>`; SSH client echoes the command; SOCKS reports `socks5h://…`; exit-node is `tc:fake-exit-<id>`; exec is `tc:fake-exec-<id>`. Parse returns stub JSON; resolve returns `tc:fake-resolved`. No network. |
 
 `vite` / `npm run dev` without Wails has no Go bindings. The UI then uses an in-browser fake that matches the Go fake, and shows an “In-browser fake adapter” chip.
 
@@ -179,11 +180,35 @@ Manual on **macOS or Windows** (cannot be fully exercised as a native Wails wind
 - [ ] Services → files-serve shortcut; multi-row session list stays still while polling
 - [ ] Repeat recv/serve/copy with the real adapter (default) on a normal network
 
+## Plan 4 acceptance
+
+Automated (this repo / CI-friendly):
+
+- [x] `go test ./...` without the `integration` tag
+- [x] Fake adapter env override (`TAILCAT_ADAPTER=fake`)
+- [x] Real adapter compiles; default is `NewReal()`
+- [x] Frontend `npm run build`
+- [x] Isolation: only `internal/adapter` imports `github.com/tailscale/tailcat`
+- [x] SSH serve refuses no-auth without `confirmDangerous`
+- [x] SOCKS / exit-node / exec / SSH client on the fake path
+- [x] DERP region / map URL persist in the key store directory
+- [x] Windows-safe `npm run build` (Node writes `dist/.keep`; no `touch`)
+
+Manual on **macOS or Windows** (cannot be fully exercised as a native Wails window on a headless Linux agent):
+
+- [ ] Services → SSH serve with authorized keys; no-auth SSH requires typing `CONFIRM`
+- [ ] Connect → SSH command against that address; SOCKS listen URL appears
+- [ ] Services → exit-node and exec; Diagnostics lists them as wired
+- [ ] Keys → save region / DERP map URL
+- [ ] Tray or app menu: Open shows the window; Quit exits. Closing the window hides it (`HideWindowOnClose`) so sessions can keep running.
+- [ ] Linux: app menu Open/Quit is the tray fallback (no libayatana requirement in unit tests)
+
 ## Layout
 
 - `main.go` / `app.go` — Wails entry and JS bindings
 - `internal/session` — session state machine
-- `internal/service` — StartPipeServe / DialPipe / StartPortServe / StartForward / StartBrowse / StartPing / StartRecv / StartCopy / StartFilesServe / ListRemote / ParseAddr / ResolveAddr / Stop / List / Events
-- `internal/store` — named key files (`*.private.json`)
+- `internal/service` — StartPipeServe / DialPipe / StartPortServe / StartForward / StartBrowse / StartPing / StartRecv / StartCopy / StartFilesServe / ListRemote / StartSSHServe / StartSSHClient / StartSOCKS / StartExitNode / StartExec / ParseAddr / ResolveAddr / Stop / List / Events
+- `internal/store` — named key files (`*.private.json`) and `settings.json` (region / DERP map URL)
 - `internal/adapter` — `TailcatAdapter` plus fake and real implementations
+- `internal/tray` — Open / session count / Quit (native systray on macOS/Windows; stub + app menu on Linux)
 - `frontend/` — glass shell, Connect, Services, Files, Keys, Diagnostics

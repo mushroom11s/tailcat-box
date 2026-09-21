@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import SessionCard from "../components/SessionCard";
-import { useI18n } from "../i18n";
+import { useI18n, type MessageKey } from "../i18n";
 import type { Session, TailcatEvent } from "../lib/wails";
 
 type Props = {
@@ -8,11 +8,27 @@ type Props = {
   events: TailcatEvent[];
   busy: boolean;
   error: string;
+  version: string;
   onPing: (addr: string, untilDirect: boolean) => void;
   onStop: (id: string) => void;
 };
 
-export default function DiagnosticsPage({ sessions, events, busy, error, onPing, onStop }: Props) {
+const WIRED: MessageKey[] = [
+  "wiredPipe",
+  "wiredPorts",
+  "wiredPing",
+  "wiredFiles",
+  "wiredSSH",
+  "wiredSOCKS",
+  "wiredExit",
+  "wiredExec",
+  "wiredDERP",
+  "wiredTray",
+];
+
+const UNWIRED: MessageKey[] = ["unwiredAndroid", "unwiredPTY", "unwiredAllow", "unwiredDNS"];
+
+export default function DiagnosticsPage({ sessions, events, busy, error, version, onPing, onStop }: Props) {
   const { t } = useI18n();
   const [addr, setAddr] = useState("");
   const [untilDirect, setUntilDirect] = useState(true);
@@ -74,6 +90,24 @@ export default function DiagnosticsPage({ sessions, events, busy, error, onPing,
           <SessionCard key={sess.ID} session={sess} onStop={onStop} />
         ))}
       </div>
+      <h3 className="kind" style={{ marginTop: 24 }}>
+        {t("engine")}
+      </h3>
+      <p className="lede">
+        {t("compiledModule")}: {version || "unknown"}
+      </p>
+      <h3 className="kind">{t("wired")}</h3>
+      <ul className="cap-list">
+        {WIRED.map((item) => (
+          <li key={item}>{t(item)}</li>
+        ))}
+      </ul>
+      <h3 className="kind">{t("notYetWired")}</h3>
+      <ul className="cap-list">
+        {UNWIRED.map((item) => (
+          <li key={item}>{t(item)}</li>
+        ))}
+      </ul>
     </section>
   );
 }

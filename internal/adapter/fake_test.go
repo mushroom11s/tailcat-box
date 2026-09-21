@@ -306,3 +306,150 @@ func TestFakeListRemoteUnknownServe(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestFakeSSHServeKeyedAndNoAuth(t *testing.T) {
+	f := adapter.NewFake()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	ch, err := f.StartSSHServe(ctx, "ssh1", adapter.SSHServeOpts{AuthorizedKeys: "ssh-ed25519 AAAA test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case ev := <-ch:
+		if ev.Kind != adapter.EventReady {
+			t.Fatalf("%+v", ev)
+		}
+		if ev.Address != "tc:fake-ssh-ssh1" {
+			t.Fatalf("address=%q", ev.Address)
+		}
+	case <-ctx.Done():
+		t.Fatal("timeout keyed")
+	}
+
+	noAuthCh, err := f.StartSSHServe(ctx, "ssh2", adapter.SSHServeOpts{NoAuth: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case ev := <-noAuthCh:
+		if ev.Kind != adapter.EventReady {
+			t.Fatalf("%+v", ev)
+		}
+		if ev.Address != "tc:fake-noauth-ssh-ssh2" {
+			t.Fatalf("address=%q", ev.Address)
+		}
+	case <-ctx.Done():
+		t.Fatal("timeout no-auth")
+	}
+}
+
+func TestFakeSSHClientAgainstServe(t *testing.T) {
+	f := adapter.NewFake()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	serveCh, err := f.StartSSHServe(ctx, "ssh1", adapter.SSHServeOpts{NoAuth: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var addr string
+	select {
+	case ev := <-serveCh:
+		if ev.Kind != adapter.EventReady {
+			t.Fatalf("%+v", ev)
+		}
+		addr = ev.Address
+	case <-ctx.Done():
+		t.Fatal("timeout serve")
+	}
+
+	clientCh, err := f.StartSSHClient(ctx, "c1", addr, adapter.SSHClientOpts{Command: "whoami"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := collectUntilClosed(t, ctx, clientCh)
+	var data string
+	var closed bool
+	for _, ev := range events {
+		if ev.Kind == adapter.EventData {
+			data = ev.Data
+		}
+		if ev.Kind == adapter.EventClosed {
+			closed = true
+		}
+	}
+	if !strings.Contains(data, "whoami") {
+		t.Fatalf("data=%q events=%+v", data, events)
+	}
+	if !closed {
+		t.Fatalf("events=%+v", events)
+	}
+
+	if _, err := f.StartSSHClient(ctx, "c2", "tc:unknown", adapter.SSHClientOpts{}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFakeSOCKSExitExecAndNetworkOpts(t *testing.T) {
+	f := adapter.NewFake()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	f.SetNetworkOpts(adapter.NetworkOpts{Region: "nyc", DERPMapURL: "https://example.test/derpmap.json"})
+	got := f.NetworkOpts()
+	if got.Region != "nyc" || got.DERPMapURL == "" {
+		t.Fatalf("%+v", got)
+	}
+
+	exitCh, err := f.StartExitNode(ctx, "e1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var exitAddr string
+	select {
+	case ev := <-exitCh:
+		if ev.Kind != adapter.EventReady {
+			t.Fatalf("%+v", ev)
+		}
+		exitAddr = ev.Address
+		if exitAddr != "tc:fake-exit-e1" {
+			t.Fatalf("address=%q", exitAddr)
+		}
+	case <-ctx.Done():
+		t.Fatal("timeout exit")
+	}
+
+	socksCh, err := f.StartSOCKS(ctx, "s1", exitAddr, "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case ev := <-socksCh:
+		if ev.Kind != adapter.EventReady {
+			t.Fatalf("%+v", ev)
+		}
+		if !strings.HasPrefix(ev.Address, "socks5h://") {
+			t.Fatalf("socks addr=%q", ev.Address)
+		}
+	case <-ctx.Done():
+		t.Fatal("timeout socks")
+	}
+
+	execCh, err := f.StartExec(ctx, "x1", []string{"/bin/echo", "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case ev := <-execCh:
+		if ev.Kind != adapter.EventReady {
+			t.Fatalf("%+v", ev)
+		}
+		if ev.Address != "tc:fake-exec-x1" {
+			t.Fatalf("address=%q", ev.Address)
+		}
+	case <-ctx.Done():
+		t.Fatal("timeout exec")
+	}
+}

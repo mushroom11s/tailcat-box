@@ -11,6 +11,7 @@ import (
 	"github.com/mushroom11s/tailcat-desktop-client/internal/service"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/store"
+	"github.com/mushroom11s/tailcat-desktop-client/internal/tray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -18,9 +19,11 @@ const tailcatEventName = "tailcat:event"
 
 // App is the Wails-bound application. The UI talks only to these methods.
 type App struct {
-	ctx  context.Context
-	svc  *service.Service
-	keys *store.Store
+	ctx      context.Context
+	svc      *service.Service
+	keys     *store.Store
+	tray     *tray.Controller
+	trayIcon []byte
 }
 
 func newAdapter() adapter.TailcatAdapter {
@@ -47,9 +50,14 @@ func newKeyStore() *store.Store {
 // The default adapter is the embedded Tailcat library; set TAILCAT_ADAPTER=fake
 // for offline UI demos and tests.
 func NewApp() *App {
+	keys := newKeyStore()
+	svc := service.New(newAdapter())
+	if settings, err := keys.LoadSettings(); err == nil {
+		svc.SetNetworkOpts(adapter.NetworkOpts{Region: settings.Region, DERPMapURL: settings.DERPMapURL})
+	}
 	return &App{
-		svc:  service.New(newAdapter()),
-		keys: newKeyStore(),
+		svc:  svc,
+		keys: keys,
 	}
 }
 
@@ -57,11 +65,40 @@ func NewApp() *App {
 // so we can call the runtime methods.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.tray = tray.New(a.showWindow, a.quitApp, a.activeSessionCount)
+	a.tray.Start(a.trayIcon)
 	go a.forwardEvents()
+}
+
+func (a *App) showWindow() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.WindowShow(a.ctx)
+}
+
+func (a *App) quitApp() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.Quit(a.ctx)
+}
+
+func (a *App) activeSessionCount() int {
+	n := 0
+	for _, sess := range a.svc.List() {
+		if sess.Status != session.StatusStopped {
+			n++
+		}
+	}
+	return n
 }
 
 func (a *App) forwardEvents() {
 	for ev := range a.svc.Events() {
+		if a.tray != nil {
+			a.tray.Refresh()
+		}
 		if a.ctx == nil {
 			continue
 		}
@@ -157,6 +194,51 @@ func (a *App) StartFilesServe(rootDir string, mode string) (session.Session, err
 // ListRemote lists a remote path on a files peer (CLI `ls`).
 func (a *App) ListRemote(addr string, path string) ([]adapter.FileEntry, error) {
 	return a.svc.ListRemote(addr, path)
+}
+
+// StartSSHServe starts keyed SSH or no-auth SSH. no-auth requires confirmDangerous.
+func (a *App) StartSSHServe(noAuth bool, authorizedKeys string, confirmDangerous bool) (session.Session, error) {
+	return a.svc.StartSSHServe(adapter.SSHServeOpts{NoAuth: noAuth, AuthorizedKeys: authorizedKeys}, confirmDangerous)
+}
+
+// StartSSHClient dials SSH on a Tailcat peer and runs command (default whoami).
+func (a *App) StartSSHClient(addr string, command string, user string, identity string) (session.Session, error) {
+	return a.svc.StartSSHClient(addr, adapter.SSHClientOpts{Command: command, User: user, Identity: identity})
+}
+
+// StartSOCKS starts a local SOCKS5 proxy toward addr.
+func (a *App) StartSOCKS(addr string, listen string) (session.Session, error) {
+	return a.svc.StartSOCKS(addr, listen)
+}
+
+// StartExitNode serves as a Tailcat exit node.
+func (a *App) StartExitNode() (session.Session, error) {
+	return a.svc.StartExitNode()
+}
+
+// StartExec runs command for each incoming connection (CLI `serve exec`).
+func (a *App) StartExec(command string) (session.Session, error) {
+	return a.svc.StartExec(strings.Fields(command))
+}
+
+// GetNetworkSettings returns persisted region / DERP map URL.
+func (a *App) GetNetworkSettings() (store.Settings, error) {
+	return a.keys.LoadSettings()
+}
+
+// SetNetworkSettings persists region / DERP map URL and applies them to the adapter.
+func (a *App) SetNetworkSettings(region string, derpMapURL string) error {
+	settings := store.Settings{Region: strings.TrimSpace(region), DERPMapURL: strings.TrimSpace(derpMapURL)}
+	if err := a.keys.SaveSettings(settings); err != nil {
+		return err
+	}
+	a.svc.SetNetworkOpts(adapter.NetworkOpts{Region: settings.Region, DERPMapURL: settings.DERPMapURL})
+	return nil
+}
+
+// TailcatVersion reports the compiled github.com/tailscale/tailcat module version.
+func (a *App) TailcatVersion() string {
+	return adapter.TailcatVersion()
 }
 
 // SelectDirectory opens a native folder picker when a window is available.

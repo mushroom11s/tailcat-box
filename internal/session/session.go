@@ -19,6 +19,11 @@ const (
 	KindRecv       Kind = "recv"
 	KindCopy       Kind = "copy"
 	KindFilesServe Kind = "files_serve"
+	KindSSHServe   Kind = "ssh_serve"
+	KindSSHClient  Kind = "ssh_client"
+	KindSOCKS      Kind = "socks"
+	KindExitNode   Kind = "exit_node"
+	KindExec       Kind = "exec"
 )
 
 type Status string
@@ -38,6 +43,7 @@ type Session struct {
 	CreatedAt time.Time
 	Err       string
 	Progress  string
+	Dangerous bool
 }
 
 func New(kind Kind) *Session {

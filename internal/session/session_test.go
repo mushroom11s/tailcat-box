@@ -14,6 +14,9 @@ func TestNewSessionStartsInStarting(t *testing.T) {
 	if s.Status != session.StatusStarting {
 		t.Fatalf("status=%s", s.Status)
 	}
+	if s.Dangerous {
+		t.Fatal("new session should not be marked dangerous")
+	}
 }
 
 func TestTransitionStartingToRunning(t *testing.T) {
@@ -43,6 +46,11 @@ func TestPlan2SessionKinds(t *testing.T) {
 		session.KindRecv,
 		session.KindCopy,
 		session.KindFilesServe,
+		session.KindSSHServe,
+		session.KindSSHClient,
+		session.KindSOCKS,
+		session.KindExitNode,
+		session.KindExec,
 	}
 	for _, kind := range kinds {
 		s := session.New(kind)

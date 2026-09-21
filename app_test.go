@@ -227,3 +227,105 @@ waitReady:
 		t.Fatal("expected picker error without a window")
 	}
 }
+
+func TestAppPlan4Bindings(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	a := NewApp()
+
+	if _, err := a.StartSSHServe(true, "", false); err == nil {
+		t.Fatal("expected no-auth confirmation error")
+	}
+
+	ssh, err := a.StartSSHServe(true, "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ssh.Kind != session.KindSSHServe || !ssh.Dangerous {
+		t.Fatalf("%+v", ssh)
+	}
+
+	var addr string
+	deadline := time.After(2 * time.Second)
+waitReady:
+	for {
+		for _, item := range a.ListSessions() {
+			if item.ID == ssh.ID && item.Status == session.StatusRunning && item.Address != "" {
+				addr = item.Address
+				break waitReady
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("ssh serve never ready: %+v", a.ListSessions())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+
+	client, err := a.StartSSHClient(addr, "whoami", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.Kind != session.KindSSHClient {
+		t.Fatalf("kind=%s", client.Kind)
+	}
+
+	exitSess, err := a.StartExitNode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exitSess.Kind != session.KindExitNode {
+		t.Fatalf("kind=%s", exitSess.Kind)
+	}
+
+	var exitAddr string
+	deadline = time.After(2 * time.Second)
+waitExit:
+	for {
+		for _, item := range a.ListSessions() {
+			if item.ID == exitSess.ID && item.Status == session.StatusRunning && item.Address != "" {
+				exitAddr = item.Address
+				break waitExit
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("exit never ready: %+v", a.ListSessions())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+
+	socks, err := a.StartSOCKS(exitAddr, "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if socks.Kind != session.KindSOCKS {
+		t.Fatalf("kind=%s", socks.Kind)
+	}
+
+	execSess, err := a.StartExec("/bin/echo hi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if execSess.Kind != session.KindExec {
+		t.Fatalf("kind=%s", execSess.Kind)
+	}
+
+	if _, err := a.StartExec(""); err == nil {
+		t.Fatal("expected empty exec error")
+	}
+
+	if err := a.SetNetworkSettings("nyc", "https://example.test/derpmap.json"); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := a.GetNetworkSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.Region != "nyc" || settings.DERPMapURL != "https://example.test/derpmap.json" {
+		t.Fatalf("%+v", settings)
+	}
+	if v := a.TailcatVersion(); v == "" || v == "unknown" {
+		t.Fatalf("version=%q", v)
+	}
+}

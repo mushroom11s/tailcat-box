@@ -78,6 +78,38 @@ export function SelectFiles(arg1) {
   return window['go']['main']['App']['SelectFiles'](arg1);
 }
 
+export function StartSSHServe(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartSSHServe'](arg1, arg2, arg3);
+}
+
+export function StartSSHClient(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['StartSSHClient'](arg1, arg2, arg3, arg4);
+}
+
+export function StartSOCKS(arg1, arg2) {
+  return window['go']['main']['App']['StartSOCKS'](arg1, arg2);
+}
+
+export function StartExitNode() {
+  return window['go']['main']['App']['StartExitNode']();
+}
+
+export function StartExec(arg1) {
+  return window['go']['main']['App']['StartExec'](arg1);
+}
+
+export function GetNetworkSettings() {
+  return window['go']['main']['App']['GetNetworkSettings']();
+}
+
+export function SetNetworkSettings(arg1, arg2) {
+  return window['go']['main']['App']['SetNetworkSettings'](arg1, arg2);
+}
+
+export function TailcatVersion() {
+  return window['go']['main']['App']['TailcatVersion']();
+}
+
 export function StopSession(arg1) {
   return window['go']['main']['App']['StopSession'](arg1);
 }

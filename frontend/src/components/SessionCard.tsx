@@ -34,6 +34,7 @@ export default function SessionCard({ session, onStop }: Props) {
         <div className="card-meta">
           <span className="kind">{kindKey ? t(kindKey) : session.Kind}</span>
           <span className={`pill ${session.Status}`}>{statusKey ? t(statusKey) : session.Status}</span>
+          {session.Dangerous ? <span className="pill error">{t("dangerous")}</span> : null}
         </div>
         <div className="card-actions">
           {session.Address ? (

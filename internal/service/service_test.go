@@ -378,3 +378,95 @@ func TestFilesValidationErrors(t *testing.T) {
 		t.Fatal("expected empty addr error")
 	}
 }
+
+func TestStartSSHServeRequiresDangerConfirm(t *testing.T) {
+	svc := service.New(adapter.NewFake())
+	if _, err := svc.StartSSHServe(adapter.SSHServeOpts{NoAuth: true}, false); err == nil {
+		t.Fatal("expected no-auth confirmation error")
+	}
+	if _, err := svc.StartSSHServe(adapter.SSHServeOpts{}, false); err == nil {
+		t.Fatal("expected authorized keys error")
+	}
+
+	sess, err := svc.StartSSHServe(adapter.SSHServeOpts{NoAuth: true}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sess.Kind != session.KindSSHServe {
+		t.Fatalf("kind=%s", sess.Kind)
+	}
+	if !sess.Dangerous {
+		t.Fatal("expected dangerous session")
+	}
+	ready := waitRunning(t, svc, sess.ID)
+	if !strings.HasPrefix(ready.Address, "tc:fake-noauth-ssh-") {
+		t.Fatalf("addr=%q", ready.Address)
+	}
+
+	keyed, err := svc.StartSSHServe(adapter.SSHServeOpts{AuthorizedKeys: "ssh-ed25519 AAAA test"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keyed.Dangerous {
+		t.Fatal("keyed ssh should not be marked dangerous")
+	}
+	waitRunning(t, svc, keyed.ID)
+}
+
+func TestStartSSHClientSOCKSExitExec(t *testing.T) {
+	svc := service.New(adapter.NewFake())
+	if _, err := svc.StartSSHClient("", adapter.SSHClientOpts{}); err == nil {
+		t.Fatal("expected empty addr error")
+	}
+	if _, err := svc.StartSOCKS("", ""); err == nil {
+		t.Fatal("expected empty addr error")
+	}
+	if _, err := svc.StartExec(nil); err == nil {
+		t.Fatal("expected empty exec error")
+	}
+
+	ssh, err := svc.StartSSHServe(adapter.SSHServeOpts{NoAuth: true}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ready := waitRunning(t, svc, ssh.ID)
+
+	client, err := svc.StartSSHClient(ready.Address, adapter.SSHClientOpts{Command: "whoami"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.Kind != session.KindSSHClient {
+		t.Fatalf("kind=%s", client.Kind)
+	}
+	prog := waitProgress(t, svc, client.ID)
+	if !strings.Contains(prog.Progress, "whoami") {
+		t.Fatalf("progress=%q", prog.Progress)
+	}
+
+	exitSess, err := svc.StartExitNode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exitSess.Kind != session.KindExitNode {
+		t.Fatalf("kind=%s", exitSess.Kind)
+	}
+	exitReady := waitRunning(t, svc, exitSess.ID)
+
+	socks, err := svc.StartSOCKS(exitReady.Address, "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if socks.Kind != session.KindSOCKS {
+		t.Fatalf("kind=%s", socks.Kind)
+	}
+	waitRunning(t, svc, socks.ID)
+
+	execSess, err := svc.StartExec([]string{"/bin/echo", "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if execSess.Kind != session.KindExec {
+		t.Fatalf("kind=%s", execSess.Kind)
+	}
+	waitRunning(t, svc, execSess.ID)
+}

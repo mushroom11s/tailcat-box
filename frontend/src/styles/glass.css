@@ -537,6 +537,35 @@ textarea {
   font-weight: 600;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 40;
+}
+
+.modal {
+  width: min(520px, 100%);
+  padding: 22px 24px;
+  text-align: left;
+}
+
+.modal h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.modal p {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .check {
   display: flex;
   align-items: center;
@@ -553,6 +582,18 @@ textarea {
   min-height: 140px;
   max-height: 280px;
   overflow: auto;
+}
+
+.cap-list {
+  margin: 0 0 16px;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: left;
+}
+
+.cap-list li {
+  margin: 4px 0;
 }
 
 .keys {

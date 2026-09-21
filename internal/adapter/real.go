@@ -22,6 +22,7 @@ type Real struct {
 	serves   map[string]*serveRun
 	forwards map[string]*forwardRun
 	cancels  map[string]context.CancelFunc
+	net      NetworkOpts
 }
 
 type serveRun struct {
@@ -137,6 +138,7 @@ func (r *Real) runPipeServe(ctx context.Context, sessionID string, run *serveRun
 			}
 		},
 	}
+	r.applyServerNet(ctx, srv)
 	if err := srv.Start(); err != nil {
 		send(Event{SessionID: sessionID, Kind: EventError, Err: err.Error()})
 		return
@@ -179,8 +181,7 @@ func (r *Real) DialPipe(ctx context.Context, sessionID string, addr string, payl
 			r.mu.Unlock()
 		}()
 
-		cl := tailcat.NewClient(tailcat.Addr(addr))
-		cl.Logf = func(string, ...any) {}
+		cl := r.newClient(addr)
 		defer cl.Close()
 
 		conn, err := cl.DialTCPPort(ctx, PipePort)

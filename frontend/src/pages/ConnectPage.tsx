@@ -3,7 +3,7 @@ import SessionCard from "../components/SessionCard";
 import { useI18n } from "../i18n";
 import type { Session } from "../lib/wails";
 
-type Tab = "pipe" | "forward" | "browse";
+type Tab = "pipe" | "forward" | "browse" | "ssh" | "socks";
 
 type Props = {
   sessions: Session[];
@@ -13,6 +13,8 @@ type Props = {
   onSend: (addr: string, payload: string) => void;
   onForward: (addr: string, spec: string) => void;
   onBrowse: (addr: string) => void;
+  onSSH: (addr: string, command: string, user: string, identity: string) => void;
+  onSOCKS: (addr: string, listen: string) => void;
   onStop: (id: string) => void;
 };
 
@@ -24,6 +26,8 @@ export default function ConnectPage({
   onSend,
   onForward,
   onBrowse,
+  onSSH,
+  onSOCKS,
   onStop,
 }: Props) {
   const { t } = useI18n();
@@ -31,9 +35,15 @@ export default function ConnectPage({
   const [addr, setAddr] = useState("");
   const [payload, setPayload] = useState("hello");
   const [spec, setSpec] = useState("18080:8080");
+  const [sshCmd, setSshCmd] = useState("whoami");
+  const [sshUser, setSshUser] = useState("");
+  const [sshIdentity, setSshIdentity] = useState("");
+  const [socksListen, setSocksListen] = useState("127.0.0.1:1080");
   const dials = sessions.filter((s) => s.Kind === "pipe_dial");
   const forwards = sessions.filter((s) => s.Kind === "forward");
   const browses = sessions.filter((s) => s.Kind === "browse");
+  const ssh = sessions.filter((s) => s.Kind === "ssh_client");
+  const socks = sessions.filter((s) => s.Kind === "socks");
 
   function submitPipe(e: FormEvent) {
     e.preventDefault();
@@ -50,10 +60,12 @@ export default function ConnectPage({
     onBrowse(addr.trim());
   }
 
-  const tabLabel: Record<Tab, "tabPipe" | "tabForward" | "tabBrowse"> = {
+  const tabLabel: Record<Tab, "tabPipe" | "tabForward" | "tabBrowse" | "tabSSH" | "tabSOCKS"> = {
     pipe: "tabPipe",
     forward: "tabForward",
     browse: "tabBrowse",
+    ssh: "tabSSH",
+    socks: "tabSOCKS",
   };
 
   return (
@@ -61,7 +73,7 @@ export default function ConnectPage({
       <h2>{t("connectTitle")}</h2>
       <p className="lede">{t("connectLede")}</p>
       <div className="tabs" role="tablist" aria-label={t("connectMode")}>
-        {(["pipe", "forward", "browse"] as Tab[]).map((value) => (
+        {(["pipe", "forward", "browse", "ssh", "socks"] as Tab[]).map((value) => (
           <button
             key={value}
             type="button"
@@ -149,6 +161,90 @@ export default function ConnectPage({
         </form>
       ) : null}
 
+      {tab === "ssh" ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSSH(addr.trim(), sshCmd.trim(), sshUser.trim(), sshIdentity.trim());
+          }}
+        >
+          <div className="field">
+            <label htmlFor="ssh-addr">{t("address")}</label>
+            <input
+              id="ssh-addr"
+              value={addr}
+              onChange={(e) => setAddr(e.target.value)}
+              placeholder="tc:…"
+              autoComplete="off"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="ssh-user">{t("sshUser")}</label>
+            <input id="ssh-user" value={sshUser} onChange={(e) => setSshUser(e.target.value)} autoComplete="off" />
+          </div>
+          <div className="field">
+            <label htmlFor="ssh-cmd">{t("sshCommand")}</label>
+            <input
+              id="ssh-cmd"
+              value={sshCmd}
+              onChange={(e) => setSshCmd(e.target.value)}
+              placeholder="whoami"
+              autoComplete="off"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="ssh-id">{t("sshIdentity")}</label>
+            <input
+              id="ssh-id"
+              value={sshIdentity}
+              onChange={(e) => setSshIdentity(e.target.value)}
+              placeholder="/home/me/.ssh/id_ed25519"
+              autoComplete="off"
+            />
+          </div>
+          <div className="row">
+            <button className="btn" type="submit" disabled={busy || !addr.trim()}>
+              {t("runSSH")}
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      {tab === "socks" ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSOCKS(addr.trim(), socksListen.trim());
+          }}
+        >
+          <div className="field">
+            <label htmlFor="socks-addr">{t("socksPeer")}</label>
+            <input
+              id="socks-addr"
+              value={addr}
+              onChange={(e) => setAddr(e.target.value)}
+              placeholder="tc:…"
+              autoComplete="off"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="socks-listen">{t("socksListen")}</label>
+            <input
+              id="socks-listen"
+              value={socksListen}
+              onChange={(e) => setSocksListen(e.target.value)}
+              placeholder="127.0.0.1:1080"
+              autoComplete="off"
+            />
+          </div>
+          <div className="row">
+            <button className="btn" type="submit" disabled={busy || !addr.trim()}>
+              {t("startSOCKS")}
+            </button>
+          </div>
+        </form>
+      ) : null}
+
       {error ? <p className="err">{error}</p> : null}
 
       {tab === "pipe" ? (
@@ -176,6 +272,24 @@ export default function ConnectPage({
         <div className="stack" style={{ marginTop: 16 }}>
           {browses.length === 0 ? <p className="empty">{t("emptyBrowses")}</p> : null}
           {browses.map((sess) => (
+            <SessionCard key={sess.ID} session={sess} onStop={onStop} />
+          ))}
+        </div>
+      ) : null}
+
+      {tab === "ssh" ? (
+        <div className="stack" style={{ marginTop: 16 }}>
+          {ssh.length === 0 ? <p className="empty">{t("emptySSHClient")}</p> : null}
+          {ssh.map((sess) => (
+            <SessionCard key={sess.ID} session={sess} onStop={onStop} />
+          ))}
+        </div>
+      ) : null}
+
+      {tab === "socks" ? (
+        <div className="stack" style={{ marginTop: 16 }}>
+          {socks.length === 0 ? <p className="empty">{t("emptySOCKS")}</p> : null}
+          {socks.map((sess) => (
             <SessionCard key={sess.ID} session={sess} onStop={onStop} />
           ))}
         </div>

@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
 import { useI18n } from "../i18n";
 import type { KeyInfo } from "../lib/wails";
@@ -25,10 +25,13 @@ type Props = {
   error: string;
   parseResult: string;
   resolveResult: string;
+  region: string;
+  derpMapURL: string;
   onCreate: (name: string, client: boolean, region: string) => void;
   onDelete: (name: string) => void;
   onParse: (raw: string) => void;
   onResolve: (raw: string) => void;
+  onSaveNetwork: (region: string, derpMapURL: string) => void;
 };
 
 export default function KeysPage({
@@ -37,20 +40,30 @@ export default function KeysPage({
   error,
   parseResult,
   resolveResult,
+  region,
+  derpMapURL,
   onCreate,
   onDelete,
   onParse,
   onResolve,
+  onSaveNetwork,
 }: Props) {
   const { t } = useI18n();
   const [name, setName] = useState("default");
   const [client, setClient] = useState(false);
-  const [region, setRegion] = useState("");
+  const [keyRegion, setKeyRegion] = useState("");
   const [raw, setRaw] = useState("");
+  const [netRegion, setNetRegion] = useState(region);
+  const [netDERP, setNetDERP] = useState(derpMapURL);
+
+  useEffect(() => {
+    setNetRegion(region);
+    setNetDERP(derpMapURL);
+  }, [region, derpMapURL]);
 
   function submitCreate(e: FormEvent) {
     e.preventDefault();
-    onCreate(name.trim(), client, region.trim());
+    onCreate(name.trim(), client, keyRegion.trim());
   }
 
   function submitParse(e: FormEvent) {
@@ -68,6 +81,41 @@ export default function KeysPage({
       <h2>{t("keysTitle")}</h2>
       <p className="lede">{t("keysLede")}</p>
 
+      <h3 className="kind">{t("derpRegion")}</h3>
+      <p className="lede">{t("derpLede")}</p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSaveNetwork(netRegion.trim(), netDERP.trim());
+        }}
+      >
+        <div className="field">
+          <label htmlFor="net-region">{t("regionLabel")}</label>
+          <input
+            id="net-region"
+            value={netRegion}
+            onChange={(e) => setNetRegion(e.target.value)}
+            placeholder="auto, nyc, 1"
+            autoComplete="off"
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="net-derp">{t("derpMapURL")}</label>
+          <input
+            id="net-derp"
+            value={netDERP}
+            onChange={(e) => setNetDERP(e.target.value)}
+            placeholder="https://tailcat.dev/derpmap.json"
+            autoComplete="off"
+          />
+        </div>
+        <div className="row">
+          <button className="btn" type="submit" disabled={busy}>
+            {t("saveNetwork")}
+          </button>
+        </div>
+      </form>
+
       <form onSubmit={submitCreate}>
         <div className="field">
           <label htmlFor="key-name">{t("name")}</label>
@@ -77,8 +125,8 @@ export default function KeysPage({
           <label htmlFor="key-region">{t("regionHint")}</label>
           <input
             id="key-region"
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
+            value={keyRegion}
+            onChange={(e) => setKeyRegion(e.target.value)}
             placeholder="auto, nyc, 1"
             autoComplete="off"
             disabled={client}
