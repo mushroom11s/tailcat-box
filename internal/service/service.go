@@ -33,8 +33,13 @@ func New(ad adapter.TailcatAdapter) *Service {
 }
 
 func (s *Service) start(kind session.Kind, addr string, run func(ctx context.Context, id string) (<-chan adapter.Event, error)) (session.Session, error) {
+	return s.startWith(kind, addr, false, run)
+}
+
+func (s *Service) startWith(kind session.Kind, addr string, dangerous bool, run func(ctx context.Context, id string) (<-chan adapter.Event, error)) (session.Session, error) {
 	sess := session.New(kind)
 	sess.Address = addr
+	sess.Dangerous = dangerous
 
 	s.mu.Lock()
 	s.sessions[sess.ID] = sess
@@ -129,6 +134,52 @@ func (s *Service) ListRemote(addr string, path string) ([]adapter.FileEntry, err
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	return s.ad.ListRemote(ctx, addr, path)
+}
+
+func (s *Service) StartSSHServe(opts adapter.SSHServeOpts, confirmDangerous bool) (session.Session, error) {
+	if opts.NoAuth {
+		if !confirmDangerous {
+			return session.Session{}, fmt.Errorf("no-auth SSH requires explicit confirmation: anyone with the address gets a shell")
+		}
+	} else if strings.TrimSpace(opts.AuthorizedKeys) == "" {
+		return session.Session{}, fmt.Errorf("authorized keys are required for keyed SSH (or use no-auth with confirmation)")
+	}
+	return s.startWith(session.KindSSHServe, "", opts.NoAuth, func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartSSHServe(ctx, id, opts)
+	})
+}
+
+func (s *Service) StartSSHClient(addr string, opts adapter.SSHClientOpts) (session.Session, error) {
+	if strings.TrimSpace(addr) == "" {
+		return session.Session{}, fmt.Errorf("address is required")
+	}
+	return s.start(session.KindSSHClient, addr, func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartSSHClient(ctx, id, addr, opts)
+	})
+}
+
+func (s *Service) StartSOCKS(addr string, listen string) (session.Session, error) {
+	if strings.TrimSpace(addr) == "" {
+		return session.Session{}, fmt.Errorf("address is required")
+	}
+	return s.start(session.KindSOCKS, addr, func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartSOCKS(ctx, id, addr, listen)
+	})
+}
+
+func (s *Service) StartExitNode() (session.Session, error) {
+	return s.start(session.KindExitNode, "", func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartExitNode(ctx, id)
+	})
+}
+
+func (s *Service) StartExec(argv []string) (session.Session, error) {
+	if len(argv) == 0 || strings.TrimSpace(argv[0]) == "" {
+		return session.Session{}, fmt.Errorf("command is required")
+	}
+	return s.start(session.KindExec, "", func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartExec(ctx, id, argv)
+	})
 }
 
 func requireDir(dir, label string) error {
