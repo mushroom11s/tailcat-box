@@ -281,7 +281,15 @@ async function fakeStopSession(id: string): Promise<void> {
 }
 
 async function fakeListSessions(): Promise<Session[]> {
-  return fake.sessions.map((s) => ({ ...s }));
+  return fake.sessions
+    .slice()
+    .sort((a, b) => {
+      if (a.CreatedAt !== b.CreatedAt) {
+        return a.CreatedAt < b.CreatedAt ? -1 : 1;
+      }
+      return a.ID < b.ID ? -1 : a.ID > b.ID ? 1 : 0;
+    })
+    .map((s) => ({ ...s }));
 }
 
 async function fakeParseAddr(raw: string): Promise<string> {
@@ -299,7 +307,15 @@ async function fakeResolveAddr(raw: string): Promise<string> {
 }
 
 async function fakeListKeys(): Promise<KeyInfo[]> {
-  return fake.keys.map((k) => ({ ...k }));
+  return fake.keys
+    .slice()
+    .sort((a, b) => {
+      if (a.Source !== b.Source) {
+        return a.Source < b.Source ? -1 : 1;
+      }
+      return a.Name < b.Name ? -1 : a.Name > b.Name ? 1 : 0;
+    })
+    .map((k) => ({ ...k }));
 }
 
 async function fakeCreateKey(name: string, client: boolean, region: string): Promise<string> {

@@ -4,6 +4,7 @@ import DiagnosticsPage from "./pages/DiagnosticsPage";
 import KeysPage from "./pages/KeysPage";
 import ServicesPage from "./pages/ServicesPage";
 import { parsePortMappings } from "./lib/ports";
+import { sameKeys, sameSessions } from "./lib/snapshot";
 import {
   createKey,
   deleteKey,
@@ -69,8 +70,10 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     try {
-      setSessions(await listSessions());
-      setKeys(await listKeys());
+      const nextSessions = await listSessions();
+      const nextKeys = await listKeys();
+      setSessions((prev) => (sameSessions(prev, nextSessions) ? prev : nextSessions));
+      setKeys((prev) => (sameKeys(prev, nextKeys) ? prev : nextKeys));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -89,7 +92,7 @@ export default function App() {
     });
     const id = window.setInterval(() => {
       void refresh();
-    }, 400);
+    }, 2000);
     return () => {
       off();
       window.clearInterval(id);

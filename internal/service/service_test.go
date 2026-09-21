@@ -210,6 +210,59 @@ func TestStartPingUntilDirect(t *testing.T) {
 	}
 }
 
+func TestListSessionsStableOrder(t *testing.T) {
+	svc := service.New(adapter.NewFake())
+	const n = 8
+	for i := 0; i < n; i++ {
+		if _, err := svc.StartPipeServe(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := svc.StartPortServe([]adapter.PortMapping{{LocalPort: uint16(8080 + i)}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first := ids(svc.List())
+	if len(first) != n*2 {
+		t.Fatalf("got %d sessions, want %d", len(first), n*2)
+	}
+	list := svc.List()
+	for i := 1; i < len(list); i++ {
+		prev, cur := list[i-1], list[i]
+		if prev.CreatedAt.After(cur.CreatedAt) {
+			t.Fatalf("not sorted by CreatedAt: %s after %s", prev.ID, cur.ID)
+		}
+		if prev.CreatedAt.Equal(cur.CreatedAt) && prev.ID > cur.ID {
+			t.Fatalf("CreatedAt tie not sorted by ID: %s then %s", prev.ID, cur.ID)
+		}
+	}
+	for i := 0; i < 40; i++ {
+		got := ids(svc.List())
+		if !equalIDs(first, got) {
+			t.Fatalf("list order changed on poll %d\nfirst=%v\ngot=%v", i, first, got)
+		}
+	}
+}
+
+func ids(list []session.Session) []string {
+	out := make([]string, len(list))
+	for i, s := range list {
+		out[i] = s.ID
+	}
+	return out
+}
+
+func equalIDs(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestParseAndResolveAddr(t *testing.T) {
 	svc := service.New(adapter.NewFake())
 	raw := "tc:example-addr"
