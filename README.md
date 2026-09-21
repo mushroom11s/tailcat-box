@@ -23,6 +23,7 @@ Full-featured desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/t
 - [Plan 3: Files](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-3.md)
 - [Plan 4: SSH, SOCKS, exit-node, exec, DERP, tray](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-4.md)
 - [Plans index](docs/superpowers/plans/README.md)
+- [Release notes (draft v0.1.0)](docs/releases/v0.1.0.md)
 
 ## Prerequisites
 
@@ -121,6 +122,33 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 ```
 
 This starts an in-process pipe serve, dials it, and asserts the echoed payload. It needs outbound HTTPS/UDP to Tailcat DERP (`https://tailcat.dev/derpmap.json` and the selected relay). Skip or expect failure on locked-down networks.
+
+## GitHub Actions and releases
+
+Public-repo Actions minutes on GitHub-hosted `ubuntu-latest`, `macos-latest`, and `windows-latest` runners are included with GitHub’s free plan for public repositories. This project does **not** use larger runners.
+
+| Workflow | When | What |
+| --- | --- | --- |
+| [CI](.github/workflows/ci.yml) | Pull requests and pushes to `main` | `go test ./...` and `frontend` `npm ci` + `npm run build` on **ubuntu-latest** (no Wails window) |
+| [Release](.github/workflows/release.yml) | `v*` tags, or manual **Run workflow** | `wails build` on **macOS** and **Windows**, zip `build/bin`, upload artifacts; on a real tag, create a GitHub Release |
+
+### Cut a release
+
+1. Put notes in `docs/releases/vX.Y.Z.md` (see [template](docs/releases/README.md)) and merge that commit to `main`.
+2. Tag the merged commit and push **only that tag** (do not rewrite tags):
+
+```bash
+git checkout main
+git pull origin main
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+3. The Release workflow builds unsigned macOS (`.app`) and Windows (`.exe`) zips named `tailcat-desktop-client-macos-…` and `tailcat-desktop-client-windows-…`, then attaches them to a GitHub Release. Body text comes from `docs/releases/<tag>.md` when that file exists.
+
+To verify the workflow **without** publishing, use **Actions → Release → Run workflow** with **dry_run** checked (the default). Uncheck dry_run only when you intend to publish, and supply a `v*` tag.
+
+`macos-latest` is currently Apple Silicon; Intel Mac and Windows ARM64 are not built. Binaries are **unsigned** (no Apple notarization, no Authenticode). Gatekeeper and SmartScreen warnings are expected.
 
 ## Plan 1 acceptance
 
