@@ -1,4 +1,5 @@
 import {
+  ConnectChatPeer as bindConnectChatPeer,
   CreateKey as bindCreateKey,
   DeleteKey as bindDeleteKey,
   DialPipe as bindDialPipe,
@@ -13,6 +14,9 @@ import {
   StartPipeServe as bindStartPipeServe,
   StartPortServe as bindStartPortServe,
   StartRecv as bindStartRecv,
+  RestartChatRoom as bindRestartChatRoom,
+  SendChatText as bindSendChatText,
+  StartChatRoom as bindStartChatRoom,
   StartCopy as bindStartCopy,
   StartFilesServe as bindStartFilesServe,
   ListRemote as bindListRemote,
@@ -24,6 +28,7 @@ import {
   StartSOCKS as bindStartSOCKS,
   StartExitNode as bindStartExitNode,
   StartExec as bindStartExec,
+  StopChatRoom as bindStopChatRoom,
   StopSession as bindStopSession,
   TailcatVersion as bindTailcatVersion,
   GetClientInfo as bindGetClientInfo,
@@ -33,6 +38,7 @@ import {
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { adapter, main, session, store } from "../../wailsjs/go/models";
+import { createBrowserHub } from "./chatBrowser";
 
 export type Session = {
   ID: string;
@@ -98,7 +104,7 @@ export type SystemInfo = {
 const TAILCAT_EVENT = "tailcat:event";
 
 type GoWindow = Window & {
-  go?: { main?: { App?: { StartPipeServe?: unknown } } };
+  go?: { main?: { App?: { StartChatRoom?: unknown } } };
   runtime?: unknown;
 };
 
@@ -107,7 +113,7 @@ function goWindow(): GoWindow {
 }
 
 export function hasWailsBindings(): boolean {
-  return typeof window !== "undefined" && typeof goWindow().go?.main?.App?.StartPipeServe === "function";
+  return typeof window !== "undefined" && typeof goWindow().go?.main?.App?.StartChatRoom === "function";
 }
 
 function asSession(s: session.Session): Session {
@@ -401,6 +407,10 @@ async function fakeCreateKey(name: string, client: boolean, region: string): Pro
     Address: address,
     Source: "app",
   });
+  browserKeyJSON.set(
+    name,
+    JSON.stringify({ Name: name, Client: client, Region: region, Address: address, PrivateKey: { fake: name } }),
+  );
   void region;
   return address;
 }
@@ -590,6 +600,44 @@ function asFileEntry(e: adapter.FileEntry): FileEntry {
   };
 }
 
+export async function startChatRoom(): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindStartChatRoom());
+  }
+  return fakeStartChatRoom();
+}
+
+export async function connectChatPeer(addr: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindConnectChatPeer(addr);
+    return;
+  }
+  await fakeConnectChatPeer(addr);
+}
+
+export async function sendChatText(body: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSendChatText(body);
+    return;
+  }
+  await fakeSendChatText(body);
+}
+
+export async function restartChatRoom(keyName: string): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindRestartChatRoom(keyName));
+  }
+  return fakeRestartChatRoom(keyName);
+}
+
+export async function stopChatRoom(): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindStopChatRoom();
+    return;
+  }
+  await fakeStopChatRoom();
+}
+
 export async function startPipeServe(): Promise<Session> {
   if (hasWailsBindings()) {
     return asSession(await bindStartPipeServe());
@@ -670,11 +718,79 @@ export async function deleteKey(name: string): Promise<void> {
 }
 
 let fakeSettings: NetworkSettings = { Region: "", DERPMapURL: "" };
+const browserChat = createBrowserHub();
+let browserChatSession: Session | null = null;
+const browserKeyJSON = new Map<string, string>();
+
+function emitBrowser(ev: { Kind: string; Data?: string; Address?: string; SessionID: string }): void {
+  emitFake({ SessionID: ev.SessionID, Kind: ev.Kind, Address: ev.Address, Data: ev.Data });
+}
+
+async function fakeStartChatRoom(): Promise<Session> {
+  if (browserChatSession && (browserChatSession.Status === "starting" || browserChatSession.Status === "running")) {
+    return { ...browserChatSession };
+  }
+  const sess = newSess("chat");
+  browserChatSession = sess;
+  const off = browserChat.onEvent((ev) => {
+    if (ev.Kind === "room-ready" && ev.Address && browserChatSession) {
+      browserChatSession.Status = "running";
+      browserChatSession.Address = ev.Address;
+    }
+    emitBrowser(ev);
+  });
+  fake.serveStops.set(sess.ID, off);
+  await browserChat.start(sess.ID, "");
+  return { ...sess, Address: browserChatSession.Address, Status: browserChatSession.Status };
+}
+
+async function fakeConnectChatPeer(addr: string): Promise<void> {
+  await browserChat.connect(addr);
+}
+
+async function fakeSendChatText(body: string): Promise<void> {
+  await browserChat.sendText(body);
+}
+
+async function fakeRestartChatRoom(keyName: string): Promise<Session> {
+  if (browserChatSession) {
+    browserChatSession.Status = "stopped";
+    const stop = fake.serveStops.get(browserChatSession.ID);
+    if (stop) {
+      stop();
+    }
+  }
+  const sess = newSess("chat");
+  browserChatSession = sess;
+  const off = browserChat.onEvent((ev) => {
+    if (ev.Kind === "room-ready" && ev.Address && browserChatSession && browserChatSession.ID === sess.ID) {
+      browserChatSession.Status = "running";
+      browserChatSession.Address = ev.Address;
+    }
+    emitBrowser(ev);
+  });
+  fake.serveStops.set(sess.ID, off);
+  const material = keyName ? (browserKeyJSON.get(keyName) ?? "") : "";
+  if (keyName && !material) {
+    throw new Error("saved key is not a Tailcat private key");
+  }
+  await browserChat.restart(sess.ID, material);
+  return { ...browserChatSession };
+}
+
+async function fakeStopChatRoom(): Promise<void> {
+  browserChat.stop();
+  if (!browserChatSession) {
+    return;
+  }
+  browserChatSession.Status = "stopped";
+  browserChatSession = null;
+}
 
 export async function getNetworkSettings(): Promise<NetworkSettings> {
   if (hasWailsBindings()) {
     const s = await bindGetNetworkSettings();
-    return { Region: s.Region ?? "", DERPMapURL: s.DERPMapURL ?? "" };
+    return { Region: s.region ?? "", DERPMapURL: s.derpMapUrl ?? "" };
   }
   return { ...fakeSettings };
 }

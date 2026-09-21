@@ -804,6 +804,45 @@ textarea {
   font-size: 14px;
 }
 
+.chat-status {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.chat-address {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+.chat-log {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+}
+.chat-bubble {
+  max-width: 70%;
+  padding: 10px 12px;
+  border-radius: 16px;
+}
+.chat-bubble.out {
+  align-self: flex-end;
+}
+.chat-bubble.in {
+  align-self: flex-start;
+}
+.chat-system {
+  text-align: center;
+  opacity: 0.8;
+}
+.chat-bubble header {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
 @media (max-width: 760px) {
   .shell {
     grid-template-columns: 1fr;

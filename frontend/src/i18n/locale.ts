@@ -61,6 +61,8 @@ export function kindMessageKey(kind: string): MessageKey | null {
       return "kindExitNode";
     case "exec":
       return "kindExec";
+    case "chat":
+      return "kindChat";
     default:
       return null;
   }
