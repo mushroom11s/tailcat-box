@@ -47,5 +47,9 @@ type TailcatAdapter interface {
 	StartBrowse(ctx context.Context, sessionID string, serverAddr string) (<-chan Event, error)
 	// StartPing emits EventData pong lines and EventClosed when done.
 	StartPing(ctx context.Context, sessionID string, addr string, untilDirect bool, timeout time.Duration) (<-chan Event, error)
+	// ParseAddr returns JSON describing a tailcat address (CLI `parse`).
+	ParseAddr(raw string) (string, error)
+	// ResolveAddr returns a self-contained equivalent of raw (CLI `resolve`).
+	ResolveAddr(ctx context.Context, raw string) (string, error)
 	Stop(sessionID string) error
 }

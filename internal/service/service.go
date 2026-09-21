@@ -89,6 +89,16 @@ func (s *Service) StartPing(addr string, untilDirect bool) (session.Session, err
 	})
 }
 
+func (s *Service) ParseAddr(raw string) (string, error) {
+	return s.ad.ParseAddr(raw)
+}
+
+func (s *Service) ResolveAddr(raw string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return s.ad.ResolveAddr(ctx, raw)
+}
+
 func (s *Service) Stop(sessionID string) error {
 	s.mu.Lock()
 	sess, ok := s.sessions[sessionID]

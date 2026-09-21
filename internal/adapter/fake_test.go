@@ -180,3 +180,25 @@ func TestFakePingEmitsDERPThenDirect(t *testing.T) {
 		t.Fatalf("events=%+v", events)
 	}
 }
+
+func TestFakeParseAndResolve(t *testing.T) {
+	f := adapter.NewFake()
+	raw := "tc:example-addr"
+	got, err := f.ParseAddr(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, raw) || !strings.Contains(got, "{") {
+		t.Fatalf("parse=%q", got)
+	}
+	resolved, err := f.ResolveAddr(context.Background(), raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved == "" {
+		t.Fatal("empty resolve")
+	}
+	if _, err := f.ParseAddr(""); err == nil {
+		t.Fatal("expected empty parse error")
+	}
+}

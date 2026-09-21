@@ -209,3 +209,22 @@ func TestStartPingUntilDirect(t *testing.T) {
 		t.Fatalf("second=%q", data[1])
 	}
 }
+
+func TestParseAndResolveAddr(t *testing.T) {
+	svc := service.New(adapter.NewFake())
+	raw := "tc:example-addr"
+	got, err := svc.ParseAddr(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, raw) {
+		t.Fatalf("parse=%q", got)
+	}
+	resolved, err := svc.ResolveAddr(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved == "" {
+		t.Fatal("empty resolve")
+	}
+}

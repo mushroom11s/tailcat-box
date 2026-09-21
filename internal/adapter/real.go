@@ -221,6 +221,14 @@ func (r *Real) StartPing(ctx context.Context, sessionID string, addr string, unt
 	return nil, fmt.Errorf("StartPing not implemented")
 }
 
+func (r *Real) ParseAddr(raw string) (string, error) {
+	return "", fmt.Errorf("ParseAddr not implemented")
+}
+
+func (r *Real) ResolveAddr(ctx context.Context, raw string) (string, error) {
+	return "", fmt.Errorf("ResolveAddr not implemented")
+}
+
 func (r *Real) Stop(sessionID string) error {
 	r.mu.Lock()
 	run, ok := r.serves[sessionID]

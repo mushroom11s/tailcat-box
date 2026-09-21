@@ -223,6 +223,23 @@ func (f *Fake) StartPing(ctx context.Context, sessionID string, addr string, unt
 	return ch, nil
 }
 
+func (f *Fake) ParseAddr(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("address is required")
+	}
+	return fmt.Sprintf(`{"fake":true,"addr":%q}`, raw), nil
+}
+
+func (f *Fake) ResolveAddr(ctx context.Context, raw string) (string, error) {
+	_ = ctx
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("address is required")
+	}
+	return "tc:fake-resolved", nil
+}
+
 func (f *Fake) Stop(sessionID string) error {
 	f.mu.Lock()
 	stop, ok := f.stops[sessionID]
