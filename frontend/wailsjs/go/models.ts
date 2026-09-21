@@ -1,3 +1,24 @@
+export namespace adapter {
+	
+	export class PortMapping {
+	    LocalPort: number;
+	    RemoteHost: string;
+	    RemotePort: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PortMapping(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.LocalPort = source["LocalPort"];
+	        this.RemoteHost = source["RemoteHost"];
+	        this.RemotePort = source["RemotePort"];
+	    }
+	}
+
+}
+
 export namespace session {
 	
 	export class Session {
@@ -40,6 +61,31 @@ export namespace session {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace store {
+	
+	export class KeyInfo {
+	    Name: string;
+	    Path: string;
+	    Client: boolean;
+	    Address: string;
+	    Source: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new KeyInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Name = source["Name"];
+	        this.Path = source["Path"];
+	        this.Client = source["Client"];
+	        this.Address = source["Address"];
+	        this.Source = source["Source"];
+	    }
 	}
 
 }

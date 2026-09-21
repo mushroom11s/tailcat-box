@@ -111,3 +111,120 @@ waitDialStopped:
 		}
 	}
 }
+
+func waitRunning(t *testing.T, svc *service.Service, id string) session.Session {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for {
+		for _, item := range svc.List() {
+			if item.ID == id && item.Status == session.StatusRunning && item.Address != "" {
+				return item
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("never running %s: %+v", id, svc.List())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+}
+
+func TestStartPortServeThenForward(t *testing.T) {
+	svc := service.New(adapter.NewFake())
+	serveSess, err := svc.StartPortServe([]adapter.PortMapping{{LocalPort: 8080}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if serveSess.Kind != session.KindPortServe {
+		t.Fatalf("kind=%s", serveSess.Kind)
+	}
+	ready := waitRunning(t, svc, serveSess.ID)
+
+	fwdSess, err := svc.StartForward(ready.Address, []adapter.PortMapping{{LocalPort: 18080, RemotePort: 8080}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fwdSess.Kind != session.KindForward {
+		t.Fatalf("kind=%s", fwdSess.Kind)
+	}
+	waitRunning(t, svc, fwdSess.ID)
+
+	browseSess, err := svc.StartBrowse(ready.Address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if browseSess.Kind != session.KindBrowse {
+		t.Fatalf("kind=%s", browseSess.Kind)
+	}
+	waitRunning(t, svc, browseSess.ID)
+
+	if err := svc.Stop(fwdSess.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Stop(browseSess.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Stop(serveSess.ID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStartPingUntilDirect(t *testing.T) {
+	svc := service.New(adapter.NewFake())
+	sess, err := svc.StartPing("tc:fake-port-x", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sess.Kind != session.KindPing {
+		t.Fatalf("kind=%s", sess.Kind)
+	}
+
+	events := svc.Events()
+	var data []string
+	gotClosed := false
+	deadline := time.After(2 * time.Second)
+	for !gotClosed {
+		select {
+		case ev := <-events:
+			if ev.SessionID != sess.ID {
+				continue
+			}
+			if ev.Kind == adapter.EventData {
+				data = append(data, ev.Data)
+			}
+			if ev.Kind == adapter.EventClosed {
+				gotClosed = true
+			}
+		case <-deadline:
+			t.Fatal("timeout waiting for ping")
+		}
+	}
+	if len(data) != 2 {
+		t.Fatalf("data=%v", data)
+	}
+	if !strings.Contains(strings.ToLower(data[0]), "derp") {
+		t.Fatalf("first=%q", data[0])
+	}
+	if !strings.Contains(strings.ToLower(data[1]), "direct") {
+		t.Fatalf("second=%q", data[1])
+	}
+}
+
+func TestParseAndResolveAddr(t *testing.T) {
+	svc := service.New(adapter.NewFake())
+	raw := "tc:example-addr"
+	got, err := svc.ParseAddr(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, raw) {
+		t.Fatalf("parse=%q", got)
+	}
+	resolved, err := svc.ResolveAddr(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved == "" {
+		t.Fatal("empty resolve")
+	}
+}

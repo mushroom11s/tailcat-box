@@ -1,6 +1,7 @@
 package adapter_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -18,5 +19,22 @@ func TestTailcatVersionPinned(t *testing.T) {
 	}
 	if !strings.HasPrefix(v, "v") && !strings.Contains(v, "-") {
 		t.Fatalf("unexpected version %q", v)
+	}
+}
+
+func TestRealParseAddr(t *testing.T) {
+	r := adapter.NewReal()
+	if _, err := r.ParseAddr(""); err == nil {
+		t.Fatal("expected error")
+	}
+	if _, err := r.ParseAddr("not-a-tailcat-addr"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestRealPortServeRequiresMappings(t *testing.T) {
+	r := adapter.NewReal()
+	if _, err := r.StartPortServe(context.Background(), "s", nil); err == nil {
+		t.Fatal("expected error")
 	}
 }

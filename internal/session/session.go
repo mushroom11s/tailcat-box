@@ -12,6 +12,10 @@ type Kind string
 const (
 	KindPipeServe Kind = "pipe_serve"
 	KindPipeDial  Kind = "pipe_dial"
+	KindPortServe Kind = "port_serve"
+	KindForward   Kind = "forward"
+	KindBrowse    Kind = "browse"
+	KindPing      Kind = "ping"
 )
 
 type Status string

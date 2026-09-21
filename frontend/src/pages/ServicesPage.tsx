@@ -1,3 +1,4 @@
+import { FormEvent, useState } from "react";
 import SessionCard from "../components/SessionCard";
 import type { Session } from "../lib/wails";
 
@@ -5,25 +6,64 @@ type Props = {
   sessions: Session[];
   busy: boolean;
   error: string;
-  onStart: () => void;
+  onStartPipe: () => void;
+  onStartPorts: (spec: string) => void;
   onStop: (id: string) => void;
 };
 
-export default function ServicesPage({ sessions, busy, error, onStart, onStop }: Props) {
-  const serves = sessions.filter((s) => s.Kind === "pipe_serve");
+export default function ServicesPage({ sessions, busy, error, onStartPipe, onStartPorts, onStop }: Props) {
+  const [spec, setSpec] = useState("8080");
+  const pipes = sessions.filter((s) => s.Kind === "pipe_serve");
+  const ports = sessions.filter((s) => s.Kind === "port_serve");
+
+  function submitPorts(e: FormEvent) {
+    e.preventDefault();
+    onStartPorts(spec.trim());
+  }
+
   return (
     <section className="page">
       <h2>Services</h2>
-      <p className="lede">Start an ephemeral Tailcat pipe server and share its address with a peer.</p>
+      <p className="lede">Serve an ephemeral pipe or TCP ports and share the Tailcat address with a peer.</p>
+
+      <h3 className="kind">Pipe</h3>
       <div className="row">
-        <button className="btn" type="button" disabled={busy} onClick={onStart}>
+        <button className="btn" type="button" disabled={busy} onClick={onStartPipe}>
           Start ephemeral pipe serve
         </button>
       </div>
+      <div className="stack">
+        {pipes.length === 0 ? <p className="empty">No pipe serve sessions yet.</p> : null}
+        {pipes.map((sess) => (
+          <SessionCard key={sess.ID} session={sess} onStop={onStop} />
+        ))}
+      </div>
+
+      <h3 className="kind" style={{ marginTop: 24 }}>
+        Ports
+      </h3>
+      <p className="lede">Comma-separated ports or mappings such as 8080,8443 or 5555:127.0.0.1:3306.</p>
+      <form onSubmit={submitPorts}>
+        <div className="field">
+          <label htmlFor="ports">Port mappings</label>
+          <input
+            id="ports"
+            value={spec}
+            onChange={(e) => setSpec(e.target.value)}
+            placeholder="8080,8443"
+            autoComplete="off"
+          />
+        </div>
+        <div className="row">
+          <button className="btn" type="submit" disabled={busy || !spec.trim()}>
+            Start port serve
+          </button>
+        </div>
+      </form>
       {error ? <p className="err">{error}</p> : null}
       <div className="stack">
-        {serves.length === 0 ? <p className="empty">No pipe serve sessions yet.</p> : null}
-        {serves.map((sess) => (
+        {ports.length === 0 ? <p className="empty">No port serve sessions yet.</p> : null}
+        {ports.map((sess) => (
           <SessionCard key={sess.ID} session={sess} onStop={onStop} />
         ))}
       </div>
