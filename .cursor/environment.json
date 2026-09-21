@@ -1,0 +1,4 @@
+{
+  "name": "Tailcat Desktop Client",
+  "install": "bash ./.cursor/install.sh"
+}
