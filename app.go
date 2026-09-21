@@ -11,6 +11,7 @@ import (
 	"github.com/mushroom11s/tailcat-desktop-client/internal/service"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
 	"github.com/mushroom11s/tailcat-desktop-client/internal/store"
+	"github.com/mushroom11s/tailcat-desktop-client/internal/tray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -18,9 +19,11 @@ const tailcatEventName = "tailcat:event"
 
 // App is the Wails-bound application. The UI talks only to these methods.
 type App struct {
-	ctx  context.Context
-	svc  *service.Service
-	keys *store.Store
+	ctx      context.Context
+	svc      *service.Service
+	keys     *store.Store
+	tray     *tray.Controller
+	trayIcon []byte
 }
 
 func newAdapter() adapter.TailcatAdapter {
@@ -62,11 +65,40 @@ func NewApp() *App {
 // so we can call the runtime methods.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.tray = tray.New(a.showWindow, a.quitApp, a.activeSessionCount)
+	a.tray.Start(a.trayIcon)
 	go a.forwardEvents()
+}
+
+func (a *App) showWindow() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.WindowShow(a.ctx)
+}
+
+func (a *App) quitApp() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.Quit(a.ctx)
+}
+
+func (a *App) activeSessionCount() int {
+	n := 0
+	for _, sess := range a.svc.List() {
+		if sess.Status != session.StatusStopped {
+			n++
+		}
+	}
+	return n
 }
 
 func (a *App) forwardEvents() {
 	for ev := range a.svc.Events() {
+		if a.tray != nil {
+			a.tray.Refresh()
+		}
 		if a.ctx == nil {
 			continue
 		}
