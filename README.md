@@ -4,22 +4,25 @@ Full-featured desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/t
 
 **Plan 1 status: complete.** The app can start an ephemeral pipe serve, copy the Tailcat address, dial that address, and transfer a short text payload using the embedded `github.com/tailscale/tailcat` library (pinned at **v0.7.0**).
 
+**Plan 2 status: complete.** Services can serve TCP port mappings; Connect can forward local ports and browse a served HTTP port; Keys & Addresses can create/list/delete named keys and parse/resolve addresses; Diagnostics can ping (including until-direct).
+
 - Shell: [Wails](https://wails.io) v2 (Go + React + TypeScript)
 - Engine: embedded `github.com/tailscale/tailcat` (UI never imports Tailcat types)
 - UI: Apple-inspired / Liquid Glass style (CSS blur/translucency; light/dark)
 - Android: planned later (not v1)
 
-Plans 2–4 (ports, files, SSH, SOCKS, exit-node, tray) are not implemented.
+Plans 3–4 (files, SSH, SOCKS, exit-node, exec, tray) are not implemented.
 
 ## Docs
 
 - [Design spec](docs/superpowers/specs/2026-09-21-tailcat-desktop-client-design.md)
 - [Plan 1: Foundation vertical slice](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-1.md)
+- [Plan 2: Ports, keys, ping](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-2.md)
 - [Plans index](docs/superpowers/plans/README.md)
 
 ## Prerequisites
 
-Install these on the machine you will build or run from (macOS or Windows for Plan 1):
+Install these on the machine you will build or run from (macOS or Windows):
 
 | Tool | Notes |
 | --- | --- |
@@ -46,10 +49,12 @@ TAILCAT_ADAPTER=fake wails dev
 
 | Mode | How | Behavior |
 | --- | --- | --- |
-| **Real** (default) | `wails dev` / `wails build` | Serve prints a `tc…` address; Connect dials TCP port **1** (same port as bare `tailcat <addr>`). Serve echoes the payload so the Connect page can show `EventData`. |
-| **Fake** | `TAILCAT_ADAPTER=fake` | Address is `tc:fake-<sessionID>`; dial replies with `echo:<payload>`. No network. |
+| **Real** (default) | `wails dev` / `wails build` | Serve prints a `tc…` address; Connect dials TCP port **1** (same port as bare `tailcat <addr>`). Port serve proxies mapped TCP ports; forward/browse listen on localhost; ping uses disco pings (DERP then direct when possible). Parse/resolve call the library. |
+| **Fake** | `TAILCAT_ADAPTER=fake` | Pipe address is `tc:fake-<sessionID>`; port serve is `tc:fake-port-<sessionID>`; dial replies with `echo:<payload>`; ping emits DERP then direct `EventData` lines. Parse returns stub JSON; resolve returns `tc:fake-resolved`. No network. |
 
 `vite` / `npm run dev` without Wails has no Go bindings. The UI then uses an in-browser fake that matches the Go fake, and shows an “In-browser fake adapter” chip.
+
+Named keys are stored as `*.private.json` under the app config dir (`<user-config>/tailcat-desktop-client/keys`). Override with `TAILCAT_KEYS_DIR`. The Keys page also lists `~/.config/tailcat/keys` (or the OS equivalent) for CLI import.
 
 ## Develop
 
@@ -79,7 +84,7 @@ From the repository root, on the OS you want a binary for:
 wails build
 ```
 
-The native binary is written to `build/bin/`. Plan 1 product targets are **macOS and Windows** only.
+The native binary is written to `build/bin/`. Product targets are **macOS and Windows**.
 
 Linux is not a Plan 1 product target. On Ubuntu 24.04, `wails doctor` may still report `libwebkit` missing even when WebKitGTK 4.1 is installed:
 
@@ -132,10 +137,30 @@ Manual on **macOS or Windows** (cannot be fully exercised as a native Wails wind
 - [ ] Repeat the serve+dial path with the real adapter (default) on a normal network
 - [ ] Optional: interop with the official `tailcat` CLI using port 1 / bare dial
 
+## Plan 2 acceptance
+
+Automated (this repo / CI-friendly):
+
+- [x] `go test ./...` without the `integration` tag
+- [x] Fake adapter env override (`TAILCAT_ADAPTER=fake`)
+- [x] Real adapter compiles; default is `NewReal()`
+- [x] Frontend `npm run build`
+- [x] Isolation: only `internal/adapter` imports `github.com/tailscale/tailcat`
+- [x] Port serve → forward / browse / ping / keys / parse / resolve on the fake path
+
+Manual on **macOS or Windows** (cannot be fully exercised as a native Wails window on a headless Linux agent):
+
+- [ ] Services → Start port serve (`8080` or `5555:host:port`) → address visible → Copy
+- [ ] Connect → Forward mappings against that address; Browse port 80
+- [ ] Keys & Addresses → create named key, copy address, delete; parse/resolve JSON
+- [ ] Diagnostics → ping with until-direct → EventData log shows progress lines
+- [ ] Repeat port/forward/ping with the real adapter (default) on a normal network
+
 ## Layout
 
 - `main.go` / `app.go` — Wails entry and JS bindings
 - `internal/session` — session state machine
-- `internal/service` — StartPipeServe / DialPipe / Stop / List / Events
+- `internal/service` — StartPipeServe / DialPipe / StartPortServe / StartForward / StartBrowse / StartPing / ParseAddr / ResolveAddr / Stop / List / Events
+- `internal/store` — named key files (`*.private.json`)
 - `internal/adapter` — `TailcatAdapter` plus fake and real implementations
-- `frontend/` — glass shell, Connect + Services pages
+- `frontend/` — glass shell, Connect, Services, Keys, Diagnostics
