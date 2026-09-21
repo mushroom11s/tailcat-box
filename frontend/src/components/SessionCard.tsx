@@ -1,36 +1,6 @@
 import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
+import { kindMessageKey, statusMessageKey, useI18n } from "../i18n";
 import type { Session } from "../lib/wails";
-
-function kindLabel(kind: string): string {
-  if (kind === "pipe_serve") {
-    return "Pipe serve";
-  }
-  if (kind === "pipe_dial") {
-    return "Pipe dial";
-  }
-  if (kind === "port_serve") {
-    return "Port serve";
-  }
-  if (kind === "forward") {
-    return "Forward";
-  }
-  if (kind === "browse") {
-    return "Browse";
-  }
-  if (kind === "ping") {
-    return "Ping";
-  }
-  if (kind === "recv") {
-    return "Recv inbox";
-  }
-  if (kind === "copy") {
-    return "Copy";
-  }
-  if (kind === "files_serve") {
-    return "Files serve";
-  }
-  return kind;
-}
 
 async function copyText(text: string): Promise<void> {
   try {
@@ -54,28 +24,31 @@ type Props = {
 };
 
 export default function SessionCard({ session, onStop }: Props) {
+  const { t } = useI18n();
   const stopped = session.Status === "stopped";
+  const kindKey = kindMessageKey(session.Kind);
+  const statusKey = statusMessageKey(session.Status);
   return (
     <article className="glass card">
       <div className="card-head">
         <div className="card-meta">
-          <span className="kind">{kindLabel(session.Kind)}</span>
-          <span className={`pill ${session.Status}`}>{session.Status}</span>
+          <span className="kind">{kindKey ? t(kindKey) : session.Kind}</span>
+          <span className={`pill ${session.Status}`}>{statusKey ? t(statusKey) : session.Status}</span>
         </div>
         <div className="card-actions">
           {session.Address ? (
             <button className="btn btn-ghost" type="button" onClick={() => void copyText(session.Address)}>
-              Copy
+              {t("copy")}
             </button>
           ) : null}
           {onStop && !stopped ? (
             <button className="btn btn-danger" type="button" onClick={() => onStop(session.ID)}>
-              Stop
+              {t("stop")}
             </button>
           ) : null}
         </div>
       </div>
-      {session.Address ? <p className="address">{session.Address}</p> : <p className="empty">No address yet</p>}
+      {session.Address ? <p className="address">{session.Address}</p> : <p className="empty">{t("noAddressYet")}</p>}
       {session.Progress ? <p className="progress">{session.Progress}</p> : null}
       {session.Err ? <p className="err">{session.Err}</p> : null}
     </article>

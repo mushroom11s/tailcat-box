@@ -24,6 +24,9 @@
     radial-gradient(800px 500px at 50% 120%, #c8f0ea 0%, transparent 45%),
     linear-gradient(180deg, #eef2f7 0%, #e6ebf3 100%);
   --sidebar-w: 232px;
+  --scrollbar-size: 8px;
+  --scrollbar-thumb: rgba(29, 29, 31, 0.22);
+  --scrollbar-thumb-hover: rgba(29, 29, 31, 0.38);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,6 +50,8 @@
       radial-gradient(900px 600px at 100% 0%, #4a2160 0%, transparent 50%),
       radial-gradient(700px 500px at 50% 110%, #163a3a 0%, transparent 50%),
       linear-gradient(180deg, #0d0d10 0%, #16161c 100%);
+    --scrollbar-thumb: rgba(245, 245, 247, 0.28);
+    --scrollbar-thumb-hover: rgba(245, 245, 247, 0.46);
   }
 }
 
@@ -70,6 +75,8 @@
     radial-gradient(900px 600px at 100% 0%, #4a2160 0%, transparent 50%),
     radial-gradient(700px 500px at 50% 110%, #163a3a 0%, transparent 50%),
     linear-gradient(180deg, #0d0d10 0%, #16161c 100%);
+  --scrollbar-thumb: rgba(245, 245, 247, 0.28);
+  --scrollbar-thumb-hover: rgba(245, 245, 247, 0.46);
 }
 
 * {
@@ -205,6 +212,16 @@ textarea {
   background: rgba(127, 127, 127, 0.12);
 }
 
+.lang-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(127, 127, 127, 0.12);
+}
+
+.lang-toggle button,
 .theme-toggle button {
   appearance: none;
   border: 0;
@@ -216,7 +233,8 @@ textarea {
   cursor: pointer;
 }
 
-.theme-toggle button.active {
+.theme-toggle button.active,
+.lang-toggle button.active {
   background: var(--glass-bg-strong);
   color: var(--text);
   font-weight: 600;
@@ -232,6 +250,48 @@ textarea {
   padding: 28px 32px;
   min-width: 0;
   overflow: auto;
+}
+
+.main,
+.log,
+.result {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.main::-webkit-scrollbar,
+.log::-webkit-scrollbar,
+.result::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+.main::-webkit-scrollbar-track,
+.log::-webkit-scrollbar-track,
+.result::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main::-webkit-scrollbar-thumb,
+.log::-webkit-scrollbar-thumb,
+.result::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.main::-webkit-scrollbar-thumb:hover,
+.log::-webkit-scrollbar-thumb:hover,
+.result::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+
+.main::-webkit-scrollbar-corner,
+.log::-webkit-scrollbar-corner,
+.result::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .page h2 {

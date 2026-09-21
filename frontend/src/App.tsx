@@ -6,6 +6,7 @@ import KeysPage from "./pages/KeysPage";
 import ServicesPage from "./pages/ServicesPage";
 import { parsePortMappings } from "./lib/ports";
 import { sameKeys, sameSessions } from "./lib/snapshot";
+import { useI18n, type Locale } from "./i18n";
 import {
   createKey,
   deleteKey,
@@ -37,12 +38,12 @@ type Theme = "system" | "light" | "dark";
 
 const THEME_KEY = "tailcat-theme";
 
-const NAV: Array<{ id: Page; label: string; available: boolean }> = [
-  { id: "connect", label: "Connect", available: true },
-  { id: "services", label: "Services", available: true },
-  { id: "files", label: "Files", available: true },
-  { id: "keys", label: "Keys & Addresses", available: true },
-  { id: "diagnostics", label: "Diagnostics", available: true },
+const NAV: Array<{ id: Page; labelKey: "navConnect" | "navServices" | "navFiles" | "navKeys" | "navDiagnostics" }> = [
+  { id: "connect", labelKey: "navConnect" },
+  { id: "services", labelKey: "navServices" },
+  { id: "files", labelKey: "navFiles" },
+  { id: "keys", labelKey: "navKeys" },
+  { id: "diagnostics", labelKey: "navDiagnostics" },
 ];
 
 function applyTheme(theme: Theme): void {
@@ -63,6 +64,7 @@ function readTheme(): Theme {
 }
 
 export default function App() {
+  const { locale, setLocale, t } = useI18n();
   const [page, setPage] = useState<Page>("services");
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -131,7 +133,7 @@ export default function App() {
           <div className="brand-mark" aria-hidden="true" />
           <div>
             <h1>Tailcat</h1>
-            <p>Desktop client</p>
+            <p>{t("brandTagline")}</p>
           </div>
         </div>
         <nav className="nav">
@@ -140,23 +142,30 @@ export default function App() {
               key={item.id}
               type="button"
               className={`nav-btn ${page === item.id ? "active" : ""}`}
-              disabled={!item.available}
-              title={item.available ? undefined : "Plan 3+"}
               onClick={() => {
-                if (item.available) {
-                  setPage(item.id);
-                  setError("");
-                }
+                setPage(item.id);
+                setError("");
               }}
             >
-              {item.label}
-              {!item.available ? <span className="nav-hint">Plan 3+</span> : null}
+              {t(item.labelKey)}
             </button>
           ))}
         </nav>
         <div className="sidebar-footer">
-          {fallback ? <div className="fallback-chip">In-browser fake adapter</div> : null}
-          <div className="theme-toggle" role="group" aria-label="Theme">
+          {fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}
+          <div className="lang-toggle" role="group" aria-label={t("language")}>
+            {(["en", "zh-CN"] as Locale[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={locale === value ? "active" : ""}
+                onClick={() => setLocale(value)}
+              >
+                {value === "en" ? t("langEnglish") : t("langChinese")}
+              </button>
+            ))}
+          </div>
+          <div className="theme-toggle" role="group" aria-label={t("theme")}>
             {(["system", "light", "dark"] as Theme[]).map((value) => (
               <button
                 key={value}
@@ -164,7 +173,7 @@ export default function App() {
                 className={theme === value ? "active" : ""}
                 onClick={() => setTheme(value)}
               >
-                {value[0].toUpperCase() + value.slice(1)}
+                {value === "system" ? t("themeSystem") : value === "light" ? t("themeLight") : t("themeDark")}
               </button>
             ))}
           </div>
