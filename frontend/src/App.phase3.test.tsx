@@ -75,11 +75,11 @@ describe("phase 3 voice notes", () => {
   it("sends the composer burn choice with the voice note", async () => {
     const user = userEvent.setup();
     const { onSendVoice } = renderChat();
-    await user.selectOptions(screen.getByLabelText("Burn"), "5");
+    await user.click(screen.getByRole("switch", { name: "Burn" }));
     fireEvent.pointerDown(screen.getByRole("button", { name: "Record voice note" }));
     await screen.findByRole("button", { name: "Recording" });
     fireEvent.pointerUp(screen.getByRole("button", { name: "Recording" }));
-    await vi.waitFor(() => expect(onSendVoice).toHaveBeenCalledWith(opusMIME, 2, expect.any(Uint8Array), true, 5));
+    await vi.waitFor(() => expect(onSendVoice).toHaveBeenCalledWith(opusMIME, 2, expect.any(Uint8Array), true, 0));
   });
 
   it("focuses the peer field instead of recording when nobody is connected", () => {
@@ -261,7 +261,7 @@ describe("phase 3 browser fake", () => {
     await screen.findByRole("button", { name: "Copy" });
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
-    await user.selectOptions(screen.getByLabelText("Burn"), "0");
+    await user.click(screen.getByRole("switch", { name: "Burn" }));
     fireEvent.pointerDown(screen.getByRole("button", { name: "Record voice note" }));
     expect(await screen.findByRole("button", { name: "Recording" })).toBeTruthy();
     fireEvent.pointerUp(screen.getByRole("button", { name: "Recording" }));

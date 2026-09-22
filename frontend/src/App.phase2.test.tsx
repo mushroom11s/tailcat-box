@@ -39,7 +39,7 @@ describe("phase 2 files and burn", () => {
     await screen.findByRole("button", { name: "Copy" });
     await user.type(screen.getByLabelText("Peer"), "tc:fake-official");
     await user.click(screen.getByRole("button", { name: "Connect" }));
-    await user.selectOptions(screen.getByLabelText("Burn"), "0");
+    await user.click(screen.getByRole("switch", { name: "Burn" }));
     await user.type(screen.getByLabelText("Message"), "kept");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("They may keep a copy.")).toBeTruthy();
@@ -56,7 +56,7 @@ describe("phase 2 files and burn", () => {
     await screen.findByRole("button", { name: "Copy" });
     await user.type(screen.getByLabelText("Peer"), "tc:fake-box");
     await user.click(screen.getByRole("button", { name: "Connect" }));
-    await user.selectOptions(screen.getByLabelText("Burn"), "5");
+    await user.click(screen.getByRole("switch", { name: "Burn" }));
     await user.type(screen.getByLabelText("Message"), "gone");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("Removed on their side after they open it.")).toBeTruthy();

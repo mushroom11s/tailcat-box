@@ -80,9 +80,9 @@ function stamp(iso: string): string {
   return d.toLocaleTimeString();
 }
 
-function burnChoice(mode: string): { burn: boolean; ttl: number } {
-  if (mode === "0" || mode === "5" || mode === "30") {
-    return { burn: true, ttl: Number(mode) };
+function burnChoice(on: boolean): { burn: boolean; ttl: number } {
+  if (on) {
+    return { burn: true, ttl: 0 };
   }
   return { burn: false, ttl: 0 };
 }
@@ -114,12 +114,12 @@ export default function ChatPage({
   const { t } = useI18n();
   const peerRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const burnRef = useRef("off");
+  const burnRef = useRef(false);
   const [draftPeer, setDraftPeer] = useState("");
   const [draft, setDraft] = useState("");
   const [inline, setInline] = useState("");
   const [notice, setNotice] = useState("");
-  const [burnMode, setBurnMode] = useState("off");
+  const [burnOn, setBurnOn] = useState(false);
   const [viewer, setViewer] = useState<{ id: string; left: number | null } | null>(null);
   const [recording, setRecording] = useState(false);
   const captureRef = useRef<VoiceCapture | null>(null);
@@ -158,7 +158,7 @@ export default function ChatPage({
       onChange: setCallView,
     });
   }
-  burnRef.current = burnMode;
+  burnRef.current = burnOn;
 
   async function reportStatus(status: string): Promise<void> {
     if (status === "replaced") {
@@ -294,7 +294,7 @@ export default function ChatPage({
       return;
     }
     const body = draft;
-    const choice = burnChoice(burnMode);
+    const choice = burnChoice(burnOn);
     try {
       await onSend(body, choice.burn, choice.ttl);
       setDraft("");
@@ -588,15 +588,6 @@ export default function ChatPage({
       ) : null}
       </div>
       <div className="field">
-        <label htmlFor="chat-burn">{t("chatBurnLabel")}</label>
-        <select id="chat-burn" value={burnMode} onChange={(e) => setBurnMode(e.target.value)}>
-          <option value="off">{t("chatBurnOff")}</option>
-          <option value="0">{t("chatBurnUntilClosed")}</option>
-          <option value="5">{t("chatBurn5")}</option>
-          <option value="30">{t("chatBurn30")}</option>
-        </select>
-      </div>
-      <div className="field">
         <label htmlFor="chat-composer">{t("chatMessageLabel")}</label>
         <textarea
           id="chat-composer"
@@ -632,9 +623,21 @@ export default function ChatPage({
         <IconButton label={t("chatCallScreen")} onClick={() => void placeCall("screen")}>
           <ScreenIcon />
         </IconButton>
-        <IconButton label={t("send")} onClick={() => void send()}>
-          <SendIcon />
-        </IconButton>
+        <label className="burn-switch" htmlFor="chat-burn">
+          <span>{t("chatBurnLabel")}</span>
+          <input
+            id="chat-burn"
+            className="switch"
+            type="checkbox"
+            role="switch"
+            checked={burnOn}
+            aria-checked={burnOn}
+            onChange={(e) => setBurnOn(e.target.checked)}
+          />
+        </label>
+        <button className="btn composer-send" type="button" onClick={() => void send()}>
+          {t("send")}
+        </button>
       </div>
       <input
         ref={fileRef}
@@ -881,10 +884,6 @@ function VideoIcon() {
 
 function ScreenIcon() {
   return <StrokeIcon d="M3 5h18v12H3zM8 21h8M12 17v4" />;
-}
-
-function SendIcon() {
-  return <StrokeIcon d="M4 12h14M13 6l6 6-6 6" />;
 }
 
 function BurnBadge({ caps, onDelete }: { caps: string[]; onDelete: () => Promise<void> | void }) {
