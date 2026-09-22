@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net"
 	"sync"
@@ -23,6 +24,7 @@ type Real struct {
 	forwards map[string]*forwardRun
 	cancels  map[string]context.CancelFunc
 	net      NetworkOpts
+	chat     *realRoom
 }
 
 type serveRun struct {
@@ -43,6 +45,15 @@ func NewReal() *Real {
 		forwards: make(map[string]*forwardRun),
 		cancels:  make(map[string]context.CancelFunc),
 	}
+}
+
+func (r *Real) GeneratePrivateKeyJSON() (string, error) {
+	pk := tailcat.NewPrivateKey()
+	body, err := json.Marshal(pk)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }
 
 // Version returns the pinned github.com/tailscale/tailcat module version.

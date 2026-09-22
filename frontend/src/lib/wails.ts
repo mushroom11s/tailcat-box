@@ -1,6 +1,9 @@
 import {
+  ConnectChatPeer as bindConnectChatPeer,
   CreateKey as bindCreateKey,
+  DecodeChatVoice as bindDecodeChatVoice,
   DeleteKey as bindDeleteKey,
+  DiscardChatMessage as bindDiscardChatMessage,
   DialPipe as bindDialPipe,
   GetNetworkSettings as bindGetNetworkSettings,
   ListKeys as bindListKeys,
@@ -13,6 +16,14 @@ import {
   StartPipeServe as bindStartPipeServe,
   StartPortServe as bindStartPortServe,
   StartRecv as bindStartRecv,
+  ResendChatFile as bindResendChatFile,
+  RestartChatRoom as bindRestartChatRoom,
+  SaveChatFile as bindSaveChatFile,
+  SendChatFile as bindSendChatFile,
+  SendChatSignal as bindSendChatSignal,
+  SendChatText as bindSendChatText,
+  SendChatVoice as bindSendChatVoice,
+  StartChatRoom as bindStartChatRoom,
   StartCopy as bindStartCopy,
   StartFilesServe as bindStartFilesServe,
   ListRemote as bindListRemote,
@@ -24,15 +35,18 @@ import {
   StartSOCKS as bindStartSOCKS,
   StartExitNode as bindStartExitNode,
   StartExec as bindStartExec,
+  StopChatRoom as bindStopChatRoom,
   StopSession as bindStopSession,
   TailcatVersion as bindTailcatVersion,
   GetClientInfo as bindGetClientInfo,
   GetSystemInfo as bindGetSystemInfo,
   RecordUpdateCheck as bindRecordUpdateCheck,
   SetLaunchAtLogin as bindSetLaunchAtLogin,
+  SetUILocale as bindSetUILocale,
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { adapter, main, session, store } from "../../wailsjs/go/models";
+import { createBrowserHub } from "./chatBrowser";
 
 export type Session = {
   ID: string;
@@ -98,7 +112,7 @@ export type SystemInfo = {
 const TAILCAT_EVENT = "tailcat:event";
 
 type GoWindow = Window & {
-  go?: { main?: { App?: { StartPipeServe?: unknown } } };
+  go?: { main?: { App?: { StartChatRoom?: unknown } } };
   runtime?: unknown;
 };
 
@@ -107,7 +121,7 @@ function goWindow(): GoWindow {
 }
 
 export function hasWailsBindings(): boolean {
-  return typeof window !== "undefined" && typeof goWindow().go?.main?.App?.StartPipeServe === "function";
+  return typeof window !== "undefined" && typeof goWindow().go?.main?.App?.StartChatRoom === "function";
 }
 
 function asSession(s: session.Session): Session {
@@ -401,6 +415,10 @@ async function fakeCreateKey(name: string, client: boolean, region: string): Pro
     Address: address,
     Source: "app",
   });
+  browserKeyJSON.set(
+    name,
+    JSON.stringify({ Name: name, Client: client, Region: region, Address: address, PrivateKey: { fake: name } }),
+  );
   void region;
   return address;
 }
@@ -590,6 +608,119 @@ function asFileEntry(e: adapter.FileEntry): FileEntry {
   };
 }
 
+export async function startChatRoom(): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindStartChatRoom());
+  }
+  return fakeStartChatRoom();
+}
+
+export async function connectChatPeer(addr: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindConnectChatPeer(addr);
+    return;
+  }
+  await fakeConnectChatPeer(addr);
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+export async function sendChatVoice(
+  mime: string,
+  durationSec: number,
+  audio: Uint8Array,
+  burn = false,
+  ttlSec = 0,
+): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSendChatVoice(mime, durationSec, bytesToBase64(audio), burn, ttlSec);
+    return;
+  }
+  await browserChat.sendVoice(mime, durationSec, audio, burn, ttlSec);
+}
+
+export async function decodeChatVoice(mime: string, audioBase64: string): Promise<string> {
+  if (hasWailsBindings()) {
+    return (await bindDecodeChatVoice(mime, audioBase64)) ?? "";
+  }
+  if (mime.includes("wav")) {
+    return audioBase64;
+  }
+  throw new Error("Cannot play this voice message.");
+}
+
+export async function sendChatSignal(metaJSON: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSendChatSignal(metaJSON);
+    return;
+  }
+  browserChat.sendSignal(metaJSON);
+}
+
+export async function sendChatText(body: string, burn = false, ttlSec = 0): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSendChatText(body, burn, ttlSec);
+    return;
+  }
+  await fakeSendChatText(body, burn, ttlSec);
+}
+
+export async function sendChatFile(path: string, burn = false, ttlSec = 0): Promise<string> {
+  if (hasWailsBindings()) {
+    return (await bindSendChatFile(path, burn, ttlSec)) ?? "";
+  }
+  throw new Error("file picker requires a running window");
+}
+
+export async function sendChatFileBytes(file: File, burn = false, ttlSec = 0): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return browserChat.sendFile({ name: file.name, mime: file.type || "application/octet-stream", bytes }, burn, ttlSec);
+}
+
+export async function discardChatMessage(id: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindDiscardChatMessage(id);
+    return;
+  }
+  browserChat.discard(id);
+}
+
+export async function resendChatFile(id: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindResendChatFile(id);
+    return;
+  }
+  await browserChat.resend(id);
+}
+
+export async function saveChatFile(id: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSaveChatFile(id);
+  }
+}
+
+export async function restartChatRoom(keyName: string): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindRestartChatRoom(keyName));
+  }
+  return fakeRestartChatRoom(keyName);
+}
+
+export async function stopChatRoom(): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindStopChatRoom();
+    return;
+  }
+  await fakeStopChatRoom();
+}
+
 export async function startPipeServe(): Promise<Session> {
   if (hasWailsBindings()) {
     return asSession(await bindStartPipeServe());
@@ -670,11 +801,79 @@ export async function deleteKey(name: string): Promise<void> {
 }
 
 let fakeSettings: NetworkSettings = { Region: "", DERPMapURL: "" };
+const browserChat = createBrowserHub();
+let browserChatSession: Session | null = null;
+const browserKeyJSON = new Map<string, string>();
+
+function emitBrowser(ev: { Kind: string; Data?: string; Address?: string; SessionID: string }): void {
+  emitFake({ SessionID: ev.SessionID, Kind: ev.Kind, Address: ev.Address, Data: ev.Data });
+}
+
+async function fakeStartChatRoom(): Promise<Session> {
+  if (browserChatSession && (browserChatSession.Status === "starting" || browserChatSession.Status === "running")) {
+    return { ...browserChatSession };
+  }
+  const sess = newSess("chat");
+  browserChatSession = sess;
+  const off = browserChat.onEvent((ev) => {
+    if (ev.Kind === "room-ready" && ev.Address && browserChatSession) {
+      browserChatSession.Status = "running";
+      browserChatSession.Address = ev.Address;
+    }
+    emitBrowser(ev);
+  });
+  fake.serveStops.set(sess.ID, off);
+  await browserChat.start(sess.ID, "");
+  return { ...sess, Address: browserChatSession.Address, Status: browserChatSession.Status };
+}
+
+async function fakeConnectChatPeer(addr: string): Promise<void> {
+  await browserChat.connect(addr);
+}
+
+async function fakeSendChatText(body: string, burn: boolean, ttlSec: number): Promise<void> {
+  await browserChat.sendText(body, burn, ttlSec);
+}
+
+async function fakeRestartChatRoom(keyName: string): Promise<Session> {
+  if (browserChatSession) {
+    browserChatSession.Status = "stopped";
+    const stop = fake.serveStops.get(browserChatSession.ID);
+    if (stop) {
+      stop();
+    }
+  }
+  const sess = newSess("chat");
+  browserChatSession = sess;
+  const off = browserChat.onEvent((ev) => {
+    if (ev.Kind === "room-ready" && ev.Address && browserChatSession && browserChatSession.ID === sess.ID) {
+      browserChatSession.Status = "running";
+      browserChatSession.Address = ev.Address;
+    }
+    emitBrowser(ev);
+  });
+  fake.serveStops.set(sess.ID, off);
+  const material = keyName ? (browserKeyJSON.get(keyName) ?? "") : "";
+  if (keyName && !material) {
+    throw new Error("saved key is not a Tailcat private key");
+  }
+  await browserChat.restart(sess.ID, material);
+  return { ...browserChatSession };
+}
+
+async function fakeStopChatRoom(): Promise<void> {
+  browserChat.stop();
+  if (!browserChatSession) {
+    return;
+  }
+  browserChatSession.Status = "stopped";
+  browserChatSession = null;
+}
 
 export async function getNetworkSettings(): Promise<NetworkSettings> {
   if (hasWailsBindings()) {
     const s = await bindGetNetworkSettings();
-    return { Region: s.Region ?? "", DERPMapURL: s.DERPMapURL ?? "" };
+    return { Region: s.region ?? "", DERPMapURL: s.derpMapUrl ?? "" };
   }
   return { ...fakeSettings };
 }
@@ -851,6 +1050,12 @@ export async function recordUpdateCheck(): Promise<ClientInfo> {
   }
   fake.lastUpdateCheck = new Date().toISOString();
   return fakeClientInfo();
+}
+
+export async function setUILocale(locale: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSetUILocale(locale);
+  }
 }
 
 export async function setLaunchAtLogin(enabled: boolean): Promise<SystemInfo> {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -383,6 +384,47 @@ func TestAppSettingsBindings(t *testing.T) {
 	}
 }
 
+func TestProductTitle(t *testing.T) {
+	if got := productTitle("en"); got != "Tailcat Box" {
+		t.Fatalf("en=%q", got)
+	}
+	if got := productTitle("zh-CN"); got != "猫砂盆" {
+		t.Fatalf("zh-CN=%q", got)
+	}
+	if got := productTitle("zh"); got != "猫砂盆" {
+		t.Fatalf("zh=%q", got)
+	}
+	if got := productTitle(""); got != "Tailcat Box" {
+		t.Fatalf("empty=%q", got)
+	}
+}
+
+func TestChooseConfigDir(t *testing.T) {
+	next := filepath.Join("/cfg", "tailcat-box")
+	legacy := filepath.Join("/cfg", "tailcat-desktop-client")
+	none := func(string) bool { return false }
+	if got := chooseConfigDir("/cfg", "tailcat-box", "tailcat-desktop-client", none); got != next {
+		t.Fatalf("new install=%q", got)
+	}
+	legacyOnly := func(path string) bool { return path == legacy }
+	if got := chooseConfigDir("/cfg", "tailcat-box", "tailcat-desktop-client", legacyOnly); got != legacy {
+		t.Fatalf("legacy install=%q", got)
+	}
+	both := func(string) bool { return true }
+	if got := chooseConfigDir("/cfg", "tailcat-box", "tailcat-desktop-client", both); got != next {
+		t.Fatalf("both present=%q", got)
+	}
+}
+
+func TestSetUILocaleWithoutWindow(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	t.Setenv("TAILCAT_SETTINGS_DIR", t.TempDir())
+	a := NewApp()
+	a.SetUILocale("zh-CN")
+	a.SetUILocale("en")
+}
+
 func TestMaybeRecordDailyUpdateCheck(t *testing.T) {
 	t.Setenv("TAILCAT_ADAPTER", "fake")
 	t.Setenv("TAILCAT_SETTINGS_DIR", t.TempDir())
@@ -399,4 +441,81 @@ func TestMaybeRecordDailyUpdateCheck(t *testing.T) {
 	if a.GetClientInfo().LastUpdateCheck != first {
 		t.Fatal("should not rewrite last check within 24h")
 	}
+}
+
+func TestChatRoomEchoAndRestartKey(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	a := NewApp()
+	if _, err := a.StartChatRoom(); err != nil {
+		t.Fatal(err)
+	}
+	var addr string
+	deadline := time.After(2 * time.Second)
+	for addr == "" {
+		for _, item := range a.ListSessions() {
+			if item.Kind == session.KindChat && item.Status == session.StatusRunning {
+				addr = item.Address
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("%+v", a.ListSessions())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	again, err := a.StartChatRoom()
+	if err != nil || again.Address != addr {
+		t.Fatalf("again=%+v err=%v", again, err)
+	}
+	if err := a.ConnectChatPeer("tc:fake-echo"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SendChatText("hi", false, 0); err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.After(2 * time.Second)
+	for !chatHas(a, "in", "echo") {
+		select {
+		case <-deadline:
+			t.Fatalf("%+v", a.chat.Messages())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if _, err := a.CreateKey("home", false, ""); err != nil {
+		t.Fatal(err)
+	}
+	restarted, err := a.RestartChatRoom("home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.After(2 * time.Second)
+	var next string
+	for next == "" {
+		for _, item := range a.ListSessions() {
+			if item.ID == restarted.ID && item.Status == session.StatusRunning {
+				next = item.Address
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("%+v", a.ListSessions())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if next == addr || !strings.HasPrefix(next, "tc:fake-room-key-") {
+		t.Fatalf("next=%s old=%s", next, addr)
+	}
+	if a.chat.Peer() != "" {
+		t.Fatalf("peer=%s", a.chat.Peer())
+	}
+}
+
+func chatHas(a *App, direction, body string) bool {
+	for _, msg := range a.chat.Messages() {
+		if msg.Direction == direction && msg.Body == body {
+			return true
+		}
+	}
+	return false
 }

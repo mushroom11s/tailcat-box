@@ -20,15 +20,17 @@ type KeyInfo struct {
 }
 
 type CreateOpts struct {
-	Client bool
-	Region string
+	Client         bool
+	Region         string
+	PrivateKeyJSON string
 }
 
 type fileRecord struct {
-	Name    string `json:"Name"`
-	Client  bool   `json:"Client"`
-	Region  string `json:"Region,omitempty"`
-	Address string `json:"Address"`
+	Name       string          `json:"Name"`
+	Client     bool            `json:"Client"`
+	Region     string          `json:"Region,omitempty"`
+	Address    string          `json:"Address"`
+	PrivateKey json.RawMessage `json:"PrivateKey,omitempty"`
 }
 
 type Store struct {
@@ -93,6 +95,12 @@ func (s *Store) Create(name string, opts CreateOpts) (string, error) {
 		Region:  opts.Region,
 		Address: addr,
 	}
+	if opts.PrivateKeyJSON != "" {
+		if !json.Valid([]byte(opts.PrivateKeyJSON)) {
+			return "", fmt.Errorf("private key JSON is invalid")
+		}
+		rec.PrivateKey = json.RawMessage(opts.PrivateKeyJSON)
+	}
 	body, err := json.MarshalIndent(rec, "", "\t")
 	if err != nil {
 		return "", err
@@ -101,6 +109,22 @@ func (s *Store) Create(name string, opts CreateOpts) (string, error) {
 		return "", err
 	}
 	return addr, nil
+}
+
+func (s *Store) ReadRaw(name string) ([]byte, error) {
+	if err := validateName(name); err != nil {
+		return nil, err
+	}
+	body, err := os.ReadFile(filepath.Join(s.Dir, name+keySuffix))
+	if err == nil {
+		return body, nil
+	}
+	if s.ExtraDir != "" && os.IsNotExist(err) {
+		if extra, err2 := os.ReadFile(filepath.Join(s.ExtraDir, name+keySuffix)); err2 == nil {
+			return extra, nil
+		}
+	}
+	return nil, err
 }
 
 func (s *Store) Delete(name string) error {

@@ -75,7 +75,7 @@ def main() -> int:
 
     sources = collect_sources(bin_dir, args.os_slug)
     arch = detect_arch()
-    name = f"tailcat-desktop-client-{args.os_slug}-{arch}-{args.version}.zip"
+    name = f"tailcat-box-{args.os_slug}-{arch}-{args.version}.zip"
     dest = out_dir / name
 
     if args.os_slug == "macos" and shutil.which("ditto"):

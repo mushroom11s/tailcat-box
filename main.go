@@ -12,26 +12,26 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-//go:embed build/appicon.png
-var trayIcon []byte
-
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()
-	app.trayIcon = trayIcon
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:             "Tailcat",
+		Title:             productTitle("en"),
 		Width:             1100,
 		Height:            760,
 		HideWindowOnClose: true,
-		Menu:              app.applicationMenu(),
+		Menu:              app.applicationMenu(productTitle("en")),
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop:     true,
+			DisableWebViewDrop: true,
+		},
+		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,
 		},
@@ -42,9 +42,9 @@ func main() {
 	}
 }
 
-func (a *App) applicationMenu() *menu.Menu {
+func (a *App) applicationMenu(title string) *menu.Menu {
 	m := menu.NewMenu()
-	appMenu := m.AddSubmenu("Tailcat")
+	appMenu := m.AddSubmenu(title)
 	appMenu.AddText("Open", nil, func(_ *menu.CallbackData) {
 		a.showWindow()
 	})

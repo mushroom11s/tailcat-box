@@ -13,12 +13,17 @@ func (c *Controller) Start(icon []byte) {
 		return
 	}
 	start, _ := systray.RunWithExternalLoop(func() {
+		if len(icon) == 0 {
+			icon = DefaultIcon
+		}
 		if len(icon) > 0 {
 			systray.SetIcon(icon)
 		}
-		systray.SetTitle("Tailcat")
-		systray.SetTooltip("Tailcat desktop client")
-		openItem := systray.AddMenuItem(LabelOpen, "Show the Tailcat window")
+		c.bindProduct(func(title, tooltip string) {
+			systray.SetTitle(title)
+			systray.SetTooltip(tooltip)
+		})
+		openItem := systray.AddMenuItem(LabelOpen, "Show the Tailcat Box window")
 		openItem.Click(c.Open)
 		countItem := systray.AddMenuItem(SessionCountLabel(0), "")
 		countItem.Disable()
@@ -26,7 +31,7 @@ func (c *Controller) Start(icon []byte) {
 			countItem.SetTitle(s)
 		})
 		systray.AddSeparator()
-		quitItem := systray.AddMenuItem(LabelQuit, "Quit Tailcat")
+		quitItem := systray.AddMenuItem(LabelQuit, "Quit Tailcat Box")
 		quitItem.Click(func() {
 			c.Quit()
 			systray.Quit()

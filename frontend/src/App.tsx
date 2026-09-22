@@ -1,62 +1,52 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import ConnectPage from "./pages/ConnectPage";
-import DiagnosticsPage from "./pages/DiagnosticsPage";
-import FilesPage from "./pages/FilesPage";
-import KeysPage from "./pages/KeysPage";
-import ServicesPage from "./pages/ServicesPage";
+import { useCallback, useEffect, useRef, useState } from "react";
+import ChatPage, { type ChatMessage, type ChatTransfer } from "./pages/ChatPage";
 import SettingsPage from "./pages/SettingsPage";
+import TunnelPage from "./pages/TunnelPage";
 import { parsePortMappings } from "./lib/ports";
 import { sameKeys, sameSessions } from "./lib/snapshot";
 import { useI18n } from "./i18n";
+import iconUrl from "./assets/icon.png";
+import { localizeChatError } from "./lib/chatText";
 import {
+  connectChatPeer,
   createKey,
   deleteKey,
-  dialPipe,
+  discardChatMessage,
   getNetworkSettings,
   hasWailsBindings,
   listKeys,
-  listRemote,
   listSessions,
   onTailcatEvent,
-  parseAddr,
-  resolveAddr,
+  resendChatFile,
+  restartChatRoom,
+  saveChatFile,
+  sendChatFile,
+  sendChatFileBytes,
+  sendChatSignal,
+  sendChatText,
+  sendChatVoice,
   setNetworkSettings,
   startBrowse,
-  startCopy,
-  startExec,
-  startExitNode,
-  startFilesServe,
+  startChatRoom,
   startForward,
   startPing,
-  startPipeServe,
   startPortServe,
-  startRecv,
-  startSOCKS,
-  startSSHClient,
-  startSSHServe,
   stopSession,
   tailcatVersion,
-  type FileEntry,
   type KeyInfo,
   type Session,
   type TailcatEvent,
 } from "./lib/wails";
+import { WindowSetTitle } from "../wailsjs/runtime/runtime";
 
-type Page = "connect" | "services" | "files" | "keys" | "diagnostics" | "settings";
+type Page = "chat" | "tunnel" | "settings";
 type Theme = "system" | "light" | "dark";
 
 const THEME_KEY = "tailcat-theme";
 
-const NAV: Array<{
-  id: Page;
-  labelKey: "navConnect" | "navServices" | "navFiles" | "navKeys" | "navDiagnostics" | "navSettings";
-}> = [
-  { id: "connect", labelKey: "navConnect" },
-  { id: "services", labelKey: "navServices" },
-  { id: "files", labelKey: "navFiles" },
-  { id: "keys", labelKey: "navKeys" },
-  { id: "diagnostics", labelKey: "navDiagnostics" },
-  { id: "settings", labelKey: "navSettings" },
+const NAV: Array<{ id: Exclude<Page, "settings">; labelKey: "navChat" | "navTunnel" }> = [
+  { id: "chat", labelKey: "navChat" },
+  { id: "tunnel", labelKey: "navTunnel" },
 ];
 
 function applyTheme(theme: Theme): void {
@@ -76,21 +66,42 @@ function readTheme(): Theme {
   return "system";
 }
 
+function asMessage(data: string): ChatMessage | null {
+  try {
+    const msg = JSON.parse(data) as ChatMessage;
+    if (!msg.id || !msg.direction) {
+      return null;
+    }
+    return msg;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const { t } = useI18n();
-  const [page, setPage] = useState<Page>("services");
+  const [page, setPage] = useState<Page>("chat");
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const [sessions, setSessions] = useState<Session[]>([]);
   const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [events, setEvents] = useState<TailcatEvent[]>([]);
-  const [listing, setListing] = useState<FileEntry[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [parseResult, setParseResult] = useState("");
-  const [resolveResult, setResolveResult] = useState("");
   const [region, setRegion] = useState("");
   const [derpMapURL, setDerpMapURL] = useState("");
   const [version, setVersion] = useState("");
+  const [chatAddress, setChatAddress] = useState("");
+  const [chatPeer, setChatPeer] = useState("");
+  const [chatCaps, setChatCaps] = useState<string[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [transfers, setTransfers] = useState<ChatTransfer[]>([]);
+  const [roomError, setRoomError] = useState("");
+  const [tunnelError, setTunnelError] = useState("");
+  const [liveSignal, setLiveSignal] = useState<{ seq: number; data: string } | null>(null);
+  const [roomKey, setRoomKey] = useState("");
+  const [appliedRoom, setAppliedRoom] = useState({ key: "", region: "", derp: "" });
+  const roomKeyRef = useRef("");
+  const peerRef = useRef("");
+  const netRef = useRef({ region: "", derp: "" });
+  netRef.current = { region, derp: derpMapURL };
   const fallback = !hasWailsBindings();
 
   const refresh = useCallback(async () => {
@@ -104,8 +115,8 @@ export default function App() {
       setRegion((prev) => (prev === net.Region ? prev : net.Region));
       setDerpMapURL((prev) => (prev === net.DERPMapURL ? prev : net.DERPMapURL));
       setVersion((prev) => (prev === ver ? prev : ver));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch {
+      // Session refresh keeps the last good snapshot. Room listen errors use roomError.
     }
   }, []);
 
@@ -115,9 +126,85 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    document.title = t("productName");
+    if (hasWailsBindings()) {
+      WindowSetTitle(t("productName"));
+    }
+  }, [t]);
+
+  useEffect(() => {
     void refresh();
     const off = onTailcatEvent((ev) => {
       setEvents((prev) => [...prev, ev]);
+      if (ev.Kind === "room-ready" && ev.Data) {
+        try {
+          const data = JSON.parse(ev.Data) as { address?: string };
+          if (data.address) {
+            setChatAddress(data.address);
+            setRoomError("");
+            setAppliedRoom({
+              key: roomKeyRef.current,
+              region: netRef.current.region,
+              derp: netRef.current.derp,
+            });
+          }
+        } catch {
+          // ignore malformed event data
+        }
+      } else if (ev.Kind === "peer" && ev.Data) {
+        try {
+          const data = JSON.parse(ev.Data) as { address?: string; caps?: string[] };
+          const next = data.address ?? "";
+          if (Array.isArray(data.caps)) {
+            setChatCaps(data.caps);
+          } else if (next !== peerRef.current) {
+            setChatCaps([]);
+          }
+          peerRef.current = next;
+          setChatPeer(next);
+        } catch {
+          // ignore malformed event data
+        }
+      } else if (ev.Kind === "message" && ev.Data) {
+        const msg = asMessage(ev.Data);
+        if (msg) {
+          setChatMessages((prev) => (prev.some((item) => item.id === msg.id) ? prev : [...prev, msg]));
+          if (msg.code === "room-restarted") {
+            peerRef.current = "";
+            setChatPeer("");
+            setChatCaps([]);
+          }
+        }
+      } else if (ev.Kind === "transfer" && ev.Data) {
+        try {
+          const tr = JSON.parse(ev.Data) as ChatTransfer;
+          if (tr.id) {
+            setTransfers((prev) => {
+              const index = prev.findIndex((item) => item.id === tr.id);
+              if (index < 0) {
+                return [...prev, tr];
+              }
+              const next = prev.slice();
+              next[index] = tr;
+              return next;
+            });
+          }
+        } catch {
+          // ignore malformed event data
+        }
+      } else if (ev.Kind === "signal" && ev.Data) {
+        const data = ev.Data;
+        setLiveSignal((prev) => ({ seq: (prev?.seq ?? 0) + 1, data }));
+      } else if (ev.Kind === "discard" && ev.Data) {
+        try {
+          const data = JSON.parse(ev.Data) as { id?: string };
+          if (data.id) {
+            setChatMessages((prev) => prev.filter((item) => item.id !== data.id));
+          }
+        } catch {
+          // ignore malformed event data
+        }
+      }
       void refresh();
     });
     const id = window.setInterval(() => {
@@ -129,31 +216,111 @@ export default function App() {
     };
   }, [refresh]);
 
-  const echo = useMemo(() => {
-    const data = [...events].reverse().find((ev) => ev.Kind === "data" && ev.Data);
-    return data?.Data ?? "";
-  }, [events]);
+  useEffect(() => {
+    setAppliedRoom((prev) => {
+      if (prev.key !== roomKeyRef.current) {
+        return prev;
+      }
+      if (prev.region === region && prev.derp === derpMapURL) {
+        return prev;
+      }
+      if (prev.region === "" && prev.derp === "" && (region !== "" || derpMapURL !== "")) {
+        return { key: prev.key, region, derp: derpMapURL };
+      }
+      return prev;
+    });
+  }, [region, derpMapURL]);
 
-  async function run(action: () => Promise<unknown>): Promise<void> {
-    setBusy(true);
-    setError("");
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const sess = await startChatRoom();
+        if (!live) {
+          return;
+        }
+        if (sess.Address) {
+          setChatAddress(sess.Address);
+          setRoomError("");
+        }
+      } catch (err) {
+        if (!live) {
+          return;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        const text = localizeChatError(message, t);
+        if (!text && message === "room is starting") {
+          return;
+        }
+        setRoomError(text || message);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [t]);
+
+  async function retryRoom(): Promise<void> {
+    setRoomError("");
+    try {
+      const sess = await startChatRoom();
+      if (sess.Address) {
+        setChatAddress(sess.Address);
+        setRoomError("");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setRoomError(localizeChatError(message, t) || message);
+    }
+  }
+
+  async function runTunnel(action: () => Promise<unknown>): Promise<void> {
+    setTunnelError("");
     try {
       await action();
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
+      const message = err instanceof Error ? err.message : String(err);
+      setTunnelError(message);
     }
   }
+
+  async function run(action: () => Promise<unknown>): Promise<void> {
+    try {
+      await action();
+      await refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setRoomError(localizeChatError(message, t) || message);
+    }
+  }
+
+  async function onRestart(keyName: string): Promise<void> {
+    roomKeyRef.current = keyName;
+    setRoomError("");
+    try {
+      const sess = await restartChatRoom(keyName);
+      setAppliedRoom({ key: keyName, region, derp: derpMapURL });
+      if (sess.Address) {
+        setChatAddress(sess.Address);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setRoomError(localizeChatError(message, t) || message);
+    }
+  }
+
+  const listed = sessions.find((s) => s.Kind === "chat" && s.Status === "running");
+  const address = chatAddress || listed?.Address || "";
+  void version;
 
   return (
     <div className="shell">
       <aside className="glass sidebar">
         <div className="brand">
-          <div className="brand-mark" aria-hidden="true" />
+          <img className="brand-mark" src={iconUrl} alt="" />
           <div>
-            <h1>Tailcat</h1>
+            <h1>{t("productName")}</h1>
             <p>{t("brandTagline")}</p>
           </div>
         </div>
@@ -163,107 +330,82 @@ export default function App() {
               key={item.id}
               type="button"
               className={`nav-btn ${page === item.id ? "active" : ""}`}
-              onClick={() => {
-                setPage(item.id);
-                setError("");
-              }}
+              onClick={() => setPage(item.id)}
             >
               {t(item.labelKey)}
             </button>
           ))}
         </nav>
-        <div className="sidebar-footer">{fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}</div>
+        <div className="sidebar-footer">
+          <button
+            type="button"
+            className={`nav-btn ${page === "settings" ? "active" : ""}`}
+            onClick={() => setPage("settings")}
+          >
+            {t("navSettings")}
+          </button>
+          {fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}
+        </div>
       </aside>
       <main className="glass main">
-        {page === "services" ? (
-          <ServicesPage
-            sessions={sessions}
-            busy={busy}
-            error={error}
-            onStartPipe={() => void run(startPipeServe)}
-            onStartPorts={(spec) =>
-              void run(async () => {
-                await startPortServe(parsePortMappings(spec));
-              })
-            }
-            onStartFiles={(dir, mode) => void run(() => startFilesServe(dir, mode))}
-            onStartSSH={(noAuth, keys, confirm) => void run(() => startSSHServe(noAuth, keys, confirm))}
-            onStartExitNode={() => void run(startExitNode)}
-            onStartExec={(command) => void run(() => startExec(command))}
-            onStop={(id) => void run(() => stopSession(id))}
+        {page === "chat" ? (
+          <ChatPage
+            address={address}
+            peer={chatPeer}
+            caps={chatCaps}
+            messages={chatMessages}
+            transfers={transfers}
+            roomError={roomError}
+            onConnect={connectChatPeer}
+            onSend={sendChatText}
+            onSendVoice={sendChatVoice}
+            onSendSignal={sendChatSignal}
+            incomingSignal={liveSignal}
+            onSendPath={sendChatFile}
+            onSendBrowserFile={sendChatFileBytes}
+            onDiscard={discardChatMessage}
+            onResend={resendChatFile}
+            onSave={saveChatFile}
+            onRetry={retryRoom}
           />
-        ) : null}
-        {page === "connect" ? (
-          <ConnectPage
+        ) : page === "tunnel" ? (
+          <TunnelPage
             sessions={sessions}
-            echo={echo}
-            busy={busy}
-            error={error}
-            onSend={(addr, payload) => void run(() => dialPipe(addr, payload))}
-            onForward={(addr, spec) =>
-              void run(async () => {
-                await startForward(addr, parsePortMappings(spec));
-              })
-            }
-            onBrowse={(addr) => void run(() => startBrowse(addr))}
-            onSSH={(addr, command, user, identity) => void run(() => startSSHClient(addr, command, user, identity))}
-            onSOCKS={(addr, listen) => void run(() => startSOCKS(addr, listen))}
-            onStop={(id) => void run(() => stopSession(id))}
+            busy={false}
+            error={tunnelError}
+            onStartPorts={(spec) => void runTunnel(() => startPortServe(parsePortMappings(spec)))}
+            onForward={(addr, spec) => void runTunnel(() => startForward(addr, parsePortMappings(spec)))}
+            onBrowse={(addr) => void runTunnel(() => startBrowse(addr))}
+            onStop={(id) => void runTunnel(() => stopSession(id))}
           />
-        ) : null}
-        {page === "files" ? (
-          <FilesPage
-            sessions={sessions}
-            listing={listing}
-            busy={busy}
-            error={error}
-            onRecv={(dir, acceptDirs) => void run(() => startRecv(dir, acceptDirs))}
-            onSend={(addr, paths, remote) => void run(() => startCopy(addr, paths, remote))}
-            onServe={(dir, mode) => void run(() => startFilesServe(dir, mode))}
-            onList={(addr, path) =>
-              void run(async () => {
-                setListing(await listRemote(addr, path));
-              })
-            }
-            onStop={(id) => void run(() => stopSession(id))}
-          />
-        ) : null}
-        {page === "keys" ? (
-          <KeysPage
+        ) : (
+          <SettingsPage
+            theme={theme}
+            onTheme={setTheme}
             keys={keys}
-            busy={busy}
-            error={error}
-            parseResult={parseResult}
-            resolveResult={resolveResult}
+            busy={false}
+            error=""
             region={region}
             derpMapURL={derpMapURL}
-            onCreate={(name, client, region) => void run(() => createKey(name, client, region))}
-            onDelete={(name) => void run(() => deleteKey(name))}
-            onParse={(raw) =>
-              void run(async () => {
-                setParseResult(await parseAddr(raw));
-              })
-            }
-            onResolve={(raw) =>
-              void run(async () => {
-                setResolveResult(await resolveAddr(raw));
-              })
-            }
-            onSaveNetwork={(nextRegion, nextDERP) => void run(() => setNetworkSettings(nextRegion, nextDERP))}
-          />
-        ) : null}
-        {page === "diagnostics" ? (
-          <DiagnosticsPage
+            roomKey={roomKey}
+            appliedKey={appliedRoom.key}
+            appliedRegion={appliedRoom.region}
+            appliedDERP={appliedRoom.derp}
+            onRoomKey={(name) => {
+              roomKeyRef.current = name;
+              setRoomKey(name);
+            }}
             sessions={sessions}
             events={events}
-            busy={busy}
-            error={error}
-            version={version}
-            onPing={(addr, untilDirect) => void run(() => startPing(addr, untilDirect))}
-            onStop={(id) => void run(() => stopSession(id))}
+            peer={chatPeer}
+            onCreate={(name, client, keyRegion) => run(() => createKey(name, client, keyRegion))}
+            onDelete={(name) => run(() => deleteKey(name))}
+            onSaveNetwork={(nextRegion, nextDERP) => run(() => setNetworkSettings(nextRegion, nextDERP))}
+            onRestart={(keyName) => onRestart(keyName)}
+            onPing={(addr, untilDirect) => run(() => startPing(addr, untilDirect))}
+            onStop={(id) => run(() => stopSession(id))}
           />
-        ) : null}
-        {page === "settings" ? <SettingsPage theme={theme} onTheme={setTheme} /> : null}
+        )}
       </main>
     </div>
   );

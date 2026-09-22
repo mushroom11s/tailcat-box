@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { detectLocale, LOCALE_KEY, translate, type Locale } from "./locale";
 import type { MessageKey } from "./en";
+import { setUILocale } from "../lib/wails";
 
 type LocaleContextValue = {
   locale: Locale;
@@ -16,6 +17,8 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem(LOCALE_KEY, locale);
     document.documentElement.lang = locale;
+    document.title = translate(locale, "productName");
+    void setUILocale(locale);
   }, [locale]);
 
   const value = useMemo<LocaleContextValue>(

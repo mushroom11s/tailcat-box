@@ -18,6 +18,12 @@ func TestSessionCountLabel(t *testing.T) {
 	}
 }
 
+func TestSetProductNameBeforeTrayLoop(t *testing.T) {
+	c := tray.New(nil, nil, nil)
+	c.SetProductName("猫砂盆", "猫砂盆")
+	c.SetProductName("Tailcat Box", "Tailcat Box")
+}
+
 func TestControllerOpenQuitRefresh(t *testing.T) {
 	opened := 0
 	quit := 0

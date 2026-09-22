@@ -164,7 +164,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tailcat-desktop-client-${{ matrix.slug }}-${{ needs.meta.outputs.version }}
+          name: tailcat-box-${{ matrix.slug }}-${{ needs.meta.outputs.version }}
           path: dist-upload/*.zip
           if-no-files-found: error
           retention-days: 14
@@ -209,7 +209,7 @@ jobs:
             {
               echo "## ${VERSION}"
               echo
-              echo "Automated build of the Tailcat desktop client for macOS and Windows."
+              echo "Automated build of Tailcat Box for macOS and Windows."
               echo "Binaries are unsigned. See README for install warnings and adapter notes."
             } > release-notes.md
           fi
