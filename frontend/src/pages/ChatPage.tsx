@@ -1180,13 +1180,6 @@ function ScreenIcon() {
   return <StrokeIcon d="M3 5h18v12H3zM8 21h8M12 17v4" />;
 }
 
-<<<<<<< HEAD
-function BurnBadge({ caps, onDelete }: { caps: string[]; onDelete: () => Promise<void> | void }) {
-=======
-function SendIcon() {
-  return <StrokeIcon d="M4 12h14M13 6l6 6-6 6" />;
-}
-
 function TrashIcon() {
   return <StrokeIcon d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />;
 }
@@ -1196,7 +1189,6 @@ function CloseIcon() {
 }
 
 function BurnBadge({ caps }: { caps: string[] }) {
->>>>>>> 00a4015 (feat(chat): multi-select delete, confirm purge, remove BurnBadge Delete)
   const { t } = useI18n();
   return (
     <div className="chat-actions">
