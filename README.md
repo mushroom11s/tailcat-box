@@ -127,7 +127,7 @@ The Keys page also lists the Tailcat CLI key directory (`~/.config/tailcat/keys`
 
 ## Releases
 
-Pushing a `v*` tag builds unsigned macOS and Windows zips with GitHub Actions and attaches them to a GitHub Release. Notes for that tag live under `docs/releases/`. The binaries are unsigned, so Gatekeeper and SmartScreen warnings are expected.
+Pushing a `v*` tag builds unsigned macOS (Apple Silicon and Intel) and Windows (amd64 and ARM64) zips and attaches them to a GitHub Release. Names look like `tailcat-box-macos-arm64-…`, `tailcat-box-macos-amd64-…`, `tailcat-box-windows-amd64-…`, and `tailcat-box-windows-arm64-…`. Notes for that tag live under `docs/releases/`. The binaries are unsigned, so Gatekeeper and SmartScreen warnings are expected.
 
 Tagging, dry-run builds, and which runners are used are described in [docs/releases/README.md](docs/releases/README.md).
 

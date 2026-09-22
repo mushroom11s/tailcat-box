@@ -127,7 +127,7 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 
 ## 发布
 
-推送 `v*` 标签后，GitHub Actions 会构建未签名的 macOS 和 Windows 压缩包，并附到 GitHub Release 上。说明写在 `docs/releases/`。这些包没有签名，所以 Gatekeeper 和 SmartScreen 会提示。
+推送 `v*` 标签后，GitHub Actions 会构建未签名的压缩包：macOS（Apple Silicon 和 Intel）以及 Windows（amd64 和 ARM64），并附到 GitHub Release 上。文件名类似 `tailcat-box-macos-arm64-…`、`tailcat-box-macos-amd64-…`、`tailcat-box-windows-amd64-…`、`tailcat-box-windows-arm64-…`。说明写在 `docs/releases/`。这些包没有签名，所以 Gatekeeper 和 SmartScreen 会提示。
 
 怎么打标签、怎么先试构建，见 [docs/releases/README.md](docs/releases/README.md)。
 

@@ -2,14 +2,21 @@
 
 Pushing a `v*` tag on [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box) builds unsigned macOS and Windows zips and attaches them to a GitHub Release. Per-tag notes live in this directory. The public README only summarizes that. This file is the maintainer checklist.
 
-The [Release workflow](../../.github/workflows/release.yml) uses the normal GitHub-hosted runners `ubuntu-latest`, `macos-latest`, and `windows-latest`. It does not use larger runners.
+The [Release workflow](../../.github/workflows/release.yml) uses standard GitHub-hosted runners. It does not use larger runners.
+
+| Runner | Binary |
+| --- | --- |
+| `macos-latest` | Apple Silicon, `tailcat-box-macos-arm64-…` |
+| `macos-15-intel` | Intel Mac, `tailcat-box-macos-amd64-…`. `macos-13` was retired in December 2025. |
+| `windows-latest` | Windows amd64, `tailcat-box-windows-amd64-…` |
+| `windows-11-arm` | Windows ARM64, `tailcat-box-windows-arm64-…` |
 
 | Workflow | When | What |
 | --- | --- | --- |
 | [CI](../../.github/workflows/ci.yml) | Pull requests and pushes to `main` | `go test ./...` and `frontend` `npm ci` + `npm run build` on `ubuntu-latest` |
-| [Release](../../.github/workflows/release.yml) | Push of a `v*` tag, or **Run workflow** | `wails build` on macOS and Windows, zip `build/bin`, and publish a GitHub Release when the tag is real |
+| [Release](../../.github/workflows/release.yml) | Push of a `v*` tag, or **Run workflow** | `wails build` for the four targets above, zip `build/bin`, and publish a GitHub Release when the tag is real |
 
-`macos-latest` is Apple Silicon today. Intel Mac and Windows ARM64 are not built. Zip names look like `tailcat-box-macos-arm64-vX.Y.Z.zip` and `tailcat-box-windows-amd64-vX.Y.Z.zip`. Binaries are unsigned (no Apple notarization, no Authenticode), so Gatekeeper and SmartScreen warnings are expected.
+Binaries are unsigned (no Apple notarization, no Authenticode), so Gatekeeper and SmartScreen warnings are expected.
 
 ## Cut a release
 
