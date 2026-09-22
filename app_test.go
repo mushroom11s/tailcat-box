@@ -400,6 +400,33 @@ func TestProductTitle(t *testing.T) {
 	}
 }
 
+func TestNativeWindowTitleStaysEnglish(t *testing.T) {
+	if windowTitle != "Tailcat Box" {
+		t.Fatalf("windowTitle=%q", windowTitle)
+	}
+	if productTitle("zh-CN") == windowTitle {
+		t.Fatal("zh-CN tray name collapsed onto the fixed window title")
+	}
+}
+
+func TestStartupMenuSkipsInWindowBar(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	t.Setenv("TAILCAT_SETTINGS_DIR", t.TempDir())
+	a := NewApp()
+	got := a.startupApplicationMenu()
+	if usesSystemMenuBar() {
+		if got == nil {
+			t.Fatal("darwin should install the system menu bar")
+		}
+		return
+	}
+	if got != nil {
+		t.Fatal("windows and linux must not install an in-window menu bar")
+	}
+	a.syncApplicationMenu(productTitle("zh-CN"))
+}
+
 func TestChooseConfigDir(t *testing.T) {
 	next := filepath.Join("/cfg", "tailcat-box")
 	legacy := filepath.Join("/cfg", "tailcat-desktop-client")

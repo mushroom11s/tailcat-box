@@ -59,7 +59,11 @@ describe("phase 1 chat shell", () => {
     const attach = screen.getByRole("button", { name: "Attach" });
     expect(attach.getAttribute("title")).toBe("Attach");
     expect(attach.querySelector("svg")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Send" }).getAttribute("title")).toBe("Send");
+    const send = screen.getByRole("button", { name: "Send" });
+    const burn = screen.getByRole("switch", { name: "Burn" });
+    expect(send.textContent).toBe("Send");
+    expect(send.querySelector("svg")).toBeNull();
+    expect(send.previousElementSibling?.contains(burn)).toBe(true);
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
@@ -104,7 +108,11 @@ describe("phase 1 chat shell", () => {
     expect(Array.from(nav).map((node) => node.textContent)).toEqual(["聊天", "穿透", "设置"]);
     expect(document.querySelector(".sidebar-footer .nav-btn")?.textContent).toBe("设置");
     expect(screen.getByRole("button", { name: "添加文件" }).getAttribute("title")).toBe("添加文件");
-    expect(screen.getByRole("button", { name: "发送" }).getAttribute("title")).toBe("发送");
+    const send = screen.getByRole("button", { name: "发送" });
+    const burn = screen.getByRole("switch", { name: "阅后即焚" });
+    expect(send.textContent).toBe("发送");
+    expect(send.querySelector("svg")).toBeNull();
+    expect(send.previousElementSibling?.contains(burn)).toBe(true);
   });
 
   it("does not import toolbox pages", () => {

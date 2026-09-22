@@ -30,15 +30,18 @@ const (
 	updateCheckInterval = 24 * time.Hour
 	configDirName       = "tailcat-box"
 	legacyConfigDirName = "tailcat-desktop-client"
+	// windowTitle is the native OS caption. It stays English when the UI
+	// locale changes the sidebar brand and tray name.
+	windowTitle = "Tailcat Box"
 )
 
-// productTitle is the window, menu, and tray name for a UI locale.
+// productTitle is the tray name, and on macOS the system menu name, for a UI locale.
 func productTitle(locale string) string {
 	switch strings.ToLower(strings.TrimSpace(locale)) {
 	case "zh-cn", "zh":
 		return "猫砂盆"
 	default:
-		return "Tailcat Box"
+		return windowTitle
 	}
 }
 
@@ -142,7 +145,8 @@ func appConfigDir() (root string, userConfig string, err error) {
 	return root, userConfig, nil
 }
 
-// SetUILocale applies the product name for locale to the window, app menu, and tray.
+// SetUILocale applies the product name for locale to the tray and, on macOS,
+// the system menu bar. The native window title stays windowTitle.
 func (a *App) SetUILocale(locale string) {
 	title := productTitle(locale)
 	if a.tray != nil {
@@ -151,8 +155,8 @@ func (a *App) SetUILocale(locale string) {
 	if a.ctx == nil {
 		return
 	}
-	runtime.WindowSetTitle(a.ctx, title)
-	runtime.MenuSetApplicationMenu(a.ctx, a.applicationMenu(title))
+	runtime.WindowSetTitle(a.ctx, windowTitle)
+	a.syncApplicationMenu(title)
 }
 
 // NewApp creates a new App application struct.

@@ -37,8 +37,6 @@ import {
   type Session,
   type TailcatEvent,
 } from "./lib/wails";
-import { WindowSetTitle } from "../wailsjs/runtime/runtime";
-
 type Page = "chat" | "tunnel" | "settings";
 type Theme = "system" | "light" | "dark";
 
@@ -120,17 +118,19 @@ export default function App() {
     }
   }, []);
 
+  const mainRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     applyTheme(theme);
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
   useEffect(() => {
-    document.title = t("productName");
-    if (hasWailsBindings()) {
-      WindowSetTitle(t("productName"));
+    const node = mainRef.current;
+    if (node) {
+      node.scrollTop = 0;
     }
-  }, [t]);
+  }, [page]);
 
   useEffect(() => {
     void refresh();
@@ -347,7 +347,7 @@ export default function App() {
           {fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}
         </div>
       </aside>
-      <main className="glass main">
+      <main ref={mainRef} className="glass main">
         {page === "chat" ? (
           <ChatPage
             address={address}
