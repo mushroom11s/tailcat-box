@@ -4,13 +4,13 @@
 
 Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on macOS and Windows, built with [Wails](https://wails.io) v2 (Go + React + TypeScript).
 
-[![CI](https://github.com/mushroom11s/tailcat-desktop-client/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-desktop-client/actions/workflows/ci.yml)
+[![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml)
 
 <p align="center">
   <img src="docs/assets/icon.png" alt="Tailcat Box" width="256" />
 </p>
 
-The app is **Tailcat Box**. In 简体中文 the product name is **猫砂盆**. The GitHub repository stays `tailcat-desktop-client`.
+The app is **Tailcat Box**. In 简体中文 the product name is **猫砂盆**. The GitHub repository is [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box).
 
 ## Features
 
@@ -35,6 +35,11 @@ wails doctor
 ```
 
 ## Develop
+
+```bash
+git clone https://github.com/mushroom11s/tailcat-box.git
+cd tailcat-box
+```
 
 From the repository root:
 
@@ -156,7 +161,7 @@ git push origin v0.1.0
 - `internal/tray` — Open, session count, Quit
 - `frontend/` — Chat, Tunnel, and Settings
 
-The Go module path is still `github.com/mushroom11s/tailcat-desktop-client`.
+The GitHub repository is `mushroom11s/tailcat-box`. The Go module path is still `github.com/mushroom11s/tailcat-desktop-client`.
 
 ## Credits
 

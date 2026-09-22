@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Repo: `https://github.com/mushroom11s/tailcat-desktop-client`
+- Repo: `https://github.com/mushroom11s/tailcat-box`
 - Follow design: `docs/superpowers/specs/2026-09-21-tailcat-desktop-client-design.md`
 - Only `internal/adapter` may import `github.com/tailscale/tailcat`
 - UI never imports Tailcat types

@@ -17,7 +17,7 @@
 - Apple-inspired / Liquid Glass **style** via CSS (blur/translucency); do not require system Liquid Glass APIs.
 - Dangerous modes (`no-auth-ssh`, etc.) are **out of Plan 1** — do not expose them in the UI yet.
 - Prefer small focused files; TDD for Go service/adapter; frequent commits.
-- Repo: `https://github.com/mushroom11s/tailcat-desktop-client` (default branch `main`).
+- Repo: `https://github.com/mushroom11s/tailcat-box` (default branch `main`).
 
 ## Scope note (later plans)
 

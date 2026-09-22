@@ -4,13 +4,13 @@
 
 给 [Tailscale Tailcat](https://github.com/tailscale/tailcat) 用的桌面图形界面，支持 macOS 和 Windows。用 [Wails](https://wails.io) v2 写的（Go + React + TypeScript）。
 
-[![CI](https://github.com/mushroom11s/tailcat-desktop-client/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-desktop-client/actions/workflows/ci.yml)
+[![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml)
 
 <p align="center">
   <img src="docs/assets/icon.png" alt="猫砂盆" width="256" />
 </p>
 
-中文产品名是 **猫砂盆**，英文产品名是 **Tailcat Box**。GitHub 仓库名仍是 `tailcat-desktop-client`。
+中文产品名是 **猫砂盆**，英文产品名是 **Tailcat Box**。GitHub 仓库是 [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box)。
 
 ## 功能
 
@@ -35,6 +35,11 @@ wails doctor
 ```
 
 ## 开发
+
+```bash
+git clone https://github.com/mushroom11s/tailcat-box.git
+cd tailcat-box
+```
 
 在仓库根目录：
 
@@ -156,7 +161,7 @@ git push origin v0.1.0
 - `internal/tray` — 打开、会话数量、退出
 - `frontend/` — 聊天、穿透和设置
 
-Go module 路径仍是 `github.com/mushroom11s/tailcat-desktop-client`。
+GitHub 仓库是 `mushroom11s/tailcat-box`。Go module 路径仍是 `github.com/mushroom11s/tailcat-desktop-client`。
 
 ## 致谢
 

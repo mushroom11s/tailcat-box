@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Repo: `https://github.com/mushroom11s/tailcat-desktop-client`
+- Repo: `https://github.com/mushroom11s/tailcat-box`
 - Design: `docs/superpowers/specs/2026-09-21-tailcat-desktop-client-design.md`
 - Only `internal/adapter` imports Tailcat
 - Strong confirmations for `no-auth-ssh` and other dangerous modes (design §7)

@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Repo and module stay `tailcat-desktop-client` / `github.com/mushroom11s/tailcat-desktop-client`. This spec does not rename the repository, Go module, or binary.
+- GitHub repo is [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box). The Go module path stays `github.com/mushroom11s/tailcat-desktop-client`. This plan does not rename the Go module or the binary.
 - Shell: Native React/Wails chat UI. Do not load or iframe the official Tailcatchat page.
 - Protocol owner: Go adapter dials and listens. The webview does not speak Tailcat itself.
 - WebRTC owner: The webview owns `RTCPeerConnection`, `getUserMedia`, and `getDisplayMedia`. Go only carries the signaling envelopes. Do not add a Go WebRTC stack. Phase 1 does not add signaling.
