@@ -236,6 +236,10 @@ export default function ChatPage({
     if (ev.button !== 0 || isInteractiveTarget(ev.target)) {
       return;
     }
+    // Once multi-select is active, bubble presses are click-toggles — do not start a new drag.
+    if (multiSelectActive && ev.target instanceof Element && ev.target.closest(".chat-bubble")) {
+      return;
+    }
     const log = logRef.current;
     if (!log) {
       return;
