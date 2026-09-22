@@ -37,6 +37,7 @@ export default function TunnelPage({ sessions, busy, error, onStartPorts, onForw
       <p className="lede">{t("tunnelLede")}</p>
       {error ? <p className="err">{error}</p> : null}
 
+      <section className="glass settings-panel">
       <h3 className="kind">{t("tunnelServe")}</h3>
       <p className="lede">{t("portsLede")}</p>
       <form onSubmit={submitPorts}>
@@ -62,10 +63,10 @@ export default function TunnelPage({ sessions, busy, error, onStartPorts, onForw
           <SessionCard key={sess.ID} session={sess} onStop={onStop} />
         ))}
       </div>
+      </section>
 
-      <h3 className="kind" style={{ marginTop: 24 }}>
-        {t("tunnelForward")}
-      </h3>
+      <section className="glass settings-panel">
+      <h3 className="kind">{t("tunnelForward")}</h3>
       <form onSubmit={submitForward}>
         <div className="field">
           <label htmlFor="tunnel-fwd-addr">{t("address")}</label>
@@ -108,6 +109,7 @@ export default function TunnelPage({ sessions, busy, error, onStartPorts, onForw
           <SessionCard key={sess.ID} session={sess} onStop={onStop} />
         ))}
       </div>
+      </section>
     </section>
   );
 }

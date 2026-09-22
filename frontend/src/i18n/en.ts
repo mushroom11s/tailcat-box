@@ -1,6 +1,6 @@
 export const en = {
   productName: "Tailcat Box",
-  brandTagline: "Desktop client",
+  brandTagline: "Your chat, your tunnel.",
   brandName: "Tailcat Box",
   navChat: "Chat",
   navTunnel: "Tunnel",
@@ -28,8 +28,9 @@ export const en = {
   openInBrowser: "Open in browser",
 
   settingsTitle: "Settings",
-  settingsLede: "Appearance, language, keys, and diagnostics.",
+  settingsLede: "Configure preferences and view information about Tailcat Box.",
   appearance: "Appearance",
+  appearanceLede: "Customize how Tailcat Box looks and speaks.",
   clientInfoTitle: "About Tailcat Box",
   uptime: "Uptime",
   appVersion: "App version",
@@ -234,6 +235,7 @@ export const en = {
   pickServeDir: "Serve directory",
   pickSendFiles: "Files to send",
 
+  chatRoomLabel: "Room",
   chatListening: "Listening",
   chatCopyHelper: "Anyone with this address can send to this room while it is open.",
   chatPeerLabel: "Peer",

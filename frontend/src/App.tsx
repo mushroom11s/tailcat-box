@@ -331,7 +331,7 @@ export default function App() {
               className={`nav-btn ${page === item.id ? "active" : ""}`}
               onClick={() => setPage(item.id)}
             >
-              {t(item.labelKey)}
+              <NavGlyph name={item.id} />{t(item.labelKey)}
             </button>
           ))}
         </nav>
@@ -341,7 +341,7 @@ export default function App() {
             className={`nav-btn ${page === "settings" ? "active" : ""}`}
             onClick={() => setPage("settings")}
           >
-            {t("navSettings")}
+            <NavGlyph name="settings" />{t("navSettings")}
           </button>
           {fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}
         </div>
@@ -408,5 +408,19 @@ export default function App() {
         )}
       </main>
     </div>
+  );
+}
+
+function NavGlyph({ name }: { name: "chat" | "tunnel" | "settings" }) {
+  const d =
+    name === "chat"
+      ? "M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6A2.5 2.5 0 0 1 16.5 15H9l-3.5 3V6.5z"
+      : name === "tunnel"
+        ? "M9 8H7a4 4 0 0 0 0 8h2M15 8h2a4 4 0 0 1 0 8h-2M8 12h8"
+        : "M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM12 3.5v2.1M12 18.4v2.1M4.8 6.2l1.5 1.5M17.7 16.3l1.5 1.5M3.5 12h2.1M18.4 12h2.1M4.8 17.8l1.5-1.5M17.7 7.7l1.5-1.5";
+  return (
+    <svg className="nav-glyph" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" d={d} />
+    </svg>
   );
 }

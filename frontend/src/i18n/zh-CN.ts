@@ -6,7 +6,7 @@ import type { MessageKey } from "./en";
  */
 export const zhCN = {
   productName: "猫砂盆",
-  brandTagline: "桌面版",
+  brandTagline: "你的聊天，你的隧道。",
   brandName: "猫砂盆",
   navChat: "聊天",
   navTunnel: "穿透",
@@ -34,8 +34,9 @@ export const zhCN = {
   openInBrowser: "用浏览器打开",
 
   settingsTitle: "设置",
-  settingsLede: "改外观和语言，管理密钥，查看诊断。",
+  settingsLede: "调整偏好，查看猫砂盆的信息。",
   appearance: "外观",
+  appearanceLede: "调整猫砂盆的外观和语言。",
   clientInfoTitle: "关于猫砂盆",
   uptime: "已运行",
   appVersion: "软件版本",
@@ -236,6 +237,7 @@ export const zhCN = {
   pickServeDir: "选择要共享的文件夹",
   pickSendFiles: "选择要发送的文件",
 
+  chatRoomLabel: "房间",
   chatListening: "正在监听",
   chatCopyHelper: "房间开着时，拿到这个地址的人都能往这里发消息。",
   chatPeerLabel: "对方",
