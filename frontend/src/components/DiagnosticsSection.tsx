@@ -37,7 +37,7 @@ export default function DiagnosticsSection({ sessions, events, peer, busy, error
   }
 
   return (
-    <section>
+    <section className="glass settings-panel">
       <h2>{t("diagnosticsSection")}</h2>
       <form onSubmit={submit}>
         <div className="field">

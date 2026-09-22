@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { ClipboardSetText, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import VoiceNote from "../components/VoiceNote";
+import iconUrl from "../assets/icon.png";
 import { useI18n } from "../i18n";
 import { localizeChatError, systemText } from "../lib/chatText";
 import { purgeDiscardIds } from "../lib/chatPurge";
@@ -707,36 +708,42 @@ export default function ChatPage({
 
   return (
     <section className="page chat-page">
-      <div className="chat-status">
-        {roomError ? <p className="err">{roomError}</p> : <p>{t("chatListening")}</p>}
-        {address ? <p className="chat-address">{address}</p> : null}
-        <button className="btn" type="button" disabled={!address} onClick={() => copyText(address)}>
-          {t("copy")}
-        </button>
-        {roomError ? (
-          <button className="btn" type="button" onClick={() => onRetry()}>
-            {t("chatRetry")}
+      <div className="glass chat-identity">
+        <div className="chat-room-bar">
+          <span className={`status-dot${roomError ? " bad" : ""}`} aria-hidden="true" />
+          <span className="chat-kicker">{t("chatRoomLabel")}</span>
+          {roomError ? <span className="err">{roomError}</span> : <span className="status-pill">{t("chatListening")}</span>}
+          {address ? <p className="chat-address">{address}</p> : null}
+          <button className="btn btn-ghost" type="button" disabled={!address} onClick={() => copyText(address)}>
+            {t("copy")}
           </button>
-        ) : null}
-      </div>
-      <p className="lede">{t("chatCopyHelper")}</p>
-      {peer ? <p>{t("chatPeerConnected")}</p> : null}
-      <div className="field">
-        <label htmlFor="chat-peer">{t("chatPeerLabel")}</label>
-        <input
-          id="chat-peer"
-          ref={peerRef}
-          value={draftPeer}
-          onChange={(e) => setDraftPeer(e.target.value)}
-          autoComplete="off"
-        />
-      </div>
-      <p className="lede">{t("chatPeerHelper")}</p>
-      {inline ? <p className="err">{inline}</p> : null}
-      <div className="row">
-        <button className="btn" type="button" disabled={!address} onClick={() => connect()}>
-          {t("chatConnect")}
-        </button>
+          {roomError ? (
+            <button className="btn" type="button" onClick={() => onRetry()}>
+              {t("chatRetry")}
+            </button>
+          ) : null}
+        </div>
+        <p className="chat-quiet chat-help">{t("chatCopyHelper")}</p>
+        <div className="chat-peer-bar">
+          <label htmlFor="chat-peer"><LockIcon />{t("chatPeerLabel")}</label>
+          <input
+            id="chat-peer"
+            ref={peerRef}
+            value={draftPeer}
+            onChange={(e) => setDraftPeer(e.target.value)}
+            autoComplete="off"
+          />
+          {peer ? <span className="status-dot" aria-hidden="true" /> : null}
+          <button className="btn" type="button" disabled={!address} onClick={() => connect()}>
+            {t("chatConnect")}
+          </button>
+        </div>
+        <p className="chat-quiet chat-help">
+          {peer ? <span>{t("chatPeerConnected")}</span> : null}
+          {peer ? " · " : null}
+          {t("chatPeerHelper")}
+        </p>
+        {inline ? <p className="err">{inline}</p> : null}
       </div>
       <div className="chat-stage">
       <div className="chat-transcript-column">
@@ -775,8 +782,9 @@ export default function ChatPage({
               {systemText(msg.code, msg.body ?? "", t)}
             </p>
           ) : (
+            <div key={msg.id} className={`chat-msg ${msg.direction}`}>
+            {msg.direction === "in" ? <img className="chat-avatar" src={iconUrl} alt="" /> : null}
             <article
-              key={msg.id}
               ref={(el) => {
                 if (el) {
                   bubbleEls.current.set(msg.id, el);
@@ -803,10 +811,6 @@ export default function ChatPage({
                 applySelection(next);
               }}
             >
-              <header>
-                <span>{msg.direction === "out" ? t("chatYou") : t("chatPeerName")}</span>
-                <time>{stamp(msg.at)}</time>
-              </header>
               <BubbleBody
                 msg={msg}
                 caps={caps}
@@ -823,7 +827,12 @@ export default function ChatPage({
                 canPlayMime={canPlayMime}
                 decodeVoice={decodeVoice}
               />
+              <header>
+                <span>{msg.direction === "out" ? t("chatYou") : t("chatPeerName")}</span>
+                <time>{stamp(msg.at)}</time>
+              </header>
             </article>
+            </div>
           ),
         )}
         {transfers.map((tr) => (
@@ -861,8 +870,10 @@ export default function ChatPage({
         </aside>
       ) : null}
       </div>
-      <div className="field">
-        <label htmlFor="chat-composer">{t("chatMessageLabel")}</label>
+      {notice ? <p className="chat-quiet">{notice}</p> : null}
+      {callView.error ? <p className="err">{localizeChatError(callView.error, t) || callView.error}</p> : null}
+      <div className="glass composer-bar">
+        <label className="sr-only" htmlFor="chat-composer">{t("chatMessageLabel")}</label>
         <textarea
           id="chat-composer"
           value={draft}
@@ -870,48 +881,47 @@ export default function ChatPage({
           onKeyDown={onComposerKey}
           onKeyUp={onComposerKeyUp}
         />
-      </div>
-      {notice ? <p>{notice}</p> : null}
-      {callView.error ? <p className="err">{localizeChatError(callView.error, t) || callView.error}</p> : null}
-      <div className="row composer-actions">
-        <IconButton label={t("chatAttach")} onClick={() => void attach()}>
-          <ClipIcon />
-        </IconButton>
-        <IconButton
-          label={recording ? t("chatRecording") : t("chatRecord")}
-          pressed={recording}
-          onPointerDown={onMicDown}
-          onMouseDown={onMicDown}
-          onPointerUp={() => requestStop()}
-          onMouseUp={() => requestStop()}
-          onPointerCancel={() => requestStop()}
-        >
-          <MicIcon />
-        </IconButton>
-        <IconButton label={t("chatCallVoice")} onClick={() => void placeCall("voice")}>
-          <PhoneIcon />
-        </IconButton>
-        <IconButton label={t("chatCallVideo")} onClick={() => void placeCall("video")}>
-          <VideoIcon />
-        </IconButton>
-        <IconButton label={t("chatCallScreen")} onClick={() => void placeCall("screen")}>
-          <ScreenIcon />
-        </IconButton>
-        <label className="burn-switch" htmlFor="chat-burn">
-          <span>{t("chatBurnLabel")}</span>
-          <input
-            id="chat-burn"
-            className="switch"
-            type="checkbox"
-            role="switch"
-            checked={burnOn}
-            aria-checked={burnOn}
-            onChange={(e) => setBurnOn(e.target.checked)}
-          />
-        </label>
-        <button className="btn composer-send" type="button" onClick={() => void send()}>
-          {t("send")}
-        </button>
+        <div className="row composer-actions">
+          <IconButton label={t("chatAttach")} onClick={() => void attach()}>
+            <ClipIcon />
+          </IconButton>
+          <IconButton
+            label={recording ? t("chatRecording") : t("chatRecord")}
+            pressed={recording}
+            onPointerDown={onMicDown}
+            onMouseDown={onMicDown}
+            onPointerUp={() => requestStop()}
+            onMouseUp={() => requestStop()}
+            onPointerCancel={() => requestStop()}
+          >
+            <MicIcon />
+          </IconButton>
+          <IconButton label={t("chatCallVoice")} onClick={() => void placeCall("voice")}>
+            <PhoneIcon />
+          </IconButton>
+          <IconButton label={t("chatCallVideo")} onClick={() => void placeCall("video")}>
+            <VideoIcon />
+          </IconButton>
+          <IconButton label={t("chatCallScreen")} onClick={() => void placeCall("screen")}>
+            <ScreenIcon />
+          </IconButton>
+          <label className="burn-switch" htmlFor="chat-burn">
+            <FlameIcon />
+            <span>{t("chatBurnLabel")}</span>
+            <input
+              id="chat-burn"
+              className="switch"
+              type="checkbox"
+              role="switch"
+              checked={burnOn}
+              aria-checked={burnOn}
+              onChange={(e) => setBurnOn(e.target.checked)}
+            />
+          </label>
+          <button className="btn composer-send" type="button" onClick={() => void send()}>
+            {t("send")}
+          </button>
+        </div>
       </div>
       <input
         ref={fileRef}
@@ -1158,6 +1168,14 @@ function StrokeIcon({ d }: { d: string }) {
       <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" d={d} />
     </svg>
   );
+}
+
+function LockIcon() {
+  return <StrokeIcon d="M8 11V8a4 4 0 0 1 8 0v3M7 11h10v9H7z" />;
+}
+
+function FlameIcon() {
+  return <StrokeIcon d="M12 3s5 4.2 5 8.2A5 5 0 0 1 7 11.2C7 8.4 9.2 7 9.2 7S9.6 9 12 9c0-2.6 0-6 0-6z" />;
 }
 
 function ClipIcon() {

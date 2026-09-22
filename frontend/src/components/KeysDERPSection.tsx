@@ -71,7 +71,7 @@ export default function KeysDERPSection({
   }
 
   return (
-    <section>
+    <section className="glass settings-panel">
       <h2>{t("keysDERPTitle")}</h2>
       <h3 className="kind">{t("derpRegion")}</h3>
       <p className="lede">{t("derpLede")}</p>
