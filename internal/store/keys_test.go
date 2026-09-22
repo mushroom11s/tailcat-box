@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/store"
+	"github.com/mushroom11s/tailcat-box/internal/store"
 )
 
 func TestCreateListDelete(t *testing.T) {

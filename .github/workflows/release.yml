@@ -175,7 +175,7 @@ jobs:
           APP_VERSION: ${{ needs.meta.outputs.app_version }}
         run: |
           set -euo pipefail
-          extra_ldflags="-X github.com/mushroom11s/tailcat-desktop-client/internal/appinfo.Version=${APP_VERSION}"
+          extra_ldflags="-X github.com/mushroom11s/tailcat-box/internal/appinfo.Version=${APP_VERSION}"
           wails build -trimpath -ldflags "${extra_ldflags}"
           ls -la build/bin
 

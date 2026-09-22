@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
+	"github.com/mushroom11s/tailcat-box/internal/adapter"
 )
 
 func (s *Service) SendSignal(metaJSON string) error {

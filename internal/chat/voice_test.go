@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
+	"github.com/mushroom11s/tailcat-box/internal/adapter"
 )
 
 func sinePCM(rate int, seconds float64) []byte {

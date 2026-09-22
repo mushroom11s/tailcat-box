@@ -64,7 +64,7 @@
 
 **Interfaces:**
 - Consumes: none
-- Produces: runnable empty Wails app; Go module path `github.com/mushroom11s/tailcat-desktop-client`
+- Produces: runnable empty Wails app; Go module path `github.com/mushroom11s/tailcat-box`
 
 - [ ] **Step 1: Scaffold**
 
@@ -75,7 +75,7 @@ From repo root (with Go and Wails CLI installed):
 # OR initialize in place following current Wails v2 React+TS template layout.
 wails init -n tailcat-desktop-client -t react-ts
 # Align module path:
-# go.mod module = github.com/mushroom11s/tailcat-desktop-client
+# go.mod module = github.com/mushroom11s/tailcat-box
 ```
 
 Ensure layout matches the file map above (`main.go` / `app.go` at repo root is the Wails default).
@@ -129,7 +129,7 @@ package session_test
 import (
 	"testing"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
+	"github.com/mushroom11s/tailcat-box/internal/session"
 )
 
 func TestNewSessionStartsInStarting(t *testing.T) {
@@ -245,7 +245,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
+	"github.com/mushroom11s/tailcat-box/internal/adapter"
 )
 
 func TestFakeServeAndDial(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/appinfo"
+	"github.com/mushroom11s/tailcat-box/internal/appinfo"
 )
 
 func TestClientVersionIsNonEmpty(t *testing.T) {

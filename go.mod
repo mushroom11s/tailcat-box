@@ -1,4 +1,4 @@
-module github.com/mushroom11s/tailcat-desktop-client
+module github.com/mushroom11s/tailcat-box
 
 go 1.27.1
 

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/sysinfo"
+	"github.com/mushroom11s/tailcat-box/internal/sysinfo"
 )
 
 func TestOSVersionIncludesGOOSAndGOARCH(t *testing.T) {

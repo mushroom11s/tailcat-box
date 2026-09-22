@@ -142,7 +142,7 @@ Tagging, dry-run builds, and which runners are used are described in [docs/relea
 - `internal/tray` — Open, session count, Quit
 - `frontend/` — Chat, Tunnel, and Settings
 
-The Go module path in `go.mod` is `github.com/mushroom11s/tailcat-desktop-client`.
+The Go module path in `go.mod` is `github.com/mushroom11s/tailcat-box`.
 
 ## Credits
 

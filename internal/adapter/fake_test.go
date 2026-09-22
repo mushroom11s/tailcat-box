@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
+	"github.com/mushroom11s/tailcat-box/internal/adapter"
 )
 
 func TestFakeServeAndDial(t *testing.T) {

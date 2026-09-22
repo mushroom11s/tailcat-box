@@ -3,7 +3,7 @@ package session_test
 import (
 	"testing"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
+	"github.com/mushroom11s/tailcat-box/internal/session"
 )
 
 func TestNewSessionStartsInStarting(t *testing.T) {

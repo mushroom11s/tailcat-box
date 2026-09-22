@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/settings"
+	"github.com/mushroom11s/tailcat-box/internal/settings"
 )
 
 func TestLoadMissingFileDefaults(t *testing.T) {

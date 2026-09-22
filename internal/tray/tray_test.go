@@ -3,7 +3,7 @@ package tray_test
 import (
 	"testing"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/tray"
+	"github.com/mushroom11s/tailcat-box/internal/tray"
 )
 
 func TestSessionCountLabel(t *testing.T) {
