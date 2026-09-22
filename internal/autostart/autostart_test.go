@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/autostart"
+	"github.com/mushroom11s/tailcat-box/internal/autostart"
 )
 
 func TestLaunchAgentPlistContainsLabelAndExe(t *testing.T) {

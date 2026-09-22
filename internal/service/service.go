@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
-	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
+	"github.com/mushroom11s/tailcat-box/internal/adapter"
+	"github.com/mushroom11s/tailcat-box/internal/session"
 )
 
 const defaultPingTimeout = 10 * time.Second

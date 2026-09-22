@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
-	"github.com/mushroom11s/tailcat-desktop-client/internal/service"
-	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
+	"github.com/mushroom11s/tailcat-box/internal/adapter"
+	"github.com/mushroom11s/tailcat-box/internal/service"
+	"github.com/mushroom11s/tailcat-box/internal/session"
 )
 
 func TestStartPipeServeReady(t *testing.T) {

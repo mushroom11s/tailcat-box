@@ -3,7 +3,7 @@
 **Date:** 2026-09-22  
 **Status:** Ready for review. Design only. This document does not implement chat.  
 **Product name:** Tailcat Box (English UI) / 猫砂盆 (简体中文 UI)  
-**GitHub repo:** [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box). The Go module path stays `github.com/mushroom11s/tailcat-desktop-client`. This spec does not rename the Go module or the binary.  
+**GitHub repo:** [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box). The Go module path is `github.com/mushroom11s/tailcat-box`.  
 **Supersedes:** the product goal and primary navigation in [2026-09-21-tailcat-desktop-client-design.md](2026-09-21-tailcat-desktop-client-design.md). Plans 1–4 remain the record of the toolbox that already shipped in code.  
 **Interop target:** [tailscale/tailcatchat](https://github.com/tailscale/tailcatchat) as of the protocol described in section 4 (TCH1 envelopes, ports 100–103).
 

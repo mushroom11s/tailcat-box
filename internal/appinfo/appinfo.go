@@ -11,7 +11,7 @@ import (
 
 // Version is the desktop client software version. Override at build time with:
 //
-//	-ldflags "-X github.com/mushroom11s/tailcat-desktop-client/internal/appinfo.Version=1.2.3"
+//	-ldflags "-X github.com/mushroom11s/tailcat-box/internal/appinfo.Version=1.2.3"
 var Version = "0.1.0-dev"
 
 const tailcatModule = "github.com/tailscale/tailcat"

@@ -7,7 +7,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/appinfo"
+	"github.com/mushroom11s/tailcat-box/internal/appinfo"
 	"github.com/tailscale/tailcat"
 )
 

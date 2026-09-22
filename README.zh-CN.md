@@ -142,7 +142,7 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 - `internal/tray` — 打开、会话数量、退出
 - `frontend/` — 聊天、穿透和设置
 
-GitHub 仓库是 `tailcat-box`（https://github.com/mushroom11s/tailcat-box）。`go.mod` 里的 module 路径还是 `github.com/mushroom11s/tailcat-desktop-client`。
+GitHub 仓库是 `tailcat-box`（https://github.com/mushroom11s/tailcat-box）。`go.mod` 里的 module 路径是 `github.com/mushroom11s/tailcat-box`。
 
 ## 致谢
 

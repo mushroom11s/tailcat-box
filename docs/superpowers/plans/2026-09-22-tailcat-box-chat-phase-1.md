@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- GitHub repo is [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box). The Go module path stays `github.com/mushroom11s/tailcat-desktop-client`. This plan does not rename the Go module or the binary.
+- GitHub repo is [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box). The Go module path is `github.com/mushroom11s/tailcat-box`.
 - Shell: Native React/Wails chat UI. Do not load or iframe the official Tailcatchat page.
 - Protocol owner: Go adapter dials and listens. The webview does not speak Tailcat itself.
 - WebRTC owner: The webview owns `RTCPeerConnection`, `getUserMedia`, and `getDisplayMedia`. Go only carries the signaling envelopes. Do not add a Go WebRTC stack. Phase 1 does not add signaling.
@@ -1110,8 +1110,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
-	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
+	"github.com/mushroom11s/tailcat-box/internal/adapter"
+	"github.com/mushroom11s/tailcat-box/internal/session"
 )
 
 func waitRunning(t *testing.T, svc *Service) session.Session {
@@ -1186,8 +1186,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
-	"github.com/mushroom11s/tailcat-desktop-client/internal/session"
+	"github.com/mushroom11s/tailcat-box/internal/adapter"
+	"github.com/mushroom11s/tailcat-box/internal/session"
 )
 
 const (
@@ -2109,7 +2109,7 @@ Add field `chat *chat.Service` on `App`. In `NewApp`:
 	}
 ```
 
-Add the import `"github.com/mushroom11s/tailcat-desktop-client/internal/chat"`.
+Add the import `"github.com/mushroom11s/tailcat-box/internal/chat"`.
 
 Replace `forwardEvents`:
 
