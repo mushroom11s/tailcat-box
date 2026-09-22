@@ -111,7 +111,7 @@ waitReady:
 		}
 	}
 
-	fwd, err := a.StartForward(addr, []adapter.PortMapping{{LocalPort: 18080, RemotePort: 8080}})
+	fwd, err := a.StartForward(addr, []adapter.PortMapping{{LocalPort: 18080, RemotePort: 8080}}, false)
 	if err != nil {
 		t.Fatal(err)
 	}

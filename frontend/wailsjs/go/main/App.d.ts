@@ -73,7 +73,7 @@ export function StartExitNode():Promise<session.Session>;
 
 export function StartFilesServe(arg1:string,arg2:string):Promise<session.Session>;
 
-export function StartForward(arg1:string,arg2:Array<adapter.PortMapping>):Promise<session.Session>;
+export function StartForward(arg1:string,arg2:Array<adapter.PortMapping>,arg3:boolean):Promise<session.Session>;
 
 export function StartPing(arg1:string,arg2:boolean):Promise<session.Session>;
 

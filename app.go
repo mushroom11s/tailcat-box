@@ -275,8 +275,9 @@ func (a *App) StartPortServe(mappings []adapter.PortMapping) (session.Session, e
 }
 
 // StartForward starts local TCP forwards to addr.
-func (a *App) StartForward(addr string, mappings []adapter.PortMapping) (session.Session, error) {
-	return a.svc.StartForward(addr, mappings)
+// When openBrowser is true, the system browser opens to the first local listener after it is ready.
+func (a *App) StartForward(addr string, mappings []adapter.PortMapping, openBrowser bool) (session.Session, error) {
+	return a.svc.StartForward(addr, mappings, openBrowser)
 }
 
 // StartBrowse local-forwards port 80 and reports a local URL.

@@ -114,7 +114,7 @@ func TestFakeForwardAgainstPortServe(t *testing.T) {
 		t.Fatal("timeout")
 	}
 
-	fwdCh, err := f.StartForward(ctx, "f1", addr, []adapter.PortMapping{{LocalPort: 18080, RemotePort: 8080}})
+	fwdCh, err := f.StartForward(ctx, "f1", addr, []adapter.PortMapping{{LocalPort: 18080, RemotePort: 8080}}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,6 +125,25 @@ func TestFakeForwardAgainstPortServe(t *testing.T) {
 		}
 		if ev.Address == "" {
 			t.Fatal("expected forward listen address")
+		}
+		if strings.HasPrefix(ev.Address, "http://") {
+			t.Fatalf("forward without openBrowser returned a URL: %+v", ev)
+		}
+	case <-ctx.Done():
+		t.Fatal("timeout")
+	}
+
+	openCh, err := f.StartForward(ctx, "f2", addr, []adapter.PortMapping{{LocalPort: 0, RemotePort: 80}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case ev := <-openCh:
+		if ev.Kind != adapter.EventReady {
+			t.Fatalf("%+v", ev)
+		}
+		if ev.Address != "http://127.0.0.1:0/" {
+			t.Fatalf("openBrowser ready=%+v", ev)
 		}
 	case <-ctx.Done():
 		t.Fatal("timeout")

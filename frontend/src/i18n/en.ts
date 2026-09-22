@@ -22,10 +22,10 @@ export const en = {
   off: "Off",
 
   tunnelTitle: "Tunnel",
-  tunnelLede: "Serve TCP ports on a Tailcat address, forward them onto this machine, or browse the peer’s web port.",
+  tunnelLede: "Serve TCP ports on a Tailcat address and forward them onto this machine. You can open a forwarded HTTP port in the browser.",
   tunnelServe: "Port serve",
   tunnelForward: "Local forward",
-  tunnelBrowse: "Browse",
+  openInBrowser: "Open in browser",
 
   settingsTitle: "Settings",
   settingsLede: "Appearance, language, keys, and diagnostics.",

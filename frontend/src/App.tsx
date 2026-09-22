@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ChatPage, { type ChatMessage, type ChatTransfer } from "./pages/ChatPage";
 import SettingsPage from "./pages/SettingsPage";
 import TunnelPage from "./pages/TunnelPage";
-import { parsePortMappings } from "./lib/ports";
+import { forwardPortMappings, parsePortMappings } from "./lib/ports";
 import { sameKeys, sameSessions } from "./lib/snapshot";
 import { useI18n } from "./i18n";
 import iconUrl from "./assets/icon.png";
@@ -26,7 +26,6 @@ import {
   sendChatText,
   sendChatVoice,
   setNetworkSettings,
-  startBrowse,
   startChatRoom,
   startForward,
   startPing,
@@ -374,8 +373,9 @@ export default function App() {
             busy={false}
             error={tunnelError}
             onStartPorts={(spec) => void runTunnel(() => startPortServe(parsePortMappings(spec)))}
-            onForward={(addr, spec) => void runTunnel(() => startForward(addr, parsePortMappings(spec)))}
-            onBrowse={(addr) => void runTunnel(() => startBrowse(addr))}
+            onForward={(addr, spec, openBrowser) =>
+              void runTunnel(() => startForward(addr, forwardPortMappings(spec, openBrowser), openBrowser))
+            }
             onStop={(id) => void runTunnel(() => stopSession(id))}
           />
         ) : (

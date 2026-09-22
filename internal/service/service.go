@@ -79,9 +79,9 @@ func (s *Service) StartPortServe(mappings []adapter.PortMapping) (session.Sessio
 	})
 }
 
-func (s *Service) StartForward(addr string, mappings []adapter.PortMapping) (session.Session, error) {
+func (s *Service) StartForward(addr string, mappings []adapter.PortMapping, openBrowser bool) (session.Session, error) {
 	return s.start(session.KindForward, addr, func(ctx context.Context, id string) (<-chan adapter.Event, error) {
-		return s.ad.StartForward(ctx, id, addr, mappings)
+		return s.ad.StartForward(ctx, id, addr, mappings, openBrowser)
 	})
 }
 

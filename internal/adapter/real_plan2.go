@@ -125,15 +125,15 @@ func (r *Real) runPortServe(ctx context.Context, sessionID string, run *serveRun
 	_ = srv.Close()
 }
 
-func (r *Real) StartForward(ctx context.Context, sessionID string, serverAddr string, mappings []PortMapping) (<-chan Event, error) {
-	return r.startForward(ctx, sessionID, serverAddr, mappings, false)
+func (r *Real) StartForward(ctx context.Context, sessionID string, serverAddr string, mappings []PortMapping, openBrowser bool) (<-chan Event, error) {
+	return r.startForward(ctx, sessionID, serverAddr, mappings, openBrowser)
 }
 
 func (r *Real) StartBrowse(ctx context.Context, sessionID string, serverAddr string) (<-chan Event, error) {
 	return r.startForward(ctx, sessionID, serverAddr, []PortMapping{{LocalPort: 0, RemotePort: 80}}, true)
 }
 
-func (r *Real) startForward(ctx context.Context, sessionID string, serverAddr string, mappings []PortMapping, browse bool) (<-chan Event, error) {
+func (r *Real) startForward(ctx context.Context, sessionID string, serverAddr string, mappings []PortMapping, openBrowser bool) (<-chan Event, error) {
 	if strings.TrimSpace(serverAddr) == "" {
 		return nil, fmt.Errorf("address is required")
 	}
@@ -191,7 +191,7 @@ func (r *Real) startForward(ctx context.Context, sessionID string, serverAddr st
 		}
 
 		readyAddr := strings.Join(addrs, ", ")
-		if browse && len(run.listeners) > 0 {
+		if openBrowser && len(run.listeners) > 0 {
 			hostport := run.listeners[0].Addr().String()
 			if ap, err := netip.ParseAddrPort(hostport); err == nil && ap.Addr().IsUnspecified() {
 				hostport = net.JoinHostPort("127.0.0.1", strconv.Itoa(int(ap.Port())))

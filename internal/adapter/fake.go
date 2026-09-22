@@ -174,7 +174,7 @@ func (f *Fake) knownPortServe(addr string) bool {
 	return false
 }
 
-func (f *Fake) StartForward(ctx context.Context, sessionID string, serverAddr string, mappings []PortMapping) (<-chan Event, error) {
+func (f *Fake) StartForward(ctx context.Context, sessionID string, serverAddr string, mappings []PortMapping, openBrowser bool) (<-chan Event, error) {
 	ch := make(chan Event, 4)
 	stop := f.track(sessionID)
 
@@ -191,7 +191,11 @@ func (f *Fake) StartForward(ctx context.Context, sessionID string, serverAddr st
 		if len(mappings) > 0 && mappings[0].LocalPort != 0 {
 			listen = fmt.Sprintf("127.0.0.1:%d", mappings[0].LocalPort)
 		}
-		ch <- Event{SessionID: sessionID, Kind: EventReady, Address: listen}
+		ready := listen
+		if openBrowser {
+			ready = "http://" + listen + "/"
+		}
+		ch <- Event{SessionID: sessionID, Kind: EventReady, Address: ready, Data: ready}
 		f.waitStop(ctx, stop)
 		ch <- Event{SessionID: sessionID, Kind: EventClosed}
 	}()
