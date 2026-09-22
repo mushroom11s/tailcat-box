@@ -104,7 +104,9 @@ type TailcatAdapter interface {
 	// StartPortServe advertises TCP ports / mappings and emits EventReady with the serve address.
 	StartPortServe(ctx context.Context, sessionID string, mappings []PortMapping) (<-chan Event, error)
 	// StartForward listens locally and forwards to serverAddr using mappings.
-	StartForward(ctx context.Context, sessionID string, serverAddr string, mappings []PortMapping) (<-chan Event, error)
+	// openBrowser opens the system browser to the first local listener once it is ready,
+	// matching CLI `forward --open-browser`.
+	StartForward(ctx context.Context, sessionID string, serverAddr string, mappings []PortMapping, openBrowser bool) (<-chan Event, error)
 	// StartBrowse local-forwards remote port 80 then signals ready with a local URL in Event.Address or Event.Data.
 	StartBrowse(ctx context.Context, sessionID string, serverAddr string) (<-chan Event, error)
 	// StartPing emits EventData pong lines and EventClosed when done.

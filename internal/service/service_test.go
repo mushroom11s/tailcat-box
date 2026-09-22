@@ -140,7 +140,7 @@ func TestStartPortServeThenForward(t *testing.T) {
 	}
 	ready := waitRunning(t, svc, serveSess.ID)
 
-	fwdSess, err := svc.StartForward(ready.Address, []adapter.PortMapping{{LocalPort: 18080, RemotePort: 8080}})
+	fwdSess, err := svc.StartForward(ready.Address, []adapter.PortMapping{{LocalPort: 18080, RemotePort: 8080}}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,6 +148,18 @@ func TestStartPortServeThenForward(t *testing.T) {
 		t.Fatalf("kind=%s", fwdSess.Kind)
 	}
 	waitRunning(t, svc, fwdSess.ID)
+
+	openSess, err := svc.StartForward(ready.Address, []adapter.PortMapping{{LocalPort: 0, RemotePort: 80}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if openSess.Kind != session.KindForward {
+		t.Fatalf("kind=%s", openSess.Kind)
+	}
+	openReady := waitRunning(t, svc, openSess.ID)
+	if !strings.HasPrefix(openReady.Address, "http://") {
+		t.Fatalf("open browser address=%q", openReady.Address)
+	}
 
 	browseSess, err := svc.StartBrowse(ready.Address)
 	if err != nil {
@@ -159,6 +171,9 @@ func TestStartPortServeThenForward(t *testing.T) {
 	waitRunning(t, svc, browseSess.ID)
 
 	if err := svc.Stop(fwdSess.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Stop(openSess.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.Stop(browseSess.ID); err != nil {

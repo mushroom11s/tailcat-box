@@ -138,8 +138,8 @@ export function StartFilesServe(arg1, arg2) {
   return window['go']['main']['App']['StartFilesServe'](arg1, arg2);
 }
 
-export function StartForward(arg1, arg2) {
-  return window['go']['main']['App']['StartForward'](arg1, arg2);
+export function StartForward(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartForward'](arg1, arg2, arg3);
 }
 
 export function StartPing(arg1, arg2) {

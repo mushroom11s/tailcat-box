@@ -28,10 +28,10 @@ export const zhCN = {
   off: "关",
 
   tunnelTitle: "穿透",
-  tunnelLede: "把 TCP 端口挂到 Tailcat 地址上，转发到这台电脑，也可以打开对方的网页端口。",
+  tunnelLede: "把 TCP 端口挂到 Tailcat 地址上，再转到这台电脑。需要的话，可以用浏览器打开转过来的网页。",
   tunnelServe: "端口监听",
   tunnelForward: "本地转发",
-  tunnelBrowse: "浏览",
+  openInBrowser: "用浏览器打开",
 
   settingsTitle: "设置",
   settingsLede: "改外观和语言，管理密钥，查看诊断。",

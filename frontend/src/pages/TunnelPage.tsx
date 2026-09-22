@@ -8,19 +8,18 @@ type Props = {
   busy: boolean;
   error: string;
   onStartPorts: (spec: string) => void;
-  onForward: (addr: string, spec: string) => void;
-  onBrowse: (addr: string) => void;
+  onForward: (addr: string, spec: string, openBrowser: boolean) => void;
   onStop: (id: string) => void;
 };
 
-export default function TunnelPage({ sessions, busy, error, onStartPorts, onForward, onBrowse, onStop }: Props) {
+export default function TunnelPage({ sessions, busy, error, onStartPorts, onForward, onStop }: Props) {
   const { t } = useI18n();
   const [spec, setSpec] = useState("8080");
   const [addr, setAddr] = useState("");
   const [fwd, setFwd] = useState("18080:8080");
+  const [openBrowser, setOpenBrowser] = useState(false);
   const ports = sessions.filter((s) => s.Kind === "port_serve");
   const forwards = sessions.filter((s) => s.Kind === "forward");
-  const browses = sessions.filter((s) => s.Kind === "browse");
 
   function submitPorts(e: FormEvent) {
     e.preventDefault();
@@ -29,12 +28,7 @@ export default function TunnelPage({ sessions, busy, error, onStartPorts, onForw
 
   function submitForward(e: FormEvent) {
     e.preventDefault();
-    onForward(addr.trim(), fwd.trim());
-  }
-
-  function submitBrowse(e: FormEvent) {
-    e.preventDefault();
-    onBrowse(addr.trim());
+    onForward(addr.trim(), fwd.trim(), openBrowser);
   }
 
   return (
@@ -93,6 +87,15 @@ export default function TunnelPage({ sessions, busy, error, onStartPorts, onForw
             autoComplete="off"
           />
         </div>
+        <label className="check">
+          <input
+            id="tunnel-fwd-browser"
+            type="checkbox"
+            checked={openBrowser}
+            onChange={(e) => setOpenBrowser(e.target.checked)}
+          />
+          {t("openInBrowser")}
+        </label>
         <div className="row">
           <button className="btn" type="submit" disabled={busy || !addr.trim() || !fwd.trim()}>
             {t("startForward")}
@@ -102,33 +105,6 @@ export default function TunnelPage({ sessions, busy, error, onStartPorts, onForw
       <div className="stack">
         {forwards.length === 0 ? <p className="empty">{t("emptyForwards")}</p> : null}
         {forwards.map((sess) => (
-          <SessionCard key={sess.ID} session={sess} onStop={onStop} />
-        ))}
-      </div>
-
-      <h3 className="kind" style={{ marginTop: 24 }}>
-        {t("tunnelBrowse")}
-      </h3>
-      <form onSubmit={submitBrowse}>
-        <div className="field">
-          <label htmlFor="tunnel-browse-addr">{t("address")}</label>
-          <input
-            id="tunnel-browse-addr"
-            value={addr}
-            onChange={(e) => setAddr(e.target.value)}
-            placeholder="tc:…"
-            autoComplete="off"
-          />
-        </div>
-        <div className="row">
-          <button className="btn" type="submit" disabled={busy || !addr.trim()}>
-            {t("browsePort80")}
-          </button>
-        </div>
-      </form>
-      <div className="stack">
-        {browses.length === 0 ? <p className="empty">{t("emptyBrowses")}</p> : null}
-        {browses.map((sess) => (
           <SessionCard key={sess.ID} session={sess} onStop={onStop} />
         ))}
       </div>

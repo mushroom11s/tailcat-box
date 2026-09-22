@@ -289,7 +289,7 @@ async function fakeStartPortServe(): Promise<Session> {
   return { ...sess };
 }
 
-async function fakeStartForward(addr: string, mappings: PortMapping[]): Promise<Session> {
+async function fakeStartForward(addr: string, mappings: PortMapping[], openBrowser = false): Promise<Session> {
   const sess = newSess("forward", addr);
   later(() => {
     const current = fake.sessions.find((s) => s.ID === sess.ID);
@@ -303,9 +303,10 @@ async function fakeStartForward(addr: string, mappings: PortMapping[]): Promise<
       return;
     }
     const port = mappings[0]?.LocalPort || 0;
+    const listen = port ? `127.0.0.1:${port}` : "127.0.0.1:0";
     current.Status = "running";
-    current.Address = port ? `127.0.0.1:${port}` : "127.0.0.1:0";
-    emitFake({ SessionID: current.ID, Kind: "ready", Address: current.Address });
+    current.Address = openBrowser ? `http://${listen}/` : listen;
+    emitFake({ SessionID: current.ID, Kind: "ready", Address: current.Address, Data: current.Address });
   });
   fake.serveStops.set(sess.ID, () => undefined);
   return { ...sess };
@@ -742,11 +743,11 @@ export async function startPortServe(mappings: PortMapping[]): Promise<Session> 
   return fakeStartPortServe();
 }
 
-export async function startForward(addr: string, mappings: PortMapping[]): Promise<Session> {
+export async function startForward(addr: string, mappings: PortMapping[], openBrowser = false): Promise<Session> {
   if (hasWailsBindings()) {
-    return asSession(await bindStartForward(addr, mappings.map(toMapping)));
+    return asSession(await bindStartForward(addr, mappings.map(toMapping), openBrowser));
   }
-  return fakeStartForward(addr, mappings);
+  return fakeStartForward(addr, mappings, openBrowser);
 }
 
 export async function startBrowse(addr: string): Promise<Session> {

@@ -4,6 +4,22 @@ export type PortMapping = {
   RemotePort: number;
 };
 
+// forwardPortMappings parses a forward spec.
+// With openBrowser, a bare port (no colon) is the remote port and the local
+// listener is ephemeral, matching CLI `forward --open-browser 0:80`.
+export function forwardPortMappings(spec: string, openBrowser: boolean): PortMapping[] {
+  const mappings = parsePortMappings(spec);
+  if (!openBrowser) {
+    return mappings;
+  }
+  return mappings.map((mapping) => {
+    if (mapping.RemoteHost === "" && mapping.RemotePort === 0) {
+      return { LocalPort: 0, RemoteHost: "", RemotePort: mapping.LocalPort };
+    }
+    return mapping;
+  });
+}
+
 export function parsePortMappings(spec: string): PortMapping[] {
   const parts = spec
     .split(/[,\s]+/)
