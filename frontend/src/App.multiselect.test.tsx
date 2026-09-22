@@ -150,3 +150,111 @@ describe("drag rectangle selection", () => {
     expect(screen.queryByText(/selected/)).toBeNull();
   });
 });
+
+describe("click toggle", () => {
+  it("toggles a bubble and exits when the last selection is cleared", async () => {
+    const user = userEvent.setup();
+    renderChat();
+    fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b", "d"] } }));
+    expect(await screen.findByText("2 selected")).toBeTruthy();
+    const peerBubble = screen.getByText("peer hi").closest("article") as HTMLElement;
+    await user.click(peerBubble);
+    expect(screen.getByText("1 selected")).toBeTruthy();
+    const youBubble = screen.getByText("you hi").closest("article") as HTMLElement;
+    await user.click(youBubble);
+    expect(screen.queryByText(/selected/)).toBeNull();
+  });
+
+  it("does not select system lines on click", async () => {
+    const user = userEvent.setup();
+    renderChat();
+    fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b"] } }));
+    const sys = screen.getByText("they're hear meow");
+    await user.click(sys);
+    expect(screen.getByText("1 selected")).toBeTruthy();
+    expect(sys.className).not.toMatch(/selected/);
+  });
+});
+
+describe("confirm delete and purge", () => {
+  it("confirms local-only copy and discards selected plus in-range systems", async () => {
+    const user = userEvent.setup();
+    const { onDiscard } = renderChat();
+    fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b", "d"] } }));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain("Delete 2 local messages? Your peer is not affected.");
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+    expect(onDiscard.mock.calls.map((c) => c[0])).toEqual(["b", "sys-c", "d"]);
+    expect(screen.queryByText(/selected/)).toBeNull();
+  });
+
+  it("cancel leaves selection unchanged", async () => {
+    const user = userEvent.setup();
+    const { onDiscard } = renderChat();
+    fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b"] } }));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onDiscard).not.toHaveBeenCalled();
+    expect(screen.getByText("1 selected")).toBeTruthy();
+  });
+
+  it("Esc on the dialog cancels the dialog only", async () => {
+    renderChat();
+    fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b"] } }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("1 selected")).toBeTruthy();
+  });
+});
+
+describe("burn badge without Delete", () => {
+  it("shows burn status copy and no Delete on outbound burn bubbles", () => {
+    renderChat({
+      caps: ["burn"],
+      messages: [
+        {
+          id: "out-burn",
+          direction: "out",
+          type: "text",
+          body: "gone",
+          burn: true,
+          ttlSec: 5,
+          at: "2026-09-22T00:00:00.000Z",
+        },
+      ],
+    });
+    expect(screen.getByText("Removed on their side after they open it.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+});
+
+describe("failure and composer", () => {
+  it("keeps multi-select and shows an error when onDiscard fails", async () => {
+    const user = userEvent.setup();
+    const onDiscard = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("disk full"));
+    renderChat({ onDiscard });
+    fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b", "d"] } }));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+    expect(await screen.findByText("Could not delete some local messages.")).toBeTruthy();
+    expect(screen.getByText(/selected/)).toBeTruthy();
+  });
+
+  it("sending a message does not exit multi-select", async () => {
+    const user = userEvent.setup();
+    const { onSend } = renderChat();
+    fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b"] } }));
+    expect(await screen.findByText("1 selected")).toBeTruthy();
+    await user.type(screen.getByLabelText("Message"), "still selecting");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(onSend).toHaveBeenCalled();
+    expect(screen.getByText("1 selected")).toBeTruthy();
+  });
+});

@@ -3,6 +3,7 @@ import { ClipboardSetText, OnFileDrop, OnFileDropOff } from "../../wailsjs/runti
 import VoiceNote from "../components/VoiceNote";
 import { useI18n } from "../i18n";
 import { localizeChatError, systemText } from "../lib/chatText";
+import { purgeDiscardIds } from "../lib/chatPurge";
 import { createLiveCall, type CallMode, type CallView, type LiveCall, type LiveDevices } from "../lib/liveCall";
 import { startVoiceCapture, type VoiceCapture } from "../lib/voiceCapture";
 import { hasWailsBindings, selectFiles } from "../lib/wails";
@@ -308,6 +309,29 @@ export default function ChatPage({
     applySelection(hit);
   }
 
+  async function confirmDelete(): Promise<void> {
+    const selectedSnapshot = new Set(selectedIds);
+    const ids = purgeDiscardIds(messages, selectedSnapshot);
+    setConfirmOpen(false);
+    const remaining = new Set(selectedSnapshot);
+    let failed = false;
+    for (const id of ids) {
+      try {
+        await onDiscard?.(id);
+        remaining.delete(id);
+      } catch {
+        failed = true;
+        break;
+      }
+    }
+    if (failed) {
+      setInline(t("chatSelectDeleteError"));
+      applySelection(remaining);
+      return;
+    }
+    exitMultiSelect();
+  }
+
   async function reportStatus(status: string): Promise<void> {
     if (status === "replaced") {
       setNotice(t("chatReplacedQueue"));
@@ -443,7 +467,7 @@ export default function ChatPage({
     if (!multiSelectActive) {
       return;
     }
-    function onKey(ev: KeyboardEvent): void {
+    function onKey(ev: globalThis.KeyboardEvent): void {
       if (ev.key !== "Escape") {
         return;
       }
@@ -758,6 +782,22 @@ export default function ChatPage({
               }}
               data-msgid={msg.id}
               className={`glass chat-bubble ${msg.direction}${selectedIds.has(msg.id) ? " selected" : ""}`}
+              onClick={(ev) => {
+                if (!multiSelectActive) {
+                  return;
+                }
+                if (isInteractiveTarget(ev.target)) {
+                  return;
+                }
+                ev.preventDefault();
+                const next = new Set(selectedIds);
+                if (next.has(msg.id)) {
+                  next.delete(msg.id);
+                } else {
+                  next.add(msg.id);
+                }
+                applySelection(next);
+              }}
             >
               <header>
                 <span>{msg.direction === "out" ? t("chatYou") : t("chatPeerName")}</span>
@@ -776,7 +816,6 @@ export default function ChatPage({
                     await onDiscard?.(msg.id);
                   }
                 }}
-                onDelete={() => onDiscard?.(msg.id)}
                 canPlayMime={canPlayMime}
                 decodeVoice={decodeVoice}
               />
@@ -877,6 +916,28 @@ export default function ChatPage({
         style={{ display: "none" }}
         onChange={(e) => void onPicked(e)}
       />
+      {confirmOpen ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setConfirmOpen(false)}>
+          <div
+            className="glass modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-select-delete-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="chat-select-delete-title">{t("chatSelectDelete")}</h3>
+            <p>{fillN(t("chatSelectDeleteConfirm"), selectedIds.size)}</p>
+            <div className="row">
+              <button className="btn btn-ghost" type="button" onClick={() => setConfirmOpen(false)}>
+                {t("cancel")}
+              </button>
+              <button className="btn btn-danger" type="button" onClick={() => void confirmDelete()}>
+                {t("chatSelectDelete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -916,7 +977,6 @@ function BubbleBody({
   onOpen,
   onClose,
   onSave,
-  onDelete,
   canPlayMime,
   decodeVoice,
 }: {
@@ -927,7 +987,6 @@ function BubbleBody({
   onOpen: () => void;
   onClose: () => Promise<void>;
   onSave: () => Promise<void>;
-  onDelete: () => Promise<void> | void;
   canPlayMime?: (mime: string) => boolean;
   decodeVoice?: (mime: string, audio: string) => Promise<string | null>;
 }) {
@@ -967,7 +1026,7 @@ function BubbleBody({
             </button>
           </div>
         ) : null}
-        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} onDelete={onDelete} /> : null}
+        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} /> : null}
       </>
     );
   }
@@ -975,7 +1034,7 @@ function BubbleBody({
     return (
       <>
         <p>{msg.body}</p>
-        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} onDelete={onDelete} /> : null}
+        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} /> : null}
       </>
     );
   }
@@ -1042,7 +1101,7 @@ function BubbleBody({
             {t("chatDownload")}
           </button>
         ) : null}
-        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} onDelete={onDelete} /> : null}
+        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} /> : null}
       </div>
     );
   }
@@ -1117,14 +1176,19 @@ function ScreenIcon() {
   return <StrokeIcon d="M3 5h18v12H3zM8 21h8M12 17v4" />;
 }
 
+<<<<<<< HEAD
 function BurnBadge({ caps, onDelete }: { caps: string[]; onDelete: () => Promise<void> | void }) {
+=======
+function SendIcon() {
+  return <StrokeIcon d="M4 12h14M13 6l6 6-6 6" />;
+}
+
+function BurnBadge({ caps }: { caps: string[] }) {
+>>>>>>> 00a4015 (feat(chat): multi-select delete, confirm purge, remove BurnBadge Delete)
   const { t } = useI18n();
   return (
     <div className="chat-actions">
       <p className="chat-badge">{caps.includes("burn") ? t("chatBurnRemoved") : t("chatBurnKept")}</p>
-      <button className="btn" type="button" onClick={() => void onDelete()}>
-        {t("chatDelete")}
-      </button>
     </div>
   );
 }
