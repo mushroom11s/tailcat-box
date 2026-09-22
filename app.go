@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"encoding/base64"
 	"encoding/json"
 
 	"github.com/mushroom11s/tailcat-desktop-client/internal/adapter"
@@ -394,8 +395,13 @@ func (a *App) SendChatFile(path string, burn bool, ttlSec int) (string, error) {
 	return a.chat.SendFile(path, burn, ttlSec)
 }
 
-// SendChatVoice sends a port 103 voice note. Burn follows the composer choice.
-func (a *App) SendChatVoice(mime string, durationSec int, audio []byte, burn bool, ttlSec int) error {
+// SendChatVoice sends a port 103 voice note. audioBase64 is standard base64 of the
+// audio bytes. Burn follows the composer choice.
+func (a *App) SendChatVoice(mime string, durationSec int, audioBase64 string, burn bool, ttlSec int) error {
+	audio, err := decodeVoiceBase64(audioBase64)
+	if err != nil {
+		return err
+	}
 	return a.chat.SendVoice(mime, durationSec, audio, burn, ttlSec)
 }
 
@@ -406,8 +412,28 @@ func (a *App) SendChatSignal(metaJSON string) error {
 }
 
 // DecodeChatVoice turns a voice payload the webview cannot play into WAV bytes.
-func (a *App) DecodeChatVoice(mime string, audio []byte) ([]byte, error) {
-	return chat.DecodeVoiceWAV(mime, audio)
+// Both the input and the WAV result are standard base64 strings.
+func (a *App) DecodeChatVoice(mime string, audioBase64 string) (string, error) {
+	audio, err := decodeVoiceBase64(audioBase64)
+	if err != nil {
+		return "", err
+	}
+	wav, err := chat.DecodeVoiceWAV(mime, audio)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(wav), nil
+}
+
+func decodeVoiceBase64(s string) ([]byte, error) {
+	if s == "" {
+		return nil, nil
+	}
+	raw, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return nil, fmt.Errorf("voice audio is not base64: %w", err)
+	}
+	return raw, nil
 }
 
 func (a *App) DiscardChatMessage(id string) error {

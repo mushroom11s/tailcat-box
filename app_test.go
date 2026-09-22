@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -508,6 +509,26 @@ func TestChatRoomEchoAndRestartKey(t *testing.T) {
 	}
 	if a.chat.Peer() != "" {
 		t.Fatalf("peer=%s", a.chat.Peer())
+	}
+}
+
+func TestChatVoiceWireFormatIsBase64(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	a := NewApp()
+	raw := []byte("RIFF0000WAVE")
+	encoded := base64.StdEncoding.EncodeToString(raw)
+	got, err := a.DecodeChatVoice("audio/wav", encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != encoded {
+		t.Fatalf("decoded %q", got)
+	}
+	if _, err := a.DecodeChatVoice("audio/wav", "@@@"); err == nil {
+		t.Fatal("expected invalid base64 to fail")
+	}
+	if err := a.SendChatVoice("audio/webm;codecs=opus", 1, encoded, false, 0); err == nil || !strings.Contains(err.Error(), "no peer") {
+		t.Fatalf("send without a peer: %v", err)
 	}
 }
 
