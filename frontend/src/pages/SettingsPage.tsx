@@ -1,4 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
+import DiagnosticsSection from "../components/DiagnosticsSection";
+import KeysDERPSection from "../components/KeysDERPSection";
 import { useI18n, type Locale } from "../i18n";
 import {
   getClientInfo,
@@ -6,7 +8,10 @@ import {
   recordUpdateCheck,
   setLaunchAtLogin,
   type ClientInfo,
+  type KeyInfo,
+  type Session,
   type SystemInfo,
+  type TailcatEvent,
 } from "../lib/wails";
 
 export type Theme = "system" | "light" | "dark";
@@ -14,6 +19,25 @@ export type Theme = "system" | "light" | "dark";
 type Props = {
   theme: Theme;
   onTheme: (theme: Theme) => void;
+  keys: KeyInfo[];
+  busy: boolean;
+  error: string;
+  region: string;
+  derpMapURL: string;
+  roomKey: string;
+  appliedKey: string;
+  appliedRegion: string;
+  appliedDERP: string;
+  onRoomKey: (name: string) => void;
+  sessions: Session[];
+  events: TailcatEvent[];
+  peer: string;
+  onCreate: (name: string, client: boolean, region: string) => void | Promise<void>;
+  onDelete: (name: string) => void | Promise<void>;
+  onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
+  onRestart: (keyName: string) => void | Promise<void>;
+  onPing: (addr: string, untilDirect: boolean) => void | Promise<void>;
+  onStop: (id: string) => void | Promise<void>;
 };
 
 function formatUptime(startedAt: string): string {
@@ -115,7 +139,29 @@ function InfoRow({
   );
 }
 
-export default function SettingsPage({ theme, onTheme }: Props) {
+export default function SettingsPage({
+  theme,
+  onTheme,
+  keys,
+  busy,
+  error,
+  region,
+  derpMapURL,
+  roomKey,
+  appliedKey,
+  appliedRegion,
+  appliedDERP,
+  onRoomKey,
+  sessions,
+  events,
+  peer,
+  onCreate,
+  onDelete,
+  onSaveNetwork,
+  onRestart,
+  onPing,
+  onStop,
+}: Props) {
   const { locale, setLocale, t } = useI18n();
   const [client, setClient] = useState<ClientInfo | null>(null);
   const [system, setSystem] = useState<SystemInfo | null>(null);
@@ -123,8 +169,8 @@ export default function SettingsPage({ theme, onTheme }: Props) {
   const [browserOnline, setBrowserOnline] = useState(() =>
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [localBusy, setBusy] = useState(false);
+  const [localError, setError] = useState("");
 
   async function refresh(): Promise<void> {
     const [nextClient, nextSystem] = await Promise.all([getClientInfo(), getSystemInfo()]);
@@ -242,7 +288,7 @@ export default function SettingsPage({ theme, onTheme }: Props) {
           icon={<BoardIcon />}
           tone="warning"
           action={
-            <button className="btn-link" type="button" disabled={busy} onClick={() => void onCheckNow()}>
+            <button className="btn-link" type="button" disabled={localBusy} onClick={() => void onCheckNow()}>
               {t("checkNow")}
             </button>
           }
@@ -263,7 +309,7 @@ export default function SettingsPage({ theme, onTheme }: Props) {
             <button
               type="button"
               className={`chip-toggle${system?.LaunchAtLogin ? " on" : ""}`}
-              disabled={busy || !system}
+              disabled={localBusy || !system}
               onClick={() => void onToggleLaunch(!system?.LaunchAtLogin)}
             >
               {system?.LaunchAtLogin ? t("on") : t("off")}
@@ -276,7 +322,33 @@ export default function SettingsPage({ theme, onTheme }: Props) {
         </InfoCard>
       </div>
 
-      {error ? <p className="err">{error}</p> : null}
+      {localError ? <p className="err">{localError}</p> : null}
+
+      <KeysDERPSection
+        keys={keys}
+        busy={busy}
+        error={error}
+        region={region}
+        derpMapURL={derpMapURL}
+        roomKey={roomKey}
+        appliedKey={appliedKey}
+        appliedRegion={appliedRegion}
+        appliedDERP={appliedDERP}
+        onRoomKey={onRoomKey}
+        onCreate={onCreate}
+        onDelete={onDelete}
+        onSaveNetwork={onSaveNetwork}
+        onRestart={onRestart}
+      />
+      <DiagnosticsSection
+        sessions={sessions}
+        events={events}
+        peer={peer}
+        busy={busy}
+        error={error}
+        onPing={onPing}
+        onStop={onStop}
+      />
     </section>
   );
 }

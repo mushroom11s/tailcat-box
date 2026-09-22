@@ -223,6 +223,10 @@ github.com/tailscale/xnet v0.0.0-20240729143630-8497ac4dab2e h1:zOGKqN5D5hHhiYUp
 github.com/tailscale/xnet v0.0.0-20240729143630-8497ac4dab2e/go.mod h1:orPd6JZXXRyuDusYilywte7k094d7dycXXU5YnWsrwg=
 github.com/tkrajina/go-reflector v0.5.8 h1:yPADHrwmUbMq4RGEyaOUpz2H90sRsETNVpjzo3DLVQQ=
 github.com/tkrajina/go-reflector v0.5.8/go.mod h1:ECbqLgccecY5kPmPmXg1MrHW585yMcDkVl6IvJe64T4=
+github.com/tphakala/go-opus v1.1.0 h1:SbXQjwI/ZYy6wPXd0fafLTurkUbAhBpaYnvXYtn8uIo=
+github.com/tphakala/go-opus v1.1.0/go.mod h1:57hQHipntY2+xK7sycF4CYVSXDLW3V+AiX77iOJlojQ=
+github.com/tphakala/simd v1.8.0 h1:VeJhos1/QbYqy3nkBlqU4D9T0OxfUEOJZ8pEzMmVJNc=
+github.com/tphakala/simd v1.8.0/go.mod h1:RDX4bQNU8wV5JAYHEkic0l1CcQpBUwV7odEISuOvpUY=
 github.com/u-root/gobusybox/src v0.0.0-20240225013946-a274a8d5d83a h1:eg5FkNoQp76ZsswyGZ+TjYqA/rhKefxK8BW7XOlQsxo=
 github.com/u-root/gobusybox/src v0.0.0-20240225013946-a274a8d5d83a/go.mod h1:e/8TmrdreH0sZOw2DFKBaUV7bvDWRq6SeM9PzkuVM68=
 github.com/u-root/u-root v0.14.0 h1:Ka4T10EEML7dQ5XDvO9c3MBN8z4nuSnGjcd1jmU2ivg=

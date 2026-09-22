@@ -400,3 +400,80 @@ func TestMaybeRecordDailyUpdateCheck(t *testing.T) {
 		t.Fatal("should not rewrite last check within 24h")
 	}
 }
+
+func TestChatRoomEchoAndRestartKey(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	a := NewApp()
+	if _, err := a.StartChatRoom(); err != nil {
+		t.Fatal(err)
+	}
+	var addr string
+	deadline := time.After(2 * time.Second)
+	for addr == "" {
+		for _, item := range a.ListSessions() {
+			if item.Kind == session.KindChat && item.Status == session.StatusRunning {
+				addr = item.Address
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("%+v", a.ListSessions())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	again, err := a.StartChatRoom()
+	if err != nil || again.Address != addr {
+		t.Fatalf("again=%+v err=%v", again, err)
+	}
+	if err := a.ConnectChatPeer("tc:fake-echo"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SendChatText("hi", false, 0); err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.After(2 * time.Second)
+	for !chatHas(a, "in", "echo") {
+		select {
+		case <-deadline:
+			t.Fatalf("%+v", a.chat.Messages())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if _, err := a.CreateKey("home", false, ""); err != nil {
+		t.Fatal(err)
+	}
+	restarted, err := a.RestartChatRoom("home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.After(2 * time.Second)
+	var next string
+	for next == "" {
+		for _, item := range a.ListSessions() {
+			if item.ID == restarted.ID && item.Status == session.StatusRunning {
+				next = item.Address
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("%+v", a.ListSessions())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if next == addr || !strings.HasPrefix(next, "tc:fake-room-key-") {
+		t.Fatalf("next=%s old=%s", next, addr)
+	}
+	if a.chat.Peer() != "" {
+		t.Fatalf("peer=%s", a.chat.Peer())
+	}
+}
+
+func chatHas(a *App, direction, body string) bool {
+	for _, msg := range a.chat.Messages() {
+		if msg.Direction == direction && msg.Body == body {
+			return true
+		}
+	}
+	return false
+}

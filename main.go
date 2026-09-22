@@ -22,7 +22,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:             "Tailcat",
+		Title:             "Tailcat Box",
 		Width:             1100,
 		Height:            760,
 		HideWindowOnClose: true,
@@ -31,7 +31,11 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop:     true,
+			DisableWebViewDrop: true,
+		},
+		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,
 		},
@@ -44,7 +48,7 @@ func main() {
 
 func (a *App) applicationMenu() *menu.Menu {
 	m := menu.NewMenu()
-	appMenu := m.AddSubmenu("Tailcat")
+	appMenu := m.AddSubmenu("Tailcat Box")
 	appMenu.AddText("Open", nil, func(_ *menu.CallbackData) {
 		a.showWindow()
 	})

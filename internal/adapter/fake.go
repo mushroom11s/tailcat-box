@@ -9,13 +9,24 @@ import (
 )
 
 type Fake struct {
-	mu      sync.Mutex
-	stops   map[string]chan struct{}
-	ports   map[string]string // sessionID -> tc:fake-port-<id>
-	files   map[string]string // sessionID -> tc:fake-files-<id> or tc:fake-recv-<id>
-	peers   map[string]string // sessionID -> ssh/exit/exec fake address
-	drops   map[string]int
-	netOpts NetworkOpts
+	mu          sync.Mutex
+	stops       map[string]chan struct{}
+	ports       map[string]string // sessionID -> tc:fake-port-<id>
+	files       map[string]string // sessionID -> tc:fake-files-<id> or tc:fake-recv-<id>
+	peers       map[string]string // sessionID -> ssh/exit/exec fake address
+	drops       map[string]int
+	netOpts     NetworkOpts
+	chatRooms   map[string]*fakeRoom
+	captured    []CapturedFrame
+	resumeData  map[string][]byte
+	resumeDrops map[string]int
+}
+
+// CapturedFrame is one outbound chat frame recorded by the fake adapter.
+type CapturedFrame struct {
+	Peer  string
+	Port  uint16
+	Frame []byte
 }
 
 func NewFake() *Fake {

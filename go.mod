@@ -6,6 +6,7 @@ require (
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/pkg/sftp v1.13.6
 	github.com/tailscale/tailcat v0.7.0
+	github.com/tphakala/go-opus v1.1.0
 	github.com/wailsapp/wails/v2 v2.16.0
 	golang.org/x/crypto v0.57.0
 )
@@ -60,6 +61,7 @@ require (
 	github.com/tailscale/web-client-prebuilt v0.0.0-20250124233751-d4cd19a26976 // indirect
 	github.com/tailscale/wireguard-go v0.0.0-20260911194433-e3222a3340cd // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
+	github.com/tphakala/simd v1.8.0 // indirect
 	github.com/u-root/u-root v0.14.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect

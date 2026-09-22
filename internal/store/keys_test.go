@@ -3,6 +3,7 @@ package store_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mushroom11s/tailcat-desktop-client/internal/store"
@@ -120,5 +121,19 @@ func TestSettingsRoundTrip(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("got=%+v want=%+v", got, want)
+	}
+}
+
+func TestCreateStoresPrivateKeyAndReadRaw(t *testing.T) {
+	s := store.New(t.TempDir())
+	if _, err := s.Create("home", store.CreateOpts{PrivateKeyJSON: `{"fake":"abc"}`}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := s.ReadRaw("home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"PrivateKey"`) || !strings.Contains(string(raw), "abc") {
+		t.Fatalf("raw=%s", raw)
 	}
 }
