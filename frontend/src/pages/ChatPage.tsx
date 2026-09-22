@@ -134,6 +134,17 @@ export default function ChatPage({
   const peerCtorRef = useRef(peerConnection);
   const sendSignalRef = useRef(onSendSignal);
   const signalSeq = useRef(0);
+  const logRef = useRef<HTMLDivElement>(null);
+  const dragRectEl = useRef<HTMLDivElement>(null);
+  const bubbleEls = useRef(new Map<string, HTMLElement>());
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    active: boolean;
+    originX: number;
+    originY: number;
+  } | null>(null);
   liveMediaRef.current = liveMedia;
   peerCtorRef.current = peerConnection;
   sendSignalRef.current = onSendSignal;
@@ -180,6 +191,121 @@ export default function ChatPage({
     }
     setMultiSelectActive(true);
     setSelectedIds(next);
+  }
+
+  const DRAG_THRESHOLD = 4;
+
+  function isInteractiveTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    return Boolean(target.closest("a, button, input, textarea, select, [role='button']"));
+  }
+
+  function rectsIntersect(
+    a: { left: number; top: number; width: number; height: number },
+    b: { left: number; top: number; width: number; height: number },
+  ): boolean {
+    const ar = { left: a.left, top: a.top, right: a.left + a.width, bottom: a.top + a.height };
+    const br = { left: b.left, top: b.top, right: b.left + b.width, bottom: b.top + b.height };
+    return !(ar.right < br.left || ar.left > br.right || ar.bottom < br.top || ar.top > br.bottom);
+  }
+
+  function paintDragRect(left: number, top: number, width: number, height: number): void {
+    const el = dragRectEl.current;
+    if (!el) {
+      return;
+    }
+    el.hidden = false;
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    el.style.width = `${width}px`;
+    el.style.height = `${height}px`;
+  }
+
+  function clearDragRect(): void {
+    const el = dragRectEl.current;
+    if (!el) {
+      return;
+    }
+    el.hidden = true;
+  }
+
+  function onLogPointerDown(ev: PointerEvent<HTMLDivElement>): void {
+    if (ev.button !== 0 || isInteractiveTarget(ev.target)) {
+      return;
+    }
+    const log = logRef.current;
+    if (!log) {
+      return;
+    }
+    const box = log.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: ev.pointerId,
+      startX: ev.clientX,
+      startY: ev.clientY,
+      active: false,
+      originX: box.left,
+      originY: box.top,
+    };
+    log.setPointerCapture?.(ev.pointerId);
+  }
+
+  function onLogPointerMove(ev: PointerEvent<HTMLDivElement>): void {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== ev.pointerId) {
+      return;
+    }
+    const dx = ev.clientX - drag.startX;
+    const dy = ev.clientY - drag.startY;
+    if (!drag.active && Math.hypot(dx, dy) < DRAG_THRESHOLD) {
+      return;
+    }
+    drag.active = true;
+    const left = Math.min(drag.startX, ev.clientX) - drag.originX;
+    const top = Math.min(drag.startY, ev.clientY) - drag.originY;
+    paintDragRect(left, top, Math.abs(dx), Math.abs(dy));
+  }
+
+  function onLogPointerUp(ev: PointerEvent<HTMLDivElement>): void {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    clearDragRect();
+    if (!drag || drag.pointerId !== ev.pointerId) {
+      return;
+    }
+    if (!drag.active) {
+      return;
+    }
+    const left = Math.min(drag.startX, ev.clientX) - drag.originX;
+    const top = Math.min(drag.startY, ev.clientY) - drag.originY;
+    const width = Math.abs(ev.clientX - drag.startX);
+    const height = Math.abs(ev.clientY - drag.startY);
+    const local = { left, top, width, height };
+    const hit = new Set<string>();
+    for (const msg of messages) {
+      if (msg.direction === "system") {
+        continue;
+      }
+      const el = bubbleEls.current.get(msg.id);
+      if (!el) {
+        continue;
+      }
+      const br = el.getBoundingClientRect();
+      const rel = {
+        left: br.left - drag.originX,
+        top: br.top - drag.originY,
+        width: br.width,
+        height: br.height,
+      };
+      if (rectsIntersect(local, rel)) {
+        hit.add(msg.id);
+      }
+    }
+    if (hit.size === 0) {
+      return;
+    }
+    applySelection(hit);
   }
 
   async function reportStatus(status: string): Promise<void> {
@@ -601,7 +727,19 @@ export default function ChatPage({
           </button>
         </div>
       ) : null}
-      <div className="chat-log">
+      <div
+        className="chat-log"
+        ref={logRef}
+        onPointerDown={onLogPointerDown}
+        onPointerMove={onLogPointerMove}
+        onPointerUp={onLogPointerUp}
+        onPointerCancel={() => {
+          dragRef.current = null;
+          clearDragRect();
+        }}
+        style={{ position: "relative" }}
+      >
+        <div ref={dragRectEl} className="chat-drag-rect" hidden />
         {messages.length === 0 ? <p className="lede">{t("chatEmptyLede")}</p> : null}
         {messages.map((msg) =>
           msg.direction === "system" ? (
@@ -609,7 +747,18 @@ export default function ChatPage({
               {systemText(msg.code, msg.body ?? "", t)}
             </p>
           ) : (
-            <article key={msg.id} className={`glass chat-bubble ${msg.direction}`}>
+            <article
+              key={msg.id}
+              ref={(el) => {
+                if (el) {
+                  bubbleEls.current.set(msg.id, el);
+                } else {
+                  bubbleEls.current.delete(msg.id);
+                }
+              }}
+              data-msgid={msg.id}
+              className={`glass chat-bubble ${msg.direction}${selectedIds.has(msg.id) ? " selected" : ""}`}
+            >
               <header>
                 <span>{msg.direction === "out" ? t("chatYou") : t("chatPeerName")}</span>
                 <time>{stamp(msg.at)}</time>

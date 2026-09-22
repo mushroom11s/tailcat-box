@@ -927,6 +927,17 @@ textarea {
   flex: 1;
   font-size: 14px;
 }
+.chat-drag-rect {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--accent, #0a84ff) 70%, transparent);
+  background: color-mix(in srgb, var(--accent, #0a84ff) 18%, transparent);
+  z-index: 2;
+}
+.chat-bubble.selected {
+  outline: 2px solid color-mix(in srgb, var(--accent, #0a84ff) 80%, transparent);
+  outline-offset: 2px;
+}
 .chat-log {
   min-height: 220px;
   display: flex;

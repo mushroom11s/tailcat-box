@@ -80,7 +80,8 @@ describe("drag rectangle selection", () => {
     renderChat();
     const log = document.querySelector(".chat-log") as HTMLElement;
     const bubble = document.querySelector(".chat-bubble.in") as HTMLElement;
-    expect(log && bubble).toBeTruthy();
+    const out = document.querySelector(".chat-bubble.out") as HTMLElement;
+    expect(log && bubble && out).toBeTruthy();
 
     vi.spyOn(log, "getBoundingClientRect").mockReturnValue({
       x: 0,
@@ -104,6 +105,18 @@ describe("drag rectangle selection", () => {
       height: 40,
       toJSON: () => ({}),
     } as DOMRect);
+    // Keep other bubbles outside the drag so only the inbound one is hit.
+    vi.spyOn(out, "getBoundingClientRect").mockReturnValue({
+      x: 200,
+      y: 200,
+      top: 200,
+      left: 200,
+      bottom: 240,
+      right: 320,
+      width: 120,
+      height: 40,
+      toJSON: () => ({}),
+    } as DOMRect);
 
     fireEvent.pointerDown(log, { clientX: 0, clientY: 0, button: 0, pointerId: 1 });
     fireEvent.pointerMove(log, { clientX: 80, clientY: 80, pointerId: 1 });
@@ -111,6 +124,7 @@ describe("drag rectangle selection", () => {
 
     expect(screen.getByText("1 selected")).toBeTruthy();
     expect(bubble.className).toMatch(/selected/);
+    expect(out.className).not.toMatch(/selected/);
   });
 
   it("does not start drag-select from a button", () => {
