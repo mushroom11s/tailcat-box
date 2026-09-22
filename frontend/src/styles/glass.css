@@ -910,6 +910,34 @@ textarea {
   gap: 12px;
   align-items: flex-start;
 }
+.chat-transcript-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chat-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  margin: 8px 0 0;
+}
+.chat-select-bar span {
+  flex: 1;
+  font-size: 14px;
+}
+.chat-drag-rect {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--accent, #0a84ff) 70%, transparent);
+  background: color-mix(in srgb, var(--accent, #0a84ff) 18%, transparent);
+  z-index: 2;
+}
+.chat-bubble.selected {
+  outline: 2px solid color-mix(in srgb, var(--accent, #0a84ff) 80%, transparent);
+  outline-offset: 2px;
+}
 .chat-log {
   min-height: 220px;
   display: flex;

@@ -3,6 +3,7 @@ import { ClipboardSetText, OnFileDrop, OnFileDropOff } from "../../wailsjs/runti
 import VoiceNote from "../components/VoiceNote";
 import { useI18n } from "../i18n";
 import { localizeChatError, systemText } from "../lib/chatText";
+import { purgeDiscardIds } from "../lib/chatPurge";
 import { createLiveCall, type CallMode, type CallView, type LiveCall, type LiveDevices } from "../lib/liveCall";
 import { startVoiceCapture, type VoiceCapture } from "../lib/voiceCapture";
 import { hasWailsBindings, selectFiles } from "../lib/wails";
@@ -122,6 +123,9 @@ export default function ChatPage({
   const [burnOn, setBurnOn] = useState(false);
   const [viewer, setViewer] = useState<{ id: string; left: number | null } | null>(null);
   const [recording, setRecording] = useState(false);
+  const [multiSelectActive, setMultiSelectActive] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const captureRef = useRef<VoiceCapture | null>(null);
   const holdRef = useRef<number | null>(null);
   const pendingRef = useRef(false);
@@ -131,6 +135,17 @@ export default function ChatPage({
   const peerCtorRef = useRef(peerConnection);
   const sendSignalRef = useRef(onSendSignal);
   const signalSeq = useRef(0);
+  const logRef = useRef<HTMLDivElement>(null);
+  const dragRectEl = useRef<HTMLDivElement>(null);
+  const bubbleEls = useRef(new Map<string, HTMLElement>());
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    active: boolean;
+    originX: number;
+    originY: number;
+  } | null>(null);
   liveMediaRef.current = liveMedia;
   peerCtorRef.current = peerConnection;
   sendSignalRef.current = onSendSignal;
@@ -159,6 +174,167 @@ export default function ChatPage({
     });
   }
   burnRef.current = burnOn;
+
+  function fillN(template: string, n: number): string {
+    return template.replaceAll("{n}", String(n));
+  }
+
+  function exitMultiSelect(): void {
+    setMultiSelectActive(false);
+    setSelectedIds(new Set());
+    setConfirmOpen(false);
+  }
+
+  function applySelection(next: Set<string>): void {
+    if (next.size === 0) {
+      exitMultiSelect();
+      return;
+    }
+    setMultiSelectActive(true);
+    setSelectedIds(next);
+  }
+
+  const DRAG_THRESHOLD = 4;
+
+  function isInteractiveTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    return Boolean(target.closest("a, button, input, textarea, select, [role='button']"));
+  }
+
+  function rectsIntersect(
+    a: { left: number; top: number; width: number; height: number },
+    b: { left: number; top: number; width: number; height: number },
+  ): boolean {
+    const ar = { left: a.left, top: a.top, right: a.left + a.width, bottom: a.top + a.height };
+    const br = { left: b.left, top: b.top, right: b.left + b.width, bottom: b.top + b.height };
+    return !(ar.right < br.left || ar.left > br.right || ar.bottom < br.top || ar.top > br.bottom);
+  }
+
+  function paintDragRect(left: number, top: number, width: number, height: number): void {
+    const el = dragRectEl.current;
+    if (!el) {
+      return;
+    }
+    el.hidden = false;
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    el.style.width = `${width}px`;
+    el.style.height = `${height}px`;
+  }
+
+  function clearDragRect(): void {
+    const el = dragRectEl.current;
+    if (!el) {
+      return;
+    }
+    el.hidden = true;
+  }
+
+  function onLogPointerDown(ev: PointerEvent<HTMLDivElement>): void {
+    if (ev.button !== 0 || isInteractiveTarget(ev.target)) {
+      return;
+    }
+    // Once multi-select is active, bubble presses are click-toggles — do not start a new drag.
+    if (multiSelectActive && ev.target instanceof Element && ev.target.closest(".chat-bubble")) {
+      return;
+    }
+    const log = logRef.current;
+    if (!log) {
+      return;
+    }
+    const box = log.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: ev.pointerId,
+      startX: ev.clientX,
+      startY: ev.clientY,
+      active: false,
+      originX: box.left,
+      originY: box.top,
+    };
+    log.setPointerCapture?.(ev.pointerId);
+  }
+
+  function onLogPointerMove(ev: PointerEvent<HTMLDivElement>): void {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== ev.pointerId) {
+      return;
+    }
+    const dx = ev.clientX - drag.startX;
+    const dy = ev.clientY - drag.startY;
+    if (!drag.active && Math.hypot(dx, dy) < DRAG_THRESHOLD) {
+      return;
+    }
+    drag.active = true;
+    const left = Math.min(drag.startX, ev.clientX) - drag.originX;
+    const top = Math.min(drag.startY, ev.clientY) - drag.originY;
+    paintDragRect(left, top, Math.abs(dx), Math.abs(dy));
+  }
+
+  function onLogPointerUp(ev: PointerEvent<HTMLDivElement>): void {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    clearDragRect();
+    if (!drag || drag.pointerId !== ev.pointerId) {
+      return;
+    }
+    if (!drag.active) {
+      return;
+    }
+    const left = Math.min(drag.startX, ev.clientX) - drag.originX;
+    const top = Math.min(drag.startY, ev.clientY) - drag.originY;
+    const width = Math.abs(ev.clientX - drag.startX);
+    const height = Math.abs(ev.clientY - drag.startY);
+    const local = { left, top, width, height };
+    const hit = new Set<string>();
+    for (const msg of messages) {
+      if (msg.direction === "system") {
+        continue;
+      }
+      const el = bubbleEls.current.get(msg.id);
+      if (!el) {
+        continue;
+      }
+      const br = el.getBoundingClientRect();
+      const rel = {
+        left: br.left - drag.originX,
+        top: br.top - drag.originY,
+        width: br.width,
+        height: br.height,
+      };
+      if (rectsIntersect(local, rel)) {
+        hit.add(msg.id);
+      }
+    }
+    if (hit.size === 0) {
+      return;
+    }
+    applySelection(hit);
+  }
+
+  async function confirmDelete(): Promise<void> {
+    const selectedSnapshot = new Set(selectedIds);
+    const ids = purgeDiscardIds(messages, selectedSnapshot);
+    setConfirmOpen(false);
+    const remaining = new Set(selectedSnapshot);
+    let failed = false;
+    for (const id of ids) {
+      try {
+        await onDiscard?.(id);
+        remaining.delete(id);
+      } catch {
+        failed = true;
+        break;
+      }
+    }
+    if (failed) {
+      setInline(t("chatSelectDeleteError"));
+      applySelection(remaining);
+      return;
+    }
+    exitMultiSelect();
+  }
 
   async function reportStatus(status: string): Promise<void> {
     if (status === "replaced") {
@@ -261,12 +437,55 @@ export default function ChatPage({
       if (event.key !== "Escape") {
         return;
       }
+      if (confirmOpen || multiSelectActive) {
+        return;
+      }
       void onDiscard?.(viewer.id);
       setViewer(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [viewer, onDiscard]);
+  }, [viewer, onDiscard, confirmOpen, multiSelectActive]);
+
+  useEffect(() => {
+    if (import.meta.env.MODE !== "test") {
+      return;
+    }
+    function onSeed(ev: Event): void {
+      const detail = (ev as CustomEvent<{ ids: string[] }>).detail;
+      const ids = detail?.ids ?? [];
+      if (ids.length === 0) {
+        setMultiSelectActive(false);
+        setSelectedIds(new Set());
+        setConfirmOpen(false);
+        return;
+      }
+      setMultiSelectActive(true);
+      setSelectedIds(new Set(ids));
+    }
+    window.addEventListener("tailcat-test-select", onSeed);
+    return () => window.removeEventListener("tailcat-test-select", onSeed);
+  }, []);
+
+  useEffect(() => {
+    if (!multiSelectActive) {
+      return;
+    }
+    function onKey(ev: globalThis.KeyboardEvent): void {
+      if (ev.key !== "Escape") {
+        return;
+      }
+      if (confirmOpen) {
+        setConfirmOpen(false);
+        return;
+      }
+      setMultiSelectActive(false);
+      setSelectedIds(new Set());
+      setConfirmOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [multiSelectActive, confirmOpen]);
 
   async function connect(): Promise<void> {
     const addr = draftPeer.trim();
@@ -520,7 +739,35 @@ export default function ChatPage({
         </button>
       </div>
       <div className="chat-stage">
-      <div className="chat-log">
+      <div className="chat-transcript-column">
+      {selectedIds.size >= 1 ? (
+        <div
+          className="chat-select-bar"
+          role="toolbar"
+          aria-label={fillN(t("chatSelectCount"), selectedIds.size)}
+        >
+          <span>{fillN(t("chatSelectCount"), selectedIds.size)}</span>
+          <IconButton label={t("chatSelectDelete")} onClick={() => setConfirmOpen(true)}>
+            <TrashIcon />
+          </IconButton>
+          <IconButton label={t("chatSelectClose")} onClick={() => exitMultiSelect()}>
+            <CloseIcon />
+          </IconButton>
+        </div>
+      ) : null}
+      <div
+        className="chat-log"
+        ref={logRef}
+        onPointerDown={onLogPointerDown}
+        onPointerMove={onLogPointerMove}
+        onPointerUp={onLogPointerUp}
+        onPointerCancel={() => {
+          dragRef.current = null;
+          clearDragRect();
+        }}
+        style={{ position: "relative" }}
+      >
+        <div ref={dragRectEl} className="chat-drag-rect" hidden />
         {messages.length === 0 ? <p className="lede">{t("chatEmptyLede")}</p> : null}
         {messages.map((msg) =>
           msg.direction === "system" ? (
@@ -528,7 +775,34 @@ export default function ChatPage({
               {systemText(msg.code, msg.body ?? "", t)}
             </p>
           ) : (
-            <article key={msg.id} className={`glass chat-bubble ${msg.direction}`}>
+            <article
+              key={msg.id}
+              ref={(el) => {
+                if (el) {
+                  bubbleEls.current.set(msg.id, el);
+                } else {
+                  bubbleEls.current.delete(msg.id);
+                }
+              }}
+              data-msgid={msg.id}
+              className={`glass chat-bubble ${msg.direction}${selectedIds.has(msg.id) ? " selected" : ""}`}
+              onClick={(ev) => {
+                if (!multiSelectActive) {
+                  return;
+                }
+                if (isInteractiveTarget(ev.target)) {
+                  return;
+                }
+                ev.preventDefault();
+                const next = new Set(selectedIds);
+                if (next.has(msg.id)) {
+                  next.delete(msg.id);
+                } else {
+                  next.add(msg.id);
+                }
+                applySelection(next);
+              }}
+            >
               <header>
                 <span>{msg.direction === "out" ? t("chatYou") : t("chatPeerName")}</span>
                 <time>{stamp(msg.at)}</time>
@@ -546,7 +820,6 @@ export default function ChatPage({
                     await onDiscard?.(msg.id);
                   }
                 }}
-                onDelete={() => onDiscard?.(msg.id)}
                 canPlayMime={canPlayMime}
                 decodeVoice={decodeVoice}
               />
@@ -566,6 +839,7 @@ export default function ChatPage({
             ) : null}
           </p>
         ))}
+      </div>
       </div>
       {callView.phase !== "idle" ? (
         <aside className={`glass media-dock${callView.expanded ? " expanded" : ""}`} role="complementary" aria-label={t("chatMediaDock")}>
@@ -646,6 +920,28 @@ export default function ChatPage({
         style={{ display: "none" }}
         onChange={(e) => void onPicked(e)}
       />
+      {confirmOpen ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setConfirmOpen(false)}>
+          <div
+            className="glass modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-select-delete-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="chat-select-delete-title">{t("chatSelectDelete")}</h3>
+            <p>{fillN(t("chatSelectDeleteConfirm"), selectedIds.size)}</p>
+            <div className="row">
+              <button className="btn btn-ghost" type="button" onClick={() => setConfirmOpen(false)}>
+                {t("cancel")}
+              </button>
+              <button className="btn btn-danger" type="button" onClick={() => void confirmDelete()}>
+                {t("chatSelectDelete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -685,7 +981,6 @@ function BubbleBody({
   onOpen,
   onClose,
   onSave,
-  onDelete,
   canPlayMime,
   decodeVoice,
 }: {
@@ -696,7 +991,6 @@ function BubbleBody({
   onOpen: () => void;
   onClose: () => Promise<void>;
   onSave: () => Promise<void>;
-  onDelete: () => Promise<void> | void;
   canPlayMime?: (mime: string) => boolean;
   decodeVoice?: (mime: string, audio: string) => Promise<string | null>;
 }) {
@@ -736,7 +1030,7 @@ function BubbleBody({
             </button>
           </div>
         ) : null}
-        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} onDelete={onDelete} /> : null}
+        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} /> : null}
       </>
     );
   }
@@ -744,7 +1038,7 @@ function BubbleBody({
     return (
       <>
         <p>{msg.body}</p>
-        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} onDelete={onDelete} /> : null}
+        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} /> : null}
       </>
     );
   }
@@ -811,7 +1105,7 @@ function BubbleBody({
             {t("chatDownload")}
           </button>
         ) : null}
-        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} onDelete={onDelete} /> : null}
+        {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} /> : null}
       </div>
     );
   }
@@ -886,14 +1180,19 @@ function ScreenIcon() {
   return <StrokeIcon d="M3 5h18v12H3zM8 21h8M12 17v4" />;
 }
 
-function BurnBadge({ caps, onDelete }: { caps: string[]; onDelete: () => Promise<void> | void }) {
+function TrashIcon() {
+  return <StrokeIcon d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />;
+}
+
+function CloseIcon() {
+  return <StrokeIcon d="M6 6l12 12M18 6 6 18" />;
+}
+
+function BurnBadge({ caps }: { caps: string[] }) {
   const { t } = useI18n();
   return (
     <div className="chat-actions">
       <p className="chat-badge">{caps.includes("burn") ? t("chatBurnRemoved") : t("chatBurnKept")}</p>
-      <button className="btn" type="button" onClick={() => void onDelete()}>
-        {t("chatDelete")}
-      </button>
     </div>
   );
 }
