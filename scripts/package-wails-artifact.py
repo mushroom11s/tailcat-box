@@ -15,11 +15,18 @@ from pathlib import Path
 
 def normalize_arch(raw: str) -> str:
     value = (raw or "").strip().lower()
-    if value in {"arm64", "aarch64"}:
+    if value in {"arm64", "aarch64", "arm"}:
         return "arm64"
-    if value in {"x86_64", "amd64", "x64"}:
+    if value in {"x86_64", "amd64", "x64", "x86"}:
         return "amd64"
     return value or "unknown"
+
+
+def zip_name(os_slug: str, arch: str, version: str) -> str:
+    arch = normalize_arch(arch)
+    if arch not in {"arm64", "amd64"}:
+        raise SystemExit(f"unsupported arch: {arch}")
+    return f"tailcat-box-{os_slug}-{arch}-{version}.zip"
 
 
 def detect_arch() -> str:
@@ -65,6 +72,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
     parser.add_argument("--os-slug", required=True, choices=("macos", "windows"))
+    parser.add_argument("--arch", default="", help="amd64 or arm64. Defaults to this machine.")
     parser.add_argument("--bin-dir", default="build/bin")
     parser.add_argument("--out-dir", default="dist-upload")
     args = parser.parse_args()
@@ -74,8 +82,7 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     sources = collect_sources(bin_dir, args.os_slug)
-    arch = detect_arch()
-    name = f"tailcat-box-{args.os_slug}-{arch}-{args.version}.zip"
+    name = zip_name(args.os_slug, args.arch or detect_arch(), args.version)
     dest = out_dir / name
 
     if args.os_slug == "macos" and shutil.which("ditto"):

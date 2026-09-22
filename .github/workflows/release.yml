@@ -67,7 +67,7 @@ jobs:
           echo "Resolved version=${version} app_version=${app_version} do_release=${do_release} ref=${checkout_ref}"
 
   build:
-    name: Build ${{ matrix.slug }}
+    name: Build ${{ matrix.slug }}-${{ matrix.arch }}
     needs: meta
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
@@ -75,10 +75,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # macos-latest is Apple Silicon. macos-13 was retired; macos-15-intel is the hosted x86_64 runner.
           - os: macos-latest
             slug: macos
+            arch: arm64
+          - os: macos-15-intel
+            slug: macos
+            arch: amd64
           - os: windows-latest
             slug: windows
+            arch: amd64
+          - os: windows-11-arm
+            slug: windows
+            arch: arm64
     defaults:
       run:
         shell: bash
@@ -105,8 +114,8 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Install MinGW (Windows CGO)
-        if: runner.os == 'Windows'
+      - name: Install MinGW (Windows amd64)
+        if: matrix.arch == 'amd64' && runner.os == 'Windows'
         shell: pwsh
         run: |
           choco install mingw -y --no-progress
@@ -121,6 +130,24 @@ jobs:
           }
           Add-Content -Path $env:GITHUB_PATH -Value $mingw
           $env:PATH = "$mingw;$env:PATH"
+          gcc --version
+
+      - name: Install LLVM MinGW (Windows arm64)
+        if: matrix.arch == 'arm64' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = "20260908"
+          $zip = Join-Path $env:RUNNER_TEMP "llvm-mingw.zip"
+          $dest = Join-Path $env:RUNNER_TEMP "llvm-mingw"
+          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/$tag/llvm-mingw-$tag-ucrt-aarch64.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dest
+          $gcc = Get-ChildItem -Path $dest -Recurse -Filter gcc.exe | Select-Object -First 1
+          if (-not $gcc) {
+            throw "gcc.exe not found in llvm-mingw"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $gcc.DirectoryName
+          $env:PATH = "$($gcc.DirectoryName);$env:PATH"
           gcc --version
 
       - name: Install Wails CLI
@@ -156,15 +183,16 @@ jobs:
         env:
           VERSION: ${{ needs.meta.outputs.version }}
           OS_SLUG: ${{ matrix.slug }}
+          ARCH: ${{ matrix.arch }}
         run: |
           PY=python3
           command -v python3 >/dev/null 2>&1 || PY=python
-          "$PY" scripts/package-wails-artifact.py --version "${VERSION}" --os-slug "${OS_SLUG}"
+          "$PY" scripts/package-wails-artifact.py --version "${VERSION}" --os-slug "${OS_SLUG}" --arch "${ARCH}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tailcat-box-${{ matrix.slug }}-${{ needs.meta.outputs.version }}
+          name: tailcat-box-${{ matrix.slug }}-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
           path: dist-upload/*.zip
           if-no-files-found: error
           retention-days: 14

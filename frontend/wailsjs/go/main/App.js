@@ -18,12 +18,12 @@ export function DeleteKey(arg1) {
   return window['go']['main']['App']['DeleteKey'](arg1);
 }
 
-export function DiscardChatMessage(arg1) {
-  return window['go']['main']['App']['DiscardChatMessage'](arg1);
-}
-
 export function DialPipe(arg1, arg2) {
   return window['go']['main']['App']['DialPipe'](arg1, arg2);
+}
+
+export function DiscardChatMessage(arg1) {
+  return window['go']['main']['App']['DiscardChatMessage'](arg1);
 }
 
 export function GetClientInfo() {
@@ -110,6 +110,10 @@ export function SetNetworkSettings(arg1, arg2) {
   return window['go']['main']['App']['SetNetworkSettings'](arg1, arg2);
 }
 
+export function SetUILocale(arg1) {
+  return window['go']['main']['App']['SetUILocale'](arg1);
+}
+
 export function StartBrowse(arg1) {
   return window['go']['main']['App']['StartBrowse'](arg1);
 }
@@ -176,8 +180,4 @@ export function StopSession(arg1) {
 
 export function TailcatVersion() {
   return window['go']['main']['App']['TailcatVersion']();
-}
-
-export function SetUILocale(arg1) {
-  return window['go']['main']['App']['SetUILocale'](arg1);
 }

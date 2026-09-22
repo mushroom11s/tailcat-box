@@ -4,13 +4,13 @@
 
 Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on macOS and Windows, built with [Wails](https://wails.io) v2 (Go + React + TypeScript).
 
-[![CI](https://github.com/mushroom11s/tailcat-desktop-client/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-desktop-client/actions/workflows/ci.yml)
+[![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml)
 
 <p align="center">
   <img src="docs/assets/icon.png" alt="Tailcat Box" width="256" />
 </p>
 
-The app is **Tailcat Box**. In 简体中文 the product name is **猫砂盆**. The GitHub repository stays `tailcat-desktop-client`.
+The app is **Tailcat Box**. In 简体中文 the product name is **猫砂盆**. The GitHub repository is `tailcat-box`: [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box).
 
 ## Features
 
@@ -35,6 +35,11 @@ wails doctor
 ```
 
 ## Develop
+
+```bash
+git clone https://github.com/mushroom11s/tailcat-box.git
+cd tailcat-box
+```
 
 From the repository root:
 
@@ -83,6 +88,8 @@ go test ./...
 cd frontend && npm run build
 ```
 
+Pull requests and pushes to `main` run these checks in [CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml).
+
 `go test ./...` does not include the real-adapter integration test. That one needs outbound HTTPS/UDP to Tailcat DERP and is optional:
 
 ```bash
@@ -120,30 +127,9 @@ The Keys page also lists the Tailcat CLI key directory (`~/.config/tailcat/keys`
 
 ## Releases
 
-Public GitHub-hosted runners (`ubuntu-latest`, `macos-latest`, `windows-latest`) are enough. This project does not use larger runners.
+Pushing a `v*` tag builds unsigned macOS (Apple Silicon and Intel) and Windows (amd64 and ARM64) zips and attaches them to a GitHub Release. Names look like `tailcat-box-macos-arm64-…`, `tailcat-box-macos-amd64-…`, `tailcat-box-windows-amd64-…`, and `tailcat-box-windows-arm64-…`. Notes for that tag live under `docs/releases/`. The binaries are unsigned, so Gatekeeper and SmartScreen warnings are expected.
 
-| Workflow | When | What |
-| --- | --- | --- |
-| [CI](.github/workflows/ci.yml) | Pull requests and pushes to `main` | `go test ./...` and `frontend` `npm ci` + `npm run build` on ubuntu-latest |
-| [Release](.github/workflows/release.yml) | `v*` tags, or **Run workflow** | `wails build` on macOS and Windows, zip `build/bin`, and on a real tag publish a GitHub Release |
-
-To cut a release:
-
-1. Add notes at `docs/releases/vX.Y.Z.md` (see [template](docs/releases/README.md)) and merge that commit to `main`.
-2. Tag the merged commit and push only that tag:
-
-```bash
-git checkout main
-git pull origin main
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-3. The workflow builds unsigned macOS (`.app`) and Windows (`.exe`) zips named `tailcat-box-macos-…` and `tailcat-box-windows-…`, then attaches them to the GitHub Release. The body is `docs/releases/<tag>.md` when that file exists.
-
-**Actions → Release → Run workflow** with **dry_run** checked (the default) builds artifacts without publishing. Uncheck dry_run only when you mean to publish, and supply a `v*` tag.
-
-`macos-latest` is Apple Silicon today. Intel Mac and Windows ARM64 are not built. Binaries are unsigned (no Apple notarization, no Authenticode), so Gatekeeper and SmartScreen warnings are expected.
+Tagging, dry-run builds, and which runners are used are described in [docs/releases/README.md](docs/releases/README.md).
 
 ## Layout
 
@@ -156,7 +142,7 @@ git push origin v0.1.0
 - `internal/tray` — Open, session count, Quit
 - `frontend/` — Chat, Tunnel, and Settings
 
-The Go module path is still `github.com/mushroom11s/tailcat-desktop-client`.
+The Go module path in `go.mod` is `github.com/mushroom11s/tailcat-desktop-client`.
 
 ## Credits
 

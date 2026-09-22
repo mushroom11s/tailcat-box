@@ -13,9 +13,9 @@ export function DecodeChatVoice(arg1:string,arg2:string):Promise<string>;
 
 export function DeleteKey(arg1:string):Promise<void>;
 
-export function DiscardChatMessage(arg1:string):Promise<void>;
-
 export function DialPipe(arg1:string,arg2:string):Promise<session.Session>;
+
+export function DiscardChatMessage(arg1:string):Promise<void>;
 
 export function GetClientInfo():Promise<main.ClientInfo>;
 
@@ -59,6 +59,8 @@ export function SetLaunchAtLogin(arg1:boolean):Promise<main.SystemInfo>;
 
 export function SetNetworkSettings(arg1:string,arg2:string):Promise<void>;
 
+export function SetUILocale(arg1:string):Promise<void>;
+
 export function StartBrowse(arg1:string):Promise<session.Session>;
 
 export function StartChatRoom():Promise<session.Session>;
@@ -90,7 +92,5 @@ export function StartSSHServe(arg1:boolean,arg2:string,arg3:boolean):Promise<ses
 export function StopChatRoom():Promise<void>;
 
 export function StopSession(arg1:string):Promise<void>;
-
-export function SetUILocale(arg1:string):Promise<void>;
 
 export function TailcatVersion():Promise<string>;
