@@ -747,12 +747,12 @@ export default function ChatPage({
           aria-label={fillN(t("chatSelectCount"), selectedIds.size)}
         >
           <span>{fillN(t("chatSelectCount"), selectedIds.size)}</span>
-          <button className="btn" type="button" onClick={() => setConfirmOpen(true)}>
-            {t("chatSelectDelete")}
-          </button>
-          <button className="btn" type="button" onClick={() => exitMultiSelect()}>
-            {t("chatSelectClose")}
-          </button>
+          <IconButton label={t("chatSelectDelete")} onClick={() => setConfirmOpen(true)}>
+            <TrashIcon />
+          </IconButton>
+          <IconButton label={t("chatSelectClose")} onClick={() => exitMultiSelect()}>
+            <CloseIcon />
+          </IconButton>
         </div>
       ) : null}
       <div
@@ -1185,6 +1185,14 @@ function BurnBadge({ caps, onDelete }: { caps: string[]; onDelete: () => Promise
 =======
 function SendIcon() {
   return <StrokeIcon d="M4 12h14M13 6l6 6-6 6" />;
+}
+
+function TrashIcon() {
+  return <StrokeIcon d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />;
+}
+
+function CloseIcon() {
+  return <StrokeIcon d="M6 6l12 12M18 6 6 18" />;
 }
 
 function BurnBadge({ caps }: { caps: string[] }) {

@@ -61,8 +61,10 @@ describe("multi-select top bar and exit", () => {
     renderChat();
     fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b", "d"] } }));
     expect(await screen.findByText("2 selected")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    const bar = screen.getByRole("toolbar", { name: "2 selected" });
+    expect(within(bar).getByRole("button", { name: "Delete" })).toBeTruthy();
+    expect(within(bar).getByRole("button", { name: "Close" })).toBeTruthy();
+    await user.click(within(bar).getByRole("button", { name: "Close" }));
     expect(screen.queryByText("2 selected")).toBeNull();
   });
 
@@ -181,7 +183,8 @@ describe("confirm delete and purge", () => {
     const user = userEvent.setup();
     const { onDiscard } = renderChat();
     fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b", "d"] } }));
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    const bar = await screen.findByRole("toolbar", { name: "2 selected" });
+    await user.click(within(bar).getByRole("button", { name: "Delete" }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog.textContent).toContain("Delete 2 local messages? Your peer is not affected.");
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
@@ -193,7 +196,8 @@ describe("confirm delete and purge", () => {
     const user = userEvent.setup();
     const { onDiscard } = renderChat();
     fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b"] } }));
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    const bar = await screen.findByRole("toolbar", { name: "1 selected" });
+    await user.click(within(bar).getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onDiscard).not.toHaveBeenCalled();
     expect(screen.getByText("1 selected")).toBeTruthy();
@@ -202,7 +206,8 @@ describe("confirm delete and purge", () => {
   it("Esc on the dialog cancels the dialog only", async () => {
     renderChat();
     fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b"] } }));
-    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    const bar = await screen.findByRole("toolbar", { name: "1 selected" });
+    fireEvent.click(within(bar).getByRole("button", { name: "Delete" }));
     expect(screen.getByRole("dialog")).toBeTruthy();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -240,7 +245,8 @@ describe("failure and composer", () => {
       .mockRejectedValueOnce(new Error("disk full"));
     renderChat({ onDiscard });
     fireEvent(window, new CustomEvent("tailcat-test-select", { detail: { ids: ["b", "d"] } }));
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    const bar = await screen.findByRole("toolbar", { name: "2 selected" });
+    await user.click(within(bar).getByRole("button", { name: "Delete" }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
     expect(await screen.findByText("Could not delete some local messages.")).toBeTruthy();
