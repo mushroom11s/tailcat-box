@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ChatPage, { type ChatMessage, type ChatTransfer } from "./pages/ChatPage";
 import SettingsPage from "./pages/SettingsPage";
+import TunnelPage from "./pages/TunnelPage";
+import { parsePortMappings } from "./lib/ports";
 import { sameKeys, sameSessions } from "./lib/snapshot";
 import { useI18n } from "./i18n";
 import iconUrl from "./assets/icon.png";
@@ -24,8 +26,11 @@ import {
   sendChatText,
   sendChatVoice,
   setNetworkSettings,
+  startBrowse,
   startChatRoom,
+  startForward,
   startPing,
+  startPortServe,
   stopSession,
   tailcatVersion,
   type KeyInfo,
@@ -34,14 +39,14 @@ import {
 } from "./lib/wails";
 import { WindowSetTitle } from "../wailsjs/runtime/runtime";
 
-type Page = "chat" | "settings";
+type Page = "chat" | "tunnel" | "settings";
 type Theme = "system" | "light" | "dark";
 
 const THEME_KEY = "tailcat-theme";
 
-const NAV: Array<{ id: Page; labelKey: "navChat" | "navSettings" }> = [
+const NAV: Array<{ id: Exclude<Page, "settings">; labelKey: "navChat" | "navTunnel" }> = [
   { id: "chat", labelKey: "navChat" },
-  { id: "settings", labelKey: "navSettings" },
+  { id: "tunnel", labelKey: "navTunnel" },
 ];
 
 function applyTheme(theme: Theme): void {
@@ -89,6 +94,7 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [transfers, setTransfers] = useState<ChatTransfer[]>([]);
   const [roomError, setRoomError] = useState("");
+  const [tunnelError, setTunnelError] = useState("");
   const [liveSignal, setLiveSignal] = useState<{ seq: number; data: string } | null>(null);
   const [roomKey, setRoomKey] = useState("");
   const [appliedRoom, setAppliedRoom] = useState({ key: "", region: "", derp: "" });
@@ -268,6 +274,17 @@ export default function App() {
     }
   }
 
+  async function runTunnel(action: () => Promise<unknown>): Promise<void> {
+    setTunnelError("");
+    try {
+      await action();
+      await refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setTunnelError(message);
+    }
+  }
+
   async function run(action: () => Promise<unknown>): Promise<void> {
     try {
       await action();
@@ -319,7 +336,16 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-footer">{fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}</div>
+        <div className="sidebar-footer">
+          <button
+            type="button"
+            className={`nav-btn ${page === "settings" ? "active" : ""}`}
+            onClick={() => setPage("settings")}
+          >
+            {t("navSettings")}
+          </button>
+          {fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}
+        </div>
       </aside>
       <main className="glass main">
         {page === "chat" ? (
@@ -341,6 +367,16 @@ export default function App() {
             onResend={resendChatFile}
             onSave={saveChatFile}
             onRetry={retryRoom}
+          />
+        ) : page === "tunnel" ? (
+          <TunnelPage
+            sessions={sessions}
+            busy={false}
+            error={tunnelError}
+            onStartPorts={(spec) => void runTunnel(() => startPortServe(parsePortMappings(spec)))}
+            onForward={(addr, spec) => void runTunnel(() => startForward(addr, parsePortMappings(spec)))}
+            onBrowse={(addr) => void runTunnel(() => startBrowse(addr))}
+            onStop={(id) => void runTunnel(() => stopSession(id))}
           />
         ) : (
           <SettingsPage

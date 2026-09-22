@@ -30,7 +30,9 @@ describe("phase 1 chat shell", () => {
     renderApp();
 
     const nav = document.querySelectorAll(".nav-btn");
-    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["Chat", "Settings"]);
+    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["Chat", "Tunnel", "Settings"]);
+    expect(document.querySelector(".sidebar-footer .nav-btn")?.textContent).toBe("Settings");
+    expect(document.querySelector(".brand-mark")?.tagName).toBe("IMG");
     expect(screen.getByRole("heading", { name: "Tailcat Box" })).toBeTruthy();
 
     const copy = await screen.findByRole("button", { name: "Copy" });
@@ -54,7 +56,10 @@ describe("phase 1 chat shell", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("echo")).toBeTruthy();
     expect(screen.queryByText("hi")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Attach" })).toBeTruthy();
+    const attach = screen.getByRole("button", { name: "Attach" });
+    expect(attach.getAttribute("title")).toBe("Attach");
+    expect(attach.querySelector("svg")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send" }).getAttribute("title")).toBe("Send");
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
@@ -96,7 +101,10 @@ describe("phase 1 chat shell", () => {
     localStorage.setItem("tailcat-locale", "zh-CN");
     renderApp();
     const nav = document.querySelectorAll(".nav-btn");
-    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["聊天", "设置"]);
+    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["聊天", "穿透", "设置"]);
+    expect(document.querySelector(".sidebar-footer .nav-btn")?.textContent).toBe("设置");
+    expect(screen.getByRole("button", { name: "添加文件" }).getAttribute("title")).toBe("添加文件");
+    expect(screen.getByRole("button", { name: "发送" }).getAttribute("title")).toBe("发送");
   });
 
   it("does not import toolbox pages", () => {
@@ -129,6 +137,6 @@ describe("phase 1 chat shell", () => {
     });
     expect(screen.queryByText("Peer connected")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Services" })).toBeNull();
-    expect(document.querySelectorAll(".nav-btn").length).toBe(2);
+    expect(document.querySelectorAll(".nav-btn").length).toBe(3);
   });
 });

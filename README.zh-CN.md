@@ -15,6 +15,7 @@
 ## 功能
 
 - **聊天** — 开一个房间，交换 Tailcat 地址，发送文字、文件、语音，或实时语音、视频和共享屏幕
+- **穿透** — 监听 TCP 端口、转发到本机，或打开对方的网页端口
 - **设置** — 跟随系统 / 浅色 / 深色、中英文、密钥和 DERP、诊断、客户端和系统信息、开机时启动
 - **托盘** — macOS 和 Windows 上可以打开或退出（Linux 用应用菜单）。托盘图标和应用图标是同一只像素猫。关掉窗口只会藏起来，会话继续跑
 
@@ -153,7 +154,7 @@ git push origin v0.1.0
 - `internal/session` — 会话状态
 - `internal/store` — 命名密钥和网络设置
 - `internal/tray` — 打开、会话数量、退出
-- `frontend/` — 聊天和设置
+- `frontend/` — 聊天、穿透和设置
 
 Go module 路径仍是 `github.com/mushroom11s/tailcat-desktop-client`。
 

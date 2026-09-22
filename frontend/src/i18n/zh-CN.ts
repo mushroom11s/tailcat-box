@@ -9,6 +9,7 @@ export const zhCN = {
   brandTagline: "桌面版",
   brandName: "猫砂盆",
   navChat: "聊天",
+  navTunnel: "穿透",
   navConnect: "连接",
   navServices: "服务",
   navFiles: "文件",
@@ -25,6 +26,12 @@ export const zhCN = {
   langChinese: "简体中文",
   on: "开",
   off: "关",
+
+  tunnelTitle: "穿透",
+  tunnelLede: "把 TCP 端口挂到 Tailcat 地址上，转发到这台电脑，也可以打开对方的网页端口。",
+  tunnelServe: "端口监听",
+  tunnelForward: "本地转发",
+  tunnelBrowse: "浏览",
 
   settingsTitle: "设置",
   settingsLede: "改外观和语言，管理密钥，查看诊断。",

@@ -181,6 +181,12 @@ describe("phase 4 live media dock", () => {
       </LocaleProvider>,
     );
     expect(await screen.findByRole("button", { name: "Voice" })).toBeTruthy();
-    expect(Array.from(document.querySelectorAll(".nav-btn")).map((node) => node.textContent)).toEqual(["Chat", "Settings"]);
+    expect(Array.from(document.querySelectorAll(".nav-btn")).map((node) => node.textContent)).toEqual([
+      "Chat",
+      "Tunnel",
+      "Settings",
+    ]);
+    expect(screen.queryByRole("heading", { name: "Services" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Start SSH serve" })).toBeNull();
   });
 });

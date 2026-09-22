@@ -15,6 +15,7 @@ The app is **Tailcat Box**. In 简体中文 the product name is **猫砂盆**. T
 ## Features
 
 - **Chat** — open a room, exchange a Tailcat address, and send text, files, voice notes, or a live voice, video, or screen share
+- **Tunnel** — serve TCP ports, forward them to this machine, or browse the peer’s web port
 - **Settings** — system / light / dark theme, English and 简体中文, keys and DERP, diagnostics, client and system info, launch at login
 - **Tray** — Open and Quit on macOS and Windows (the app menu is the Linux fallback). The tray icon is the same pixel-art cat as the app icon. Closing the window hides it so sessions keep running
 
@@ -153,7 +154,7 @@ git push origin v0.1.0
 - `internal/session` — session state
 - `internal/store` — named keys and network settings
 - `internal/tray` — Open, session count, Quit
-- `frontend/` — Chat and Settings
+- `frontend/` — Chat, Tunnel, and Settings
 
 The Go module path is still `github.com/mushroom11s/tailcat-desktop-client`.
 

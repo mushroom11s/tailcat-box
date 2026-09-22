@@ -3,6 +3,7 @@ export const en = {
   brandTagline: "Desktop client",
   brandName: "Tailcat Box",
   navChat: "Chat",
+  navTunnel: "Tunnel",
   navConnect: "Connect",
   navServices: "Services",
   navFiles: "Files",
@@ -19,6 +20,12 @@ export const en = {
   langChinese: "简体中文",
   on: "On",
   off: "Off",
+
+  tunnelTitle: "Tunnel",
+  tunnelLede: "Serve TCP ports on a Tailcat address, forward them onto this machine, or browse the peer’s web port.",
+  tunnelServe: "Port serve",
+  tunnelForward: "Local forward",
+  tunnelBrowse: "Browse",
 
   settingsTitle: "Settings",
   settingsLede: "Appearance, language, keys, and diagnostics.",

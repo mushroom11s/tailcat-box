@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { ClipboardSetText, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import VoiceNote from "../components/VoiceNote";
 import { useI18n } from "../i18n";
@@ -608,34 +608,33 @@ export default function ChatPage({
       </div>
       {notice ? <p>{notice}</p> : null}
       {callView.error ? <p className="err">{localizeChatError(callView.error, t) || callView.error}</p> : null}
-      <div className="row">
-        <button className="btn" type="button" onClick={() => attach()}>
-          {t("chatAttach")}
-        </button>
-        <button
-          className="btn"
-          type="button"
-          aria-pressed={recording}
+      <div className="row composer-actions">
+        <IconButton label={t("chatAttach")} onClick={() => void attach()}>
+          <ClipIcon />
+        </IconButton>
+        <IconButton
+          label={recording ? t("chatRecording") : t("chatRecord")}
+          pressed={recording}
           onPointerDown={onMicDown}
           onMouseDown={onMicDown}
           onPointerUp={() => requestStop()}
           onMouseUp={() => requestStop()}
           onPointerCancel={() => requestStop()}
         >
-          {recording ? t("chatRecording") : t("chatRecord")}
-        </button>
-        <button className="btn" type="button" onClick={() => void placeCall("voice")}>
-          {t("chatCallVoice")}
-        </button>
-        <button className="btn" type="button" onClick={() => void placeCall("video")}>
-          {t("chatCallVideo")}
-        </button>
-        <button className="btn" type="button" onClick={() => void placeCall("screen")}>
-          {t("chatCallScreen")}
-        </button>
-        <button className="btn" type="button" onClick={() => send()}>
-          {t("send")}
-        </button>
+          <MicIcon />
+        </IconButton>
+        <IconButton label={t("chatCallVoice")} onClick={() => void placeCall("voice")}>
+          <PhoneIcon />
+        </IconButton>
+        <IconButton label={t("chatCallVideo")} onClick={() => void placeCall("video")}>
+          <VideoIcon />
+        </IconButton>
+        <IconButton label={t("chatCallScreen")} onClick={() => void placeCall("screen")}>
+          <ScreenIcon />
+        </IconButton>
+        <IconButton label={t("send")} onClick={() => void send()}>
+          <SendIcon />
+        </IconButton>
       </div>
       <input
         ref={fileRef}
@@ -814,6 +813,78 @@ function BubbleBody({
     );
   }
   return <p>{msg.body}</p>;
+}
+
+function IconButton({
+  label,
+  pressed,
+  onClick,
+  onPointerDown,
+  onMouseDown,
+  onPointerUp,
+  onMouseUp,
+  onPointerCancel,
+  children,
+}: {
+  label: string;
+  pressed?: boolean;
+  onClick?: () => void;
+  onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void;
+  onMouseDown?: (e: ReactMouseEvent<HTMLButtonElement>) => void;
+  onPointerUp?: () => void;
+  onMouseUp?: () => void;
+  onPointerCancel?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      className="btn icon-btn"
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed}
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      onMouseDown={onMouseDown}
+      onPointerUp={onPointerUp}
+      onMouseUp={onMouseUp}
+      onPointerCancel={onPointerCancel}
+    >
+      {children}
+    </button>
+  );
+}
+
+function StrokeIcon({ d }: { d: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" d={d} />
+    </svg>
+  );
+}
+
+function ClipIcon() {
+  return <StrokeIcon d="M16.5 7.5 10 14a2.5 2.5 0 0 1-3.5-3.5l7-7a4 4 0 0 1 5.7 5.7l-7.2 7.2a5.5 5.5 0 0 1-7.8-7.8L12 2.5" />;
+}
+
+function MicIcon() {
+  return <StrokeIcon d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" />;
+}
+
+function PhoneIcon() {
+  return <StrokeIcon d="M7 3h3l2 5-2.2 1.2a12 12 0 0 0 5 5L16 12l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 5 5a2 2 0 0 1 2-2z" />;
+}
+
+function VideoIcon() {
+  return <StrokeIcon d="M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8zM15 10.5 21 7v10l-6-3.5z" />;
+}
+
+function ScreenIcon() {
+  return <StrokeIcon d="M3 5h18v12H3zM8 21h8M12 17v4" />;
+}
+
+function SendIcon() {
+  return <StrokeIcon d="M4 12h14M13 6l6 6-6 6" />;
 }
 
 function BurnBadge({ caps, onDelete }: { caps: string[]; onDelete: () => Promise<void> | void }) {

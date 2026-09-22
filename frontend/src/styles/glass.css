@@ -343,6 +343,33 @@ textarea {
   cursor: not-allowed;
 }
 
+.composer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.icon-btn[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px #fff;
+}
+
 .btn-ghost {
   background: rgba(127, 127, 127, 0.16);
   color: var(--text);
