@@ -1107,7 +1107,7 @@ git commit -m "feat(chat): remove BurnBadge Delete; keep burn status copy"
 
 **Interfaces:**
 - Consumes: `onDiscard`, `setInline`, `chatSelectDeleteError`
-- Produces: on mid-batch failure — stop remaining calls (or continue; prefer **stop**), keep `multiSelectActive`, set inline error to `t("chatSelectDeleteError")` (or localized underlying message), remove successfully discarded ids from `selectedIds`, keep failed id selected; sending via composer does not call `exitMultiSelect`
+- Produces: on mid-batch failure — **stop** remaining calls, keep `multiSelectActive`, set inline error to `t("chatSelectDeleteError")`, remove successfully discarded ids from `selectedIds`, keep failed id selected; sending via composer does not call `exitMultiSelect`
 
 - [ ] **Step 1: Write the failing test**
 
