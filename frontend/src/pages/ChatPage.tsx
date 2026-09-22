@@ -122,6 +122,9 @@ export default function ChatPage({
   const [burnOn, setBurnOn] = useState(false);
   const [viewer, setViewer] = useState<{ id: string; left: number | null } | null>(null);
   const [recording, setRecording] = useState(false);
+  const [multiSelectActive, setMultiSelectActive] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const captureRef = useRef<VoiceCapture | null>(null);
   const holdRef = useRef<number | null>(null);
   const pendingRef = useRef(false);
@@ -159,6 +162,25 @@ export default function ChatPage({
     });
   }
   burnRef.current = burnOn;
+
+  function fillN(template: string, n: number): string {
+    return template.replaceAll("{n}", String(n));
+  }
+
+  function exitMultiSelect(): void {
+    setMultiSelectActive(false);
+    setSelectedIds(new Set());
+    setConfirmOpen(false);
+  }
+
+  function applySelection(next: Set<string>): void {
+    if (next.size === 0) {
+      exitMultiSelect();
+      return;
+    }
+    setMultiSelectActive(true);
+    setSelectedIds(next);
+  }
 
   async function reportStatus(status: string): Promise<void> {
     if (status === "replaced") {
@@ -261,12 +283,55 @@ export default function ChatPage({
       if (event.key !== "Escape") {
         return;
       }
+      if (confirmOpen || multiSelectActive) {
+        return;
+      }
       void onDiscard?.(viewer.id);
       setViewer(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [viewer, onDiscard]);
+  }, [viewer, onDiscard, confirmOpen, multiSelectActive]);
+
+  useEffect(() => {
+    if (import.meta.env.MODE !== "test") {
+      return;
+    }
+    function onSeed(ev: Event): void {
+      const detail = (ev as CustomEvent<{ ids: string[] }>).detail;
+      const ids = detail?.ids ?? [];
+      if (ids.length === 0) {
+        setMultiSelectActive(false);
+        setSelectedIds(new Set());
+        setConfirmOpen(false);
+        return;
+      }
+      setMultiSelectActive(true);
+      setSelectedIds(new Set(ids));
+    }
+    window.addEventListener("tailcat-test-select", onSeed);
+    return () => window.removeEventListener("tailcat-test-select", onSeed);
+  }, []);
+
+  useEffect(() => {
+    if (!multiSelectActive) {
+      return;
+    }
+    function onKey(ev: KeyboardEvent): void {
+      if (ev.key !== "Escape") {
+        return;
+      }
+      if (confirmOpen) {
+        setConfirmOpen(false);
+        return;
+      }
+      setMultiSelectActive(false);
+      setSelectedIds(new Set());
+      setConfirmOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [multiSelectActive, confirmOpen]);
 
   async function connect(): Promise<void> {
     const addr = draftPeer.trim();
@@ -520,6 +585,22 @@ export default function ChatPage({
         </button>
       </div>
       <div className="chat-stage">
+      <div className="chat-transcript-column">
+      {selectedIds.size >= 1 ? (
+        <div
+          className="chat-select-bar"
+          role="toolbar"
+          aria-label={fillN(t("chatSelectCount"), selectedIds.size)}
+        >
+          <span>{fillN(t("chatSelectCount"), selectedIds.size)}</span>
+          <button className="btn" type="button" onClick={() => setConfirmOpen(true)}>
+            {t("chatSelectDelete")}
+          </button>
+          <button className="btn" type="button" onClick={() => exitMultiSelect()}>
+            {t("chatSelectClose")}
+          </button>
+        </div>
+      ) : null}
       <div className="chat-log">
         {messages.length === 0 ? <p className="lede">{t("chatEmptyLede")}</p> : null}
         {messages.map((msg) =>
@@ -566,6 +647,7 @@ export default function ChatPage({
             ) : null}
           </p>
         ))}
+      </div>
       </div>
       {callView.phase !== "idle" ? (
         <aside className={`glass media-dock${callView.expanded ? " expanded" : ""}`} role="complementary" aria-label={t("chatMediaDock")}>
