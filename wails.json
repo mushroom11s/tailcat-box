@@ -1,7 +1,7 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "tailcat-desktop-client",
-  "outputfilename": "tailcat-desktop-client",
+  "name": "tailcat-box",
+  "outputfilename": "tailcat-box",
   "frontend:install": "npm install",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
@@ -9,5 +9,9 @@
   "author": {
     "name": "mushroom11s",
     "email": "28756933+mushroom11s@users.noreply.github.com"
+  },
+  "info": {
+    "productName": "Tailcat Box",
+    "comments": "Desktop GUI for Tailscale Tailcat"
   }
 }

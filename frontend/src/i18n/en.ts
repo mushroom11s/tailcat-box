@@ -1,4 +1,5 @@
 export const en = {
+  productName: "Tailcat Box",
   brandTagline: "Desktop client",
   brandName: "Tailcat Box",
   navChat: "Chat",
@@ -22,7 +23,7 @@ export const en = {
   settingsTitle: "Settings",
   settingsLede: "Appearance, language, keys, and diagnostics.",
   appearance: "Appearance",
-  clientInfoTitle: "Tailcat Client Info",
+  clientInfoTitle: "About Tailcat Box",
   uptime: "Uptime",
   appVersion: "App version",
   tailcatVersion: "Tailcat version",

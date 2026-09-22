@@ -137,11 +137,13 @@ textarea {
 }
 
 .brand-mark {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: linear-gradient(160deg, #7dd3fc, #2563eb 55%, #7c3aed);
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: transparent;
 }
 
 .brand h1 {

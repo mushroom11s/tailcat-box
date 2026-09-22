@@ -91,4 +91,6 @@ export function StopChatRoom():Promise<void>;
 
 export function StopSession(arg1:string):Promise<void>;
 
+export function SetUILocale(arg1:string):Promise<void>;
+
 export function TailcatVersion():Promise<string>;

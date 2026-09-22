@@ -5,6 +5,7 @@ import type { MessageKey } from "./en";
  * 专有名词可保留英文：Tailcat、Ping、EventData、SFTP、TCP、HTTP、JSON、DERP。
  */
 export const zhCN = {
+  productName: "猫砂盆",
   brandTagline: "桌面版",
   brandName: "猫砂盆",
   navChat: "聊天",
@@ -28,7 +29,7 @@ export const zhCN = {
   settingsTitle: "设置",
   settingsLede: "改外观和语言，管理密钥，查看诊断。",
   appearance: "外观",
-  clientInfoTitle: "Tailcat 客户端信息",
+  clientInfoTitle: "关于猫砂盆",
   uptime: "已运行",
   appVersion: "软件版本",
   tailcatVersion: "Tailcat 版本",

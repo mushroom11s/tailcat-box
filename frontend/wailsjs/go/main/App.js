@@ -177,3 +177,7 @@ export function StopSession(arg1) {
 export function TailcatVersion() {
   return window['go']['main']['App']['TailcatVersion']();
 }
+
+export function SetUILocale(arg1) {
+  return window['go']['main']['App']['SetUILocale'](arg1);
+}

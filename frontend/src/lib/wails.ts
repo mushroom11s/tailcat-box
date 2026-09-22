@@ -42,6 +42,7 @@ import {
   GetSystemInfo as bindGetSystemInfo,
   RecordUpdateCheck as bindRecordUpdateCheck,
   SetLaunchAtLogin as bindSetLaunchAtLogin,
+  SetUILocale as bindSetUILocale,
 } from "../../wailsjs/go/main/App";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { adapter, main, session, store } from "../../wailsjs/go/models";
@@ -1049,6 +1050,12 @@ export async function recordUpdateCheck(): Promise<ClientInfo> {
   }
   fake.lastUpdateCheck = new Date().toISOString();
   return fakeClientInfo();
+}
+
+export async function setUILocale(locale: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSetUILocale(locale);
+  }
 }
 
 export async function setLaunchAtLogin(enabled: boolean): Promise<SystemInfo> {

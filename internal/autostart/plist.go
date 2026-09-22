@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	appName = "Tailcat"
+	appName = "Tailcat Box"
 	label   = "com.mushroom11s.tailcat-desktop-client"
 )
 

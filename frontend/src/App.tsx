@@ -3,6 +3,7 @@ import ChatPage, { type ChatMessage, type ChatTransfer } from "./pages/ChatPage"
 import SettingsPage from "./pages/SettingsPage";
 import { sameKeys, sameSessions } from "./lib/snapshot";
 import { useI18n } from "./i18n";
+import iconUrl from "./assets/icon.png";
 import { localizeChatError } from "./lib/chatText";
 import {
   connectChatPeer,
@@ -119,9 +120,9 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    document.title = t("brandName");
+    document.title = t("productName");
     if (hasWailsBindings()) {
-      WindowSetTitle(t("brandName"));
+      WindowSetTitle(t("productName"));
     }
   }, [t]);
 
@@ -300,9 +301,9 @@ export default function App() {
     <div className="shell">
       <aside className="glass sidebar">
         <div className="brand">
-          <div className="brand-mark" aria-hidden="true" />
+          <img className="brand-mark" src={iconUrl} alt="" />
           <div>
-            <h1>{t("brandName")}</h1>
+            <h1>{t("productName")}</h1>
             <p>{t("brandTagline")}</p>
           </div>
         </div>

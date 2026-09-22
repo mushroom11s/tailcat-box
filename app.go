@@ -27,7 +27,19 @@ import (
 const (
 	tailcatEventName    = "tailcat:event"
 	updateCheckInterval = 24 * time.Hour
+	configDirName       = "tailcat-box"
+	legacyConfigDirName = "tailcat-desktop-client"
 )
+
+// productTitle is the window, menu, and tray name for a UI locale.
+func productTitle(locale string) string {
+	switch strings.ToLower(strings.TrimSpace(locale)) {
+	case "zh-cn", "zh":
+		return "猫砂盆"
+	default:
+		return "Tailcat Box"
+	}
+}
 
 // App is the Wails-bound application. The UI talks only to these methods.
 type App struct {
@@ -72,11 +84,11 @@ func newKeyStore() *store.Store {
 	if dir := os.Getenv("TAILCAT_KEYS_DIR"); dir != "" {
 		return store.New(dir)
 	}
-	conf, err := os.UserConfigDir()
+	root, conf, err := appConfigDir()
 	if err != nil {
 		return store.New("keys")
 	}
-	s := store.New(filepath.Join(conf, "tailcat-desktop-client", "keys"))
+	s := store.New(filepath.Join(root, "keys"))
 	s.ExtraDir = filepath.Join(conf, "tailcat", "keys")
 	return s
 }
@@ -84,11 +96,11 @@ func newKeyStore() *store.Store {
 func newSettingsStore() *settings.Store {
 	dir := os.Getenv("TAILCAT_SETTINGS_DIR")
 	if dir == "" {
-		conf, err := os.UserConfigDir()
+		root, _, err := appConfigDir()
 		if err != nil {
 			dir = "settings"
 		} else {
-			dir = filepath.Join(conf, "tailcat-desktop-client")
+			dir = root
 		}
 	}
 	s, err := settings.Load(dir)
@@ -96,6 +108,50 @@ func newSettingsStore() *settings.Store {
 		return settings.New(dir)
 	}
 	return s
+}
+
+// chooseConfigDir picks the app config directory. New installs use nextName.
+// An existing legacyName directory is kept when nextName does not exist yet.
+func chooseConfigDir(base, nextName, legacyName string, exists func(string) bool) string {
+	next := filepath.Join(base, nextName)
+	if exists(next) {
+		return next
+	}
+	legacy := filepath.Join(base, legacyName)
+	if exists(legacy) {
+		return legacy
+	}
+	return next
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+// appConfigDir returns the config root and the OS user-config directory.
+// The root is <user-config>/tailcat-box, or the legacy tailcat-desktop-client
+// directory when that is the only one present.
+func appConfigDir() (root string, userConfig string, err error) {
+	userConfig, err = os.UserConfigDir()
+	if err != nil {
+		return "", "", err
+	}
+	root = chooseConfigDir(userConfig, configDirName, legacyConfigDirName, dirExists)
+	return root, userConfig, nil
+}
+
+// SetUILocale applies the product name for locale to the window, app menu, and tray.
+func (a *App) SetUILocale(locale string) {
+	title := productTitle(locale)
+	if a.tray != nil {
+		a.tray.SetProductName(title, title)
+	}
+	if a.ctx == nil {
+		return
+	}
+	runtime.WindowSetTitle(a.ctx, title)
+	runtime.MenuSetApplicationMenu(a.ctx, a.applicationMenu(title))
 }
 
 // NewApp creates a new App application struct.
@@ -116,6 +172,7 @@ func NewApp() *App {
 		chat:       chatSvc,
 		keys:       keys,
 		settings:   newSettingsStore(),
+		trayIcon:   tray.DefaultIcon,
 		startedAt:  time.Now(),
 	}
 }
@@ -126,9 +183,9 @@ func chatDataDir() string {
 	}
 	conf, err := os.UserConfigDir()
 	if err != nil {
-		return filepath.Join(".", "tailcat-desktop-client")
+		return filepath.Join(".", configDirName, "chat")
 	}
-	return filepath.Join(conf, "tailcat-desktop-client")
+	return filepath.Join(conf, configDirName, "chat")
 }
 
 // startup is called when the app starts. The context is saved

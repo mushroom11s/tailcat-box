@@ -1,67 +1,37 @@
-# Tailcat Desktop Client
+# Tailcat Box
 
-Full-featured desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on **macOS** and **Windows**.
+[中文说明](README.zh-CN.md)
 
-**Plan 1 status: complete.** The app can start an ephemeral pipe serve, copy the Tailcat address, dial that address, and transfer a short text payload using the embedded `github.com/tailscale/tailcat` library (pinned at **v0.7.0**).
+Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on macOS and Windows, built with [Wails](https://wails.io) v2 (Go + React + TypeScript).
 
-**Plan 2 status: complete.** Services can serve TCP port mappings; Connect can forward local ports and browse a served HTTP port; Keys & Addresses can create/list/delete named keys and parse/resolve addresses; Diagnostics can ping (including until-direct).
+[![CI](https://github.com/mushroom11s/tailcat-desktop-client/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-desktop-client/actions/workflows/ci.yml)
 
-**Plan 3 status: complete.** Files can recv into an inbox, send/copy to a peer, serve a directory over SFTP, and list remote paths (fake + real adapter). Session lists stay visually stable across poll refreshes. The main pane uses a thin glass scrollbar (light/dark). UI chrome is English or 简体中文 (`zh-CN`) from the language switcher (Settings or sidebar as in current UI; persisted; defaults from the OS/browser locale).
+<p align="center">
+  <img src="docs/assets/icon.png" alt="Tailcat Box" width="256" />
+</p>
 
-**Plan 4 status: complete.** Services can serve keyed SSH, no-auth SSH (with a typed CONFIRM gate), exit-node, and per-connection exec. Connect can run an SSH command and start a SOCKS5 proxy. Keys can persist DERP region / map URL. A tray/menu offers Open + Quit (native tray on macOS/Windows; Linux uses the app menu).
+The app is **Tailcat Box**. In 简体中文 the product name is **猫砂盆**. The GitHub repository stays `tailcat-desktop-client`.
 
-- Shell: [Wails](https://wails.io) v2 (Go + React + TypeScript)
-- Engine: embedded `github.com/tailscale/tailcat` (UI never imports Tailcat types)
-- UI: Apple-inspired / Liquid Glass style (CSS blur/translucency; light/dark; thin glass scrollbars)
-- i18n: English + 简体中文 (`zh-CN`); language switcher next to theme (Settings or sidebar as in current UI); `localStorage` `tailcat-locale`
-- Android: planned later (not v1)
+## Features
 
-## Docs
+- **Chat** — open a room, exchange a Tailcat address, and send text, files, voice notes, or a live voice, video, or screen share
+- **Settings** — system / light / dark theme, English and 简体中文, keys and DERP, diagnostics, client and system info, launch at login
+- **Tray** — Open and Quit on macOS and Windows (the app menu is the Linux fallback). The tray icon is the same pixel-art cat as the app icon. Closing the window hides it so sessions keep running
 
-- [Design spec](docs/superpowers/specs/2026-09-21-tailcat-desktop-client-design.md)
-- [Tailcat Box chat design](docs/superpowers/specs/2026-09-22-tailcat-box-chat-design.md)
-- [Plan 1: Foundation vertical slice](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-1.md)
-- [Plan 2: Ports, keys, ping](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-2.md)
-- [Plan 3: Files](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-3.md)
-- [Plan 4: SSH, SOCKS, exit-node, exec, DERP, tray](docs/superpowers/plans/2026-09-21-tailcat-desktop-client-plan-4.md)
-- [Plans index](docs/superpowers/plans/README.md)
-- [Release notes (draft v0.1.0)](docs/releases/v0.1.0.md)
+The UI talks to a Go service layer. Only `internal/adapter` imports `github.com/tailscale/tailcat` (pinned at **v0.7.0**).
 
-## Prerequisites
-
-Install these on the machine you will build or run from (macOS or Windows):
+## Requirements
 
 | Tool | Notes |
 | --- | --- |
-| **Go 1.27.1+** | Required by `github.com/tailscale/tailcat` v0.7.0. Wails v2.16 needs Go 1.25+. Older local Go can still bootstrap via `GOTOOLCHAIN=auto`. |
-| **Node.js 18+** and npm | Frontend is Vite + React + TypeScript under `frontend/`. |
+| **Go 1.27.1+** | Required by `github.com/tailscale/tailcat` v0.7.0. Wails v2.16 needs Go 1.25+. Older local Go can still bootstrap with `GOTOOLCHAIN=auto`. |
+| **Node.js 18+** and npm | Frontend is Vite + React + TypeScript in `frontend/`. |
 | **Wails CLI v2** | `go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0` |
-| **Platform webview toolchain** | macOS: Xcode Command Line Tools. Windows: WebView2 (usually already present). |
-
-Confirm the CLI:
+| **Platform webview** | macOS: Xcode Command Line Tools. Windows: WebView2 (usually already installed). |
 
 ```bash
 wails doctor
 ```
-
-## Fake vs real adapter
-
-The default backend is the real Tailcat library (`adapter.NewReal()`). It uses public DERP relays by default (see upstream stability notes).
-
-For offline UI demos and automated tests:
-
-```bash
-TAILCAT_ADAPTER=fake wails dev
-```
-
-| Mode | How | Behavior |
-| --- | --- | --- |
-| **Real** (default) | `wails dev` / `wails build` | Serve prints a `tc…` address; Connect dials TCP port **1** (same port as bare `tailcat <addr>`). Port serve proxies mapped TCP ports; forward/browse listen on localhost; ping uses disco pings (DERP then direct when possible). Files recv/serve use SFTP on TCP port **22** (`SSHConnHandler` + `FileService`); copy/ls speak SFTP over that port. SSH serve uses port **22** (`SSHConnHandler`); SSH client runs a command over that port. SOCKS listens locally and dials via the peer (including exit-node IPs). Exit-node sets `OnTCPForward` / `OnUDPForward`. Exec uses `ExecConnHandler`. Parse/resolve call the library. Region / DERP map URL from Keys are applied to subsequent starts. |
-| **Fake** | `TAILCAT_ADAPTER=fake` | Pipe address is `tc:fake-<sessionID>`; port serve is `tc:fake-port-<sessionID>`; dial replies with `echo:<payload>`; ping emits DERP then direct `EventData` lines. Recv is `tc:fake-recv-<sessionID>` and emits a drop notification; files serve is `tc:fake-files-<sessionID>`; copy emits progress then closes; ls returns stub `hello.txt` and `photos/`. SSH serve is `tc:fake-ssh-<id>` or `tc:fake-noauth-ssh-<id>`; SSH client echoes the command; SOCKS reports `socks5h://…`; exit-node is `tc:fake-exit-<id>`; exec is `tc:fake-exec-<id>`. Parse returns stub JSON; resolve returns `tc:fake-resolved`. No network. |
-
-`vite` / `npm run dev` without Wails has no Go bindings. The UI then uses an in-browser fake that matches the Go fake, and shows an “In-browser fake adapter” chip.
-
-Named keys are stored as `*.private.json` under the app config dir (`<user-config>/tailcat-desktop-client/keys`). Override with `TAILCAT_KEYS_DIR`. The Keys page also lists `~/.config/tailcat/keys` (or the OS equivalent) for CLI import.
 
 ## Develop
 
@@ -71,36 +41,33 @@ From the repository root:
 wails dev
 ```
 
-Offline (no DERP):
+Offline, with no DERP traffic:
 
 ```bash
 TAILCAT_ADAPTER=fake wails dev
 ```
 
-On Linux Cloud Agent VMs / Ubuntu 24.04 (WebKitGTK 4.1 only):
+On Linux (including Ubuntu 24.04, where only WebKitGTK 4.1 is available):
 
 ```bash
 TAILCAT_ADAPTER=fake wails dev -tags webkit2_41
 ```
 
+`npm run dev` inside `frontend/` has no Go bindings. The UI falls back to an in-browser fake and shows an “In-browser fake adapter” chip.
+
 ## Build
 
-From the repository root, on the OS you want a binary for:
+On the OS you want a binary for:
 
 ```bash
 wails build
 ```
 
-The native binary is written to `build/bin/`. Product targets are **macOS and Windows**.
+The binary is `build/bin/tailcat-box` (`.app` on macOS, `.exe` on Windows). macOS and Windows are the product targets.
 
-Linux is not a Plan 1 product target. On Ubuntu 24.04, `wails doctor` may still report `libwebkit` missing even when WebKitGTK 4.1 is installed:
+Linux is not a shipped target. On Ubuntu 24.04 you can still build with `wails build -tags webkit2_41` after installing `libgtk-3-dev` and `libwebkit2gtk-4.1-dev`.
 
-```bash
-sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev
-wails build -tags webkit2_41
-```
-
-Frontend-only (no desktop window):
+Frontend only:
 
 ```bash
 cd frontend
@@ -108,36 +75,61 @@ npm install
 npm run build
 ```
 
-## Tests
-
-Unit tests (must pass; does **not** include the real-adapter integration test):
+## Test
 
 ```bash
 go test ./...
 cd frontend && npm run build
 ```
 
-Optional integration test (real adapter, public DERP, build tag `integration`):
+`go test ./...` does not include the real-adapter integration test. That one needs outbound HTTPS/UDP to Tailcat DERP and is optional:
 
 ```bash
 go test -tags=integration ./internal/adapter/ -v -count=1
 ```
 
-This starts an in-process pipe serve, dials it, and asserts the echoed payload. It needs outbound HTTPS/UDP to Tailcat DERP (`https://tailcat.dev/derpmap.json` and the selected relay). Skip or expect failure on locked-down networks.
+## Fake vs real adapter
 
-## GitHub Actions and releases
+The default backend is the embedded Tailcat library. It uses public DERP relays.
 
-Public-repo Actions minutes on GitHub-hosted `ubuntu-latest`, `macos-latest`, and `windows-latest` runners are included with GitHub’s free plan for public repositories. This project does **not** use larger runners.
+| | Real (default) | Fake (`TAILCAT_ADAPTER=fake`) |
+| --- | --- | --- |
+| How | `wails dev` / `wails build` | `TAILCAT_ADAPTER=fake wails dev` |
+| Network | Public DERP | None |
+| Pipe | Prints a `tc…` address. Connect dials TCP port **1** (same as bare `tailcat <addr>`). | Address `tc:fake-<id>`. Dial replies `echo:<payload>`. |
+| Ports | Port serve proxies the mappings. Forward and browse listen on localhost. | Address `tc:fake-port-<id>`. |
+| Files | Recv and serve use SFTP on TCP port **22**. | Recv, serve, copy, and ls return stub addresses and listings. |
+| SSH, SOCKS, exit node, exec | SSH uses port **22**. SOCKS dials through the peer. Exit node and exec use the library handlers. | Deterministic `tc:fake-…` addresses and a local SOCKS URL. |
+| Keys and DERP | Parse and resolve call the library. Saved region / map URL apply to later sessions. | Parse returns stub JSON. Resolve returns `tc:fake-resolved`. |
+| Ping | Disco pings (DERP, then direct when possible). | Emits DERP, then direct, `EventData` lines. |
+
+## Configuration
+
+New installs store keys and settings under `<user-config>/tailcat-box` (keys are `*.private.json` in `keys/`).
+
+| OS | Typical path |
+| --- | --- |
+| macOS | `~/Library/Application Support/tailcat-box` |
+| Windows | `%AppData%\tailcat-box` |
+| Linux | `~/.config/tailcat-box` |
+
+If `<user-config>/tailcat-desktop-client` already exists and `tailcat-box` does not, the app keeps using the old directory for keys and settings. Move or rename that folder to `tailcat-box` when you want the new path. Override those directories with `TAILCAT_KEYS_DIR` and `TAILCAT_SETTINGS_DIR`. Chat files are stored in `<user-config>/tailcat-box/chat` (override with `TAILCAT_CHAT_DIR`).
+
+The Keys page also lists the Tailcat CLI key directory (`~/.config/tailcat/keys`, or the OS equivalent) so you can import those keys.
+
+## Releases
+
+Public GitHub-hosted runners (`ubuntu-latest`, `macos-latest`, `windows-latest`) are enough. This project does not use larger runners.
 
 | Workflow | When | What |
 | --- | --- | --- |
-| [CI](.github/workflows/ci.yml) | Pull requests and pushes to `main` | `go test ./...` and `frontend` `npm ci` + `npm run build` on **ubuntu-latest** (no Wails window) |
-| [Release](.github/workflows/release.yml) | `v*` tags, or manual **Run workflow** | `wails build` on **macOS** and **Windows**, zip `build/bin`, upload artifacts; on a real tag, create a GitHub Release |
+| [CI](.github/workflows/ci.yml) | Pull requests and pushes to `main` | `go test ./...` and `frontend` `npm ci` + `npm run build` on ubuntu-latest |
+| [Release](.github/workflows/release.yml) | `v*` tags, or **Run workflow** | `wails build` on macOS and Windows, zip `build/bin`, and on a real tag publish a GitHub Release |
 
-### Cut a release
+To cut a release:
 
-1. Put notes in `docs/releases/vX.Y.Z.md` (see [template](docs/releases/README.md)) and merge that commit to `main`.
-2. Tag the merged commit and push **only that tag** (do not rewrite tags):
+1. Add notes at `docs/releases/vX.Y.Z.md` (see [template](docs/releases/README.md)) and merge that commit to `main`.
+2. Tag the merged commit and push only that tag:
 
 ```bash
 git checkout main
@@ -146,99 +138,25 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-3. The Release workflow builds unsigned macOS (`.app`) and Windows (`.exe`) zips named `tailcat-desktop-client-macos-…` and `tailcat-desktop-client-windows-…`, then attaches them to a GitHub Release. Body text comes from `docs/releases/<tag>.md` when that file exists.
+3. The workflow builds unsigned macOS (`.app`) and Windows (`.exe`) zips named `tailcat-box-macos-…` and `tailcat-box-windows-…`, then attaches them to the GitHub Release. The body is `docs/releases/<tag>.md` when that file exists.
 
-To verify the workflow **without** publishing, use **Actions → Release → Run workflow** with **dry_run** checked (the default). Uncheck dry_run only when you intend to publish, and supply a `v*` tag.
+**Actions → Release → Run workflow** with **dry_run** checked (the default) builds artifacts without publishing. Uncheck dry_run only when you mean to publish, and supply a `v*` tag.
 
-`macos-latest` is currently Apple Silicon; Intel Mac and Windows ARM64 are not built. Binaries are **unsigned** (no Apple notarization, no Authenticode). Gatekeeper and SmartScreen warnings are expected.
-
-## Plan 1 acceptance
-
-Automated (this repo / CI-friendly):
-
-- [x] `go test ./...` without the `integration` tag
-- [x] Fake adapter env override (`TAILCAT_ADAPTER=fake`)
-- [x] Real adapter compiles; default is `NewReal()`
-- [x] Frontend `npm run build`
-- [x] Isolation: only `internal/adapter` imports `github.com/tailscale/tailcat`
-
-Manual on **macOS or Windows** (cannot be fully exercised as a native Wails window on a headless Linux agent):
-
-- [ ] Cold start the desktop app
-- [ ] Services → Start ephemeral pipe serve → address visible → Copy
-- [ ] Connect → paste address, payload `hello`, Send → result panel shows payload (`echo:hello` on fake; raw `hello` on real, which echoes)
-- [ ] Stop sessions cleanly
-- [ ] Repeat the serve+dial path with the real adapter (default) on a normal network
-- [ ] Optional: interop with the official `tailcat` CLI using port 1 / bare dial
-
-## Plan 2 acceptance
-
-Automated (this repo / CI-friendly):
-
-- [x] `go test ./...` without the `integration` tag
-- [x] Fake adapter env override (`TAILCAT_ADAPTER=fake`)
-- [x] Real adapter compiles; default is `NewReal()`
-- [x] Frontend `npm run build`
-- [x] Isolation: only `internal/adapter` imports `github.com/tailscale/tailcat`
-- [x] Port serve → forward / browse / ping / keys / parse / resolve on the fake path
-
-Manual on **macOS or Windows** (cannot be fully exercised as a native Wails window on a headless Linux agent):
-
-- [ ] Services → Start port serve (`8080` or `5555:host:port`) → address visible → Copy
-- [ ] Connect → Forward mappings against that address; Browse port 80
-- [ ] Keys & Addresses → create named key, copy address, delete; parse/resolve JSON
-- [ ] Diagnostics → ping with until-direct → EventData log shows progress lines
-- [ ] Repeat port/forward/ping with the real adapter (default) on a normal network
-
-## Plan 3 acceptance
-
-Automated (this repo / CI-friendly):
-
-- [x] `go test ./...` without the `integration` tag
-- [x] Fake adapter env override (`TAILCAT_ADAPTER=fake`)
-- [x] Real adapter compiles; default is `NewReal()`
-- [x] Frontend `npm run build`
-- [x] Isolation: only `internal/adapter` imports `github.com/tailscale/tailcat`
-- [x] Recv / copy / files-serve / list-remote on the fake path
-- [x] Session list order is stable across repeated `List()` polls
-- [x] Windows-safe `npm run build` (Node writes `dist/.keep`; no `touch`)
-
-Manual on **macOS or Windows** (cannot be fully exercised as a native Wails window on a headless Linux agent):
-
-- [ ] Files → Start recv inbox → address visible; drop notification / progress on fake
-- [ ] Files → Start files serve → Copy address → List remote shows entries; Send a local file
-- [ ] Services → files-serve shortcut; multi-row session list stays still while polling
-- [ ] Repeat recv/serve/copy with the real adapter (default) on a normal network
-
-## Plan 4 acceptance
-
-Automated (this repo / CI-friendly):
-
-- [x] `go test ./...` without the `integration` tag
-- [x] Fake adapter env override (`TAILCAT_ADAPTER=fake`)
-- [x] Real adapter compiles; default is `NewReal()`
-- [x] Frontend `npm run build`
-- [x] Isolation: only `internal/adapter` imports `github.com/tailscale/tailcat`
-- [x] SSH serve refuses no-auth without `confirmDangerous`
-- [x] SOCKS / exit-node / exec / SSH client on the fake path
-- [x] DERP region / map URL persist in the key store directory
-- [x] Windows-safe `npm run build` (Node writes `dist/.keep`; no `touch`)
-
-Manual on **macOS or Windows** (cannot be fully exercised as a native Wails window on a headless Linux agent):
-
-- [ ] Services → SSH serve with authorized keys; no-auth SSH requires typing `CONFIRM`
-- [ ] Connect → SSH command against that address; SOCKS listen URL appears
-- [ ] Services → exit-node and exec; Diagnostics lists them as wired
-- [ ] Keys → save region / DERP map URL
-- [ ] Tray or app menu: Open shows the window; Quit exits. Closing the window hides it (`HideWindowOnClose`) so sessions can keep running.
-- [ ] Linux: app menu Open/Quit is the tray fallback (no libayatana requirement in unit tests)
+`macos-latest` is Apple Silicon today. Intel Mac and Windows ARM64 are not built. Binaries are unsigned (no Apple notarization, no Authenticode), so Gatekeeper and SmartScreen warnings are expected.
 
 ## Layout
 
 - `main.go` / `app.go` — Wails entry and JS bindings
-- `internal/session` — session state machine
-- `internal/service` — StartPipeServe / DialPipe / StartPortServe / StartForward / StartBrowse / StartPing / StartRecv / StartCopy / StartFilesServe / ListRemote / StartSSHServe / StartSSHClient / StartSOCKS / StartExitNode / StartExec / ParseAddr / ResolveAddr / Stop / List / Events
-- `internal/store` — named key files (`*.private.json`) and `settings.json` (region / DERP map URL)
-- `internal/adapter` — `TailcatAdapter` plus fake and real implementations
-- `internal/tray` — Open / session count / Quit (native systray on macOS/Windows; stub + app menu on Linux)
-- `frontend/` — glass shell, Connect, Services, Files, Keys, Diagnostics, Settings
+- `internal/adapter` — Tailcat adapter, fake and real
+- `internal/chat` — room, files, voice notes, and live media
+- `internal/service` — session commands (pipe, ports, files, SSH, SOCKS, exit node, exec, ping)
+- `internal/session` — session state
+- `internal/store` — named keys and network settings
+- `internal/tray` — Open, session count, Quit
+- `frontend/` — Chat and Settings
+
+The Go module path is still `github.com/mushroom11s/tailcat-desktop-client`.
+
+## Credits
+
+Tailcat Box is a desktop client for [Tailscale Tailcat](https://github.com/tailscale/tailcat).
