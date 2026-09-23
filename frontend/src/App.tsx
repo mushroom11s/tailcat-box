@@ -17,6 +17,7 @@ import {
   listKeys,
   listSessions,
   onTailcatEvent,
+  onTrayNavigate,
   resendChatFile,
   restartChatRoom,
   saveChatFile,
@@ -130,6 +131,14 @@ export default function App() {
       node.scrollTop = 0;
     }
   }, [page]);
+
+  useEffect(() => {
+    return onTrayNavigate((page) => {
+      if (page === "chat" || page === "tunnel" || page === "settings") {
+        setPage(page);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     void refresh();

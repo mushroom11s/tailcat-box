@@ -3,12 +3,14 @@ package main
 import (
 	"encoding/base64"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mushroom11s/tailcat-box/internal/adapter"
 	"github.com/mushroom11s/tailcat-box/internal/session"
+	"github.com/wailsapp/wails/v2/pkg/menu"
 )
 
 func TestStartPipeServeReturnsSession(t *testing.T) {
@@ -425,6 +427,51 @@ func TestStartupMenuSkipsInWindowBar(t *testing.T) {
 		t.Fatal("windows and linux must not install an in-window menu bar")
 	}
 	a.syncApplicationMenu(productTitle("zh-CN"))
+}
+
+func TestApplicationMenuLocalizesActions(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	t.Setenv("TAILCAT_SETTINGS_DIR", t.TempDir())
+	a := NewApp()
+	a.SetUILocale("zh-CN")
+	if got := menuActionLabels(a.applicationMenu(productTitle("zh-CN"))); !reflect.DeepEqual(got, []string{"打开", "隐藏", "聊天", "穿透", "设置", "退出"}) {
+		t.Fatalf("zh=%v", got)
+	}
+	a.SetUILocale("en")
+	m := a.applicationMenu(productTitle("en"))
+	if got := menuActionLabels(m); !reflect.DeepEqual(got, []string{"Open", "Hide", "Chat", "Tunnel", "Settings", "Quit"}) {
+		t.Fatalf("en=%v", got)
+	}
+	clickMenu(m)
+}
+
+func menuActionLabels(m *menu.Menu) []string {
+	if m == nil || len(m.Items) == 0 || m.Items[0].SubMenu == nil {
+		return nil
+	}
+	var out []string
+	for _, item := range m.Items[0].SubMenu.Items {
+		if item.IsSeparator() {
+			continue
+		}
+		out = append(out, item.Label)
+	}
+	return out
+}
+
+func clickMenu(m *menu.Menu) {
+	if m == nil {
+		return
+	}
+	for _, item := range m.Items {
+		if item.Click != nil {
+			item.Click(nil)
+		}
+		if item.SubMenu != nil {
+			clickMenu(item.SubMenu)
+		}
+	}
 }
 
 func TestChooseConfigDir(t *testing.T) {

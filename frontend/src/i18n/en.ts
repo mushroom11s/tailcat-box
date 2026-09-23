@@ -198,7 +198,7 @@ export const en = {
   wiredExit: "Exit node",
   wiredExec: "Exec per connection",
   wiredDERP: "DERP region / map URL",
-  wiredTray: "System tray Open + Quit (macOS/Windows; Linux best-effort app menu)",
+  wiredTray: "System tray Open, Hide, Chat, Tunnel, Settings, and Quit (macOS/Windows; left-click shows the window; Linux best-effort app menu)",
   unwiredAndroid: "Android client",
   unwiredPTY: "Interactive SSH PTY terminal in the window (commands run non-interactively)",
   unwiredAllow: "Serve --allow client allowlist UI",
