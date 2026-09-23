@@ -3,6 +3,7 @@ import DiagnosticsSection from "../components/DiagnosticsSection";
 import KeysDERPSection from "../components/KeysDERPSection";
 import iconUrl from "../assets/icon.png";
 import { useI18n, type Locale } from "../i18n";
+import { displayNickname, sanitizeNickname } from "../lib/nickname";
 import {
   getClientInfo,
   getSystemInfo,
@@ -20,6 +21,8 @@ export type Theme = "system" | "light" | "dark";
 type Props = {
   theme: Theme;
   onTheme: (theme: Theme) => void;
+  nickname: string;
+  onNickname: (nickname: string) => void;
   keys: KeyInfo[];
   busy: boolean;
   error: string;
@@ -91,6 +94,15 @@ function SunIcon() {
   );
 }
 
+function BadgeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="9" r="3.25" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" d="M6.5 19.2c.8-2.6 2.8-4 5.5-4s4.7 1.4 5.5 4" />
+    </svg>
+  );
+}
+
 function InfoCard({
   title,
   icon,
@@ -144,6 +156,8 @@ function InfoRow({
 export default function SettingsPage({
   theme,
   onTheme,
+  nickname,
+  onNickname,
   keys,
   busy,
   error,
@@ -289,6 +303,27 @@ export default function SettingsPage({
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="glass settings-panel">
+        <h3 className="kind">{t("profile")}</h3>
+        <div className="setting-row nickname-row">
+          <div className="setting-label">
+            <BadgeIcon />
+            <label htmlFor="settings-nickname">{t("nickname")}</label>
+          </div>
+          <input
+            id="settings-nickname"
+            className="nickname-input"
+            value={nickname}
+            autoComplete="off"
+            spellCheck={false}
+            aria-describedby="settings-nickname-help"
+            onChange={(e) => onNickname(sanitizeNickname(e.target.value))}
+            onBlur={(e) => onNickname(displayNickname(e.currentTarget.value))}
+          />
+        </div>
+        <p id="settings-nickname-help" className="setting-help">{t("nicknameHelp")}</p>
       </section>
 
       <div className="settings-cards">

@@ -24,3 +24,7 @@ It depends on where the address came from.
 - **Delete, then create again.** After you delete the key, a new genkey is a different address. It is not the old one.
 
 Closing the window only hides the app, so the temporary address is still live. To retire an ephemeral address, quit the process, or discard that key (for example, restart the room on New room key).
+
+## Can I set a nickname? Can the other person see it?
+
+Yes. Settings has a nickname field. It is stored only on this computer and replaces You in your local transcript (我 in the Chinese UI). **It is not sent to the other person, and they cannot see it.** On their side, messages from you still show as Peer (对方 in Chinese). A nickname they enter only replaces You on their own screen.

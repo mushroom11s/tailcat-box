@@ -7,6 +7,7 @@ import { sameKeys, sameSessions } from "./lib/snapshot";
 import { useI18n } from "./i18n";
 import iconUrl from "./assets/icon.png";
 import { localizeChatError } from "./lib/chatText";
+import { NICKNAME_KEY, readNickname } from "./lib/nickname";
 import {
   connectChatPeer,
   createKey,
@@ -80,6 +81,7 @@ export default function App() {
   const { t } = useI18n();
   const [page, setPage] = useState<Page>("chat");
   const [theme, setTheme] = useState<Theme>(() => readTheme());
+  const [nickname, setNickname] = useState(() => readNickname());
   const [sessions, setSessions] = useState<Session[]>([]);
   const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [events, setEvents] = useState<TailcatEvent[]>([]);
@@ -124,6 +126,10 @@ export default function App() {
     applyTheme(theme);
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem(NICKNAME_KEY, nickname);
+  }, [nickname]);
 
   useEffect(() => {
     const node = mainRef.current;
@@ -375,6 +381,7 @@ export default function App() {
             onResend={resendChatFile}
             onSave={saveChatFile}
             onRetry={retryRoom}
+            nickname={nickname}
           />
         ) : page === "tunnel" ? (
           <TunnelPage
@@ -391,6 +398,8 @@ export default function App() {
           <SettingsPage
             theme={theme}
             onTheme={setTheme}
+            nickname={nickname}
+            onNickname={setNickname}
             keys={keys}
             busy={false}
             error=""
