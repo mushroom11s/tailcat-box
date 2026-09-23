@@ -1565,7 +1565,8 @@ textarea {
 }
 
 .chat-remark-bar input:disabled {
-  opacity: 0.45;
+  color: var(--faint);
+  cursor: not-allowed;
 }
 
 .chat-quiet {
