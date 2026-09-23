@@ -11,6 +11,7 @@ import (
 	"github.com/mushroom11s/tailcat-box/internal/adapter"
 	"github.com/mushroom11s/tailcat-box/internal/session"
 	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
 func TestStartPipeServeReturnsSession(t *testing.T) {
@@ -444,6 +445,97 @@ func TestApplicationMenuLocalizesActions(t *testing.T) {
 		t.Fatalf("en=%v", got)
 	}
 	clickMenu(m)
+}
+
+func TestMacWindowChromeKeepsNativeTitleBar(t *testing.T) {
+	chrome := macWindowChrome()
+	if chrome == nil {
+		t.Fatal("mac chrome is nil")
+	}
+	if chrome.DisableZoom {
+		t.Fatal("DisableZoom disables the green traffic-light button")
+	}
+	bar := chrome.TitleBar
+	if bar == nil {
+		t.Fatal("missing title bar")
+	}
+	standard := mac.TitleBarDefault()
+	if *bar != *standard {
+		t.Fatalf("title bar=%+v want default %+v", *bar, *standard)
+	}
+	if bar.HideTitle || bar.HideTitleBar || bar.TitlebarAppearsTransparent || bar.FullSizeContent || bar.UseToolbar {
+		t.Fatal("title bar must stay a standard macOS bar above the content")
+	}
+}
+
+func TestViewMenuFullscreenLabels(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	t.Setenv("TAILCAT_SETTINGS_DIR", t.TempDir())
+	a := NewApp()
+
+	title, item := viewMenuLabels("en", false)
+	if title != "View" || item != "Enter Full Screen" {
+		t.Fatalf("en enter=%q %q", title, item)
+	}
+	title, item = viewMenuLabels("zh-CN", true)
+	if title != "视图" || item != "退出全屏" {
+		t.Fatalf("zh exit=%q %q", title, item)
+	}
+
+	m := a.applicationMenu(productTitle("en"))
+	view := viewMenuItem(t, m)
+	if view.Label != "View" {
+		t.Fatalf("menu=%q", view.Label)
+	}
+	if got := menuActionLabelsOf(view.SubMenu); !reflect.DeepEqual(got, []string{"Enter Full Screen"}) {
+		t.Fatalf("enter=%v", got)
+	}
+	acc := view.SubMenu.Items[0].Accelerator
+	if acc == nil || acc.Key != "f" || len(acc.Modifiers) != 2 || string(acc.Modifiers[0]) != "ctrl" || string(acc.Modifiers[1]) != "cmdorctrl" {
+		t.Fatalf("accelerator=%+v", acc)
+	}
+
+	a.uiLocale = "zh-CN"
+	a.windowFullscreen = true
+	view = viewMenuItem(t, a.applicationMenu(productTitle("zh-CN")))
+	if view.Label != "视图" {
+		t.Fatalf("zh menu=%q", view.Label)
+	}
+	if got := menuActionLabelsOf(view.SubMenu); !reflect.DeepEqual(got, []string{"退出全屏"}) {
+		t.Fatalf("exit=%v", got)
+	}
+
+	a.toggleFullscreen()
+	if !a.windowFullscreen {
+		t.Fatal("toggle without a window must leave the menu label alone")
+	}
+}
+
+func viewMenuItem(t *testing.T, m *menu.Menu) *menu.MenuItem {
+	t.Helper()
+	if m == nil || len(m.Items) < 2 {
+		t.Fatalf("menu items=%d", len(m.Items))
+	}
+	item := m.Items[1]
+	if item.SubMenu == nil {
+		t.Fatal("view menu missing submenu")
+	}
+	return item
+}
+
+func menuActionLabelsOf(m *menu.Menu) []string {
+	if m == nil {
+		return nil
+	}
+	var out []string
+	for _, item := range m.Items {
+		if item.IsSeparator() {
+			continue
+		}
+		out = append(out, item.Label)
+	}
+	return out
 }
 
 func menuActionLabels(m *menu.Menu) []string {
