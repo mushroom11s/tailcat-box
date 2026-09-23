@@ -70,6 +70,14 @@ function abbrev(address: string): string {
   return address.length <= 8 ? address : `tc…${address.slice(-4)}`;
 }
 
+function roomButton(name: string): HTMLElement | null {
+  return (
+    [...document.querySelectorAll(".nav-rooms .nav-child:not(.nav-new)")].find(
+      (el) => (el.textContent ?? "").trim() === name,
+    ) ?? null
+  ) as HTMLElement | null;
+}
+
 describe("peer remarks", () => {
   it("keeps Peer and You when no remark is stored", () => {
     render(<RemarkChat />);
@@ -158,8 +166,8 @@ describe("peer remarks", () => {
     await waitFor(() => {
       expect(JSON.parse(localStorage.getItem(REMARKS_KEY) ?? "{}")).toEqual({ "tc:fake-echo": "Bob" });
     });
-    expect(screen.getByRole("button", { name: "Bob", exact: true })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Mochi", exact: true })).toBeNull();
+    expect(roomButton("Bob")).toBeTruthy();
+    expect(roomButton("Mochi")).toBeNull();
     await user.type(screen.getByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("echo")).toBeTruthy();
@@ -174,7 +182,7 @@ describe("peer remarks", () => {
     await user.click(screen.getByRole("button", { name: "Connect" }));
     expect(await screen.findByText("Peer connected")).toBeTruthy();
     expect((screen.getByLabelText("Remark") as HTMLInputElement).value).toBe("Bob");
-    expect(screen.getByRole("button", { name: "Bob", exact: true })).toBeTruthy();
+    expect(roomButton("Bob")).toBeTruthy();
     await user.clear(screen.getByLabelText("Remark"));
     fireEvent.blur(screen.getByLabelText("Remark"));
     await waitFor(() => {
@@ -185,8 +193,8 @@ describe("peer remarks", () => {
     expect(await screen.findByText("echo")).toBeTruthy();
     expect(labels("out")[0]).toBe("Mochi");
     expect(labels("in")).toEqual(["Peer"]);
-    expect(screen.queryByRole("button", { name: "Bob", exact: true })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Mochi", exact: true })).toBeNull();
+    expect(roomButton("Bob")).toBeNull();
+    expect(roomButton("Mochi")).toBeNull();
   });
 
   it("uses the peer remark as the room label and suffixes it when two rooms share it", async () => {
@@ -195,16 +203,16 @@ describe("peer remarks", () => {
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     const first = (await screen.findByText(/^tc:fake-room-/)).textContent ?? "";
-    expect(screen.getByRole("button", { name: abbrev(first), exact: true })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Alice", exact: true })).toBeNull();
+    expect(roomButton(abbrev(first))).toBeTruthy();
+    expect(roomButton("Alice")).toBeNull();
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.type(screen.getByLabelText("Remark"), "Bob");
     fireEvent.blur(screen.getByLabelText("Remark"));
-    expect(screen.getByRole("button", { name: abbrev(first), exact: true })).toBeTruthy();
+    expect(roomButton(abbrev(first))).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Connect" }));
     expect(await screen.findByText("Peer connected")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Bob", exact: true })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Alice", exact: true })).toBeNull();
+    expect(roomButton("Bob")).toBeTruthy();
+    expect(roomButton("Alice")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "+ New room" }));
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
@@ -215,9 +223,9 @@ describe("peer remarks", () => {
     fireEvent.blur(screen.getByLabelText("Remark"));
     await user.click(screen.getByRole("button", { name: "Connect" }));
     expect(await screen.findByText("Peer connected")).toBeTruthy();
-    expect(screen.getByRole("button", { name: `Bob · ${abbrev(first)}`, exact: true })).toBeTruthy();
-    expect(screen.getByRole("button", { name: `Bob · ${abbrev(second)}`, exact: true })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Alice", exact: true })).toBeNull();
+    expect(roomButton(`Bob · ${abbrev(first)}`)).toBeTruthy();
+    expect(roomButton(`Bob · ${abbrev(second)}`)).toBeTruthy();
+    expect(roomButton("Alice")).toBeNull();
     expect(screen.queryByRole("button", { name: /Alice ·/ })).toBeNull();
   });
 });
