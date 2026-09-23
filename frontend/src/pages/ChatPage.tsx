@@ -7,6 +7,7 @@ import { localizeChatError, systemText } from "../lib/chatText";
 import { purgeDiscardIds } from "../lib/chatPurge";
 import { createLiveCall, type CallMode, type CallView, type LiveCall, type LiveDevices } from "../lib/liveCall";
 import { startVoiceCapture, type VoiceCapture } from "../lib/voiceCapture";
+import { displayNickname } from "../lib/nickname";
 import { hasWailsBindings, selectFiles } from "../lib/wails";
 
 export type ChatMessage = {
@@ -60,6 +61,7 @@ type Props = {
   incomingSignal?: { seq: number; data: string } | null;
   liveMedia?: LiveDevices;
   peerConnection?: new (config?: RTCConfiguration) => RTCPeerConnection;
+  nickname?: string;
 };
 
 async function copyText(text: string): Promise<void> {
@@ -131,8 +133,10 @@ export default function ChatPage({
   incomingSignal,
   liveMedia,
   peerConnection,
+  nickname = "",
 }: Props) {
   const { t } = useI18n();
+  const ownLabel = displayNickname(nickname) || t("chatYou");
   const peerRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const burnRef = useRef(false);
@@ -973,7 +977,7 @@ export default function ChatPage({
                 decodeVoice={decodeVoice}
               />
               <header>
-                <span>{msg.direction === "out" ? t("chatYou") : t("chatPeerName")}</span>
+                <span className="chat-who">{msg.direction === "out" ? ownLabel : t("chatPeerName")}</span>
                 <time>{stamp(msg.at)}</time>
               </header>
               {msg.burn && msg.direction === "in" && openMessage?.id !== msg.id ? (
