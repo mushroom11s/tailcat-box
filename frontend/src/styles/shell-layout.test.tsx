@@ -1,12 +1,9 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "../App";
 import { LocaleProvider } from "../i18n";
-
-const css = readFileSync(resolve(process.cwd(), "src/styles/glass.css"), "utf8");
+import css from "./glass.css?inline";
 
 afterEach(() => {
   cleanup();

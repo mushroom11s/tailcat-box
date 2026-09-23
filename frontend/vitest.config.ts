@@ -6,5 +6,8 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    css: {
+      include: /glass\.css/,
+    },
   },
 });
