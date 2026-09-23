@@ -512,16 +512,42 @@ func TestViewMenuFullscreenLabels(t *testing.T) {
 	}
 }
 
+func TestApplicationMenuIncludesEditRole(t *testing.T) {
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	t.Setenv("TAILCAT_SETTINGS_DIR", t.TempDir())
+	a := NewApp()
+	m := a.applicationMenu(productTitle("en"))
+	if len(m.Items) != 3 {
+		t.Fatalf("top-level items=%d", len(m.Items))
+	}
+	if m.Items[0].SubMenu == nil {
+		t.Fatal("app submenu missing")
+	}
+	if m.Items[1].Role != menu.EditMenuRole {
+		t.Fatalf("edit role=%d", m.Items[1].Role)
+	}
+	if m.Items[2].Label != "View" || m.Items[2].SubMenu == nil {
+		t.Fatalf("view label=%q submenu=%v", m.Items[2].Label, m.Items[2].SubMenu != nil)
+	}
+	if got := menuActionLabels(m); !reflect.DeepEqual(got, []string{"Open", "Hide", "Chat", "Tunnel", "Settings", "Quit"}) {
+		t.Fatalf("app actions=%v", got)
+	}
+}
+
 func viewMenuItem(t *testing.T, m *menu.Menu) *menu.MenuItem {
 	t.Helper()
 	if m == nil || len(m.Items) < 2 {
 		t.Fatalf("menu items=%d", len(m.Items))
 	}
-	item := m.Items[1]
-	if item.SubMenu == nil {
-		t.Fatal("view menu missing submenu")
+	for _, item := range m.Items[1:] {
+		if item.Role != 0 || item.SubMenu == nil {
+			continue
+		}
+		return item
 	}
-	return item
+	t.Fatal("view menu missing submenu")
+	return nil
 }
 
 func menuActionLabelsOf(m *menu.Menu) []string {
