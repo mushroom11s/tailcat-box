@@ -144,6 +144,10 @@ Tagging, dry-run builds, and which runners are used are described in [docs/relea
 
 The Go module path in `go.mod` is `github.com/mushroom11s/tailcat-box`.
 
+## FAQ
+
+Several people on one room address, and whether a closed address can be used again, are answered in the [usage FAQ](docs/faq.md).
+
 ## Credits
 
 Tailcat Box is a desktop client for [Tailscale Tailcat](https://github.com/tailscale/tailcat).

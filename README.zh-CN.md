@@ -144,6 +144,10 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 
 `go.mod` 里的 module 路径是 `github.com/mushroom11s/tailcat-box`。
 
+## 常见问题
+
+多人同时连同一个房间、临时地址关掉后还能不能再用，见 [使用常见问题](docs/faq.zh-CN.md)。
+
 ## 致谢
 
 猫砂盆是 [Tailscale Tailcat](https://github.com/tailscale/tailcat) 的桌面客户端。
