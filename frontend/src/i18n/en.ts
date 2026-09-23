@@ -277,6 +277,7 @@ export const en = {
   chatPeerConnected: "Peer connected",
   chatIdentityExpand: "Show room details",
   chatIdentityCollapse: "Hide room details",
+  chatNotConnected: "Not connected",
   chatHearMeow: "they're hear meow",
   chatRetry: "Retry",
   chatMessageLabel: "Message",

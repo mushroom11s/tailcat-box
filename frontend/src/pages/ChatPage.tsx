@@ -165,15 +165,32 @@ export default function ChatPage({
   const { t } = useI18n();
   const ownLabel = displayNickname(nickname) || t("chatYou");
   const connected = peer.trim().length > 0;
-  const [detailsOpen, setDetailsOpen] = useState(() => !peer.trim() || Boolean(roomError));
+  const detailsPin = useRef<"open" | "closed" | null>(null);
+  const focusPeerAfterOpen = useRef(false);
+  const [detailsOpen, setDetailsOpen] = useState(() => Boolean(roomError) || !address.trim());
   useEffect(() => {
     if (roomError) {
       setDetailsOpen(true);
       return;
     }
-    setDetailsOpen(!peer.trim());
-  }, [peer, roomError]);
+    if (detailsPin.current === "open") {
+      setDetailsOpen(true);
+      return;
+    }
+    if (detailsPin.current === "closed") {
+      setDetailsOpen(false);
+      return;
+    }
+    setDetailsOpen(!address.trim());
+  }, [address, roomError]);
   const peerRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!detailsOpen || !focusPeerAfterOpen.current) {
+      return;
+    }
+    focusPeerAfterOpen.current = false;
+    peerRef.current?.focus();
+  }, [detailsOpen]);
   const fileRef = useRef<HTMLInputElement>(null);
   const burnRef = useRef(false);
   const [draftPeer, setDraftPeer] = useState(initialPeerDraft ?? "");
@@ -592,11 +609,30 @@ export default function ChatPage({
     };
   }, [confirmOpen]);
 
+  function expandDetails(): void {
+    detailsPin.current = "open";
+    setDetailsOpen(true);
+  }
+
+  function collapseDetails(): void {
+    detailsPin.current = "closed";
+    setDetailsOpen(false);
+  }
+
+  function focusPeer(): void {
+    if (detailsOpen) {
+      peerRef.current?.focus();
+      return;
+    }
+    focusPeerAfterOpen.current = true;
+    expandDetails();
+  }
+
   async function connect(): Promise<void> {
     const addr = draftPeer.trim();
     if (!addr.startsWith("tc")) {
       setInline(t("chatAddrError"));
-      peerRef.current?.focus();
+      focusPeer();
       return;
     }
     setInline("");
@@ -605,7 +641,7 @@ export default function ChatPage({
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setInline(localizeChatError(message, t) || message);
-      peerRef.current?.focus();
+      focusPeer();
     }
   }
 
@@ -618,7 +654,7 @@ export default function ChatPage({
       return;
     }
     if (!peer) {
-      peerRef.current?.focus();
+      focusPeer();
       return;
     }
     sendingRef.current = true;
@@ -676,7 +712,7 @@ export default function ChatPage({
 
   async function placeCall(mode: CallMode): Promise<void> {
     if (!peer) {
-      peerRef.current?.focus();
+      focusPeer();
       return;
     }
     await callRef.current?.start(mode);
@@ -687,7 +723,7 @@ export default function ChatPage({
       return;
     }
     if (!peer) {
-      peerRef.current?.focus();
+      focusPeer();
       return;
     }
     pendingRef.current = true;
@@ -948,7 +984,7 @@ export default function ChatPage({
       <div className="chat-main">
       <div className={`glass chat-identity${detailsOpen ? "" : " is-compact"}`}>
         {detailsOpen ? null : (
-          <div className="chat-identity-compact" onClick={() => setDetailsOpen(true)}>
+          <div className="chat-identity-compact" onClick={() => expandDetails()}>
             <span className={`status-dot${roomError ? " bad" : ""}`} aria-hidden="true" />
             {roomError ? <span className="err">{roomError}</span> : <span className="status-pill">{t("chatListening")}</span>}
             <span className="chat-identity-addr" title={address}>{abbreviateAddress(address)}</span>
@@ -963,7 +999,12 @@ export default function ChatPage({
             >
               {t("copy")}
             </button>
-            <span className="chat-identity-peer" title={peer}>{remarkFor(remarks, peer) || abbreviateAddress(peer)}</span>
+            <span
+              className={`chat-identity-peer${remarkFor(remarks, peer) || peer.trim() ? "" : " is-quiet"}`}
+              title={peer || t("chatNotConnected")}
+            >
+              {remarkFor(remarks, peer) || (peer.trim() ? abbreviateAddress(peer) : t("chatNotConnected"))}
+            </span>
             <button
               className="chat-identity-toggle"
               type="button"
@@ -971,7 +1012,7 @@ export default function ChatPage({
               aria-label={t("chatIdentityExpand")}
               onClick={(ev) => {
                 ev.stopPropagation();
-                setDetailsOpen(true);
+                expandDetails();
               }}
             >
               <ChevronIcon />
@@ -1002,13 +1043,13 @@ export default function ChatPage({
               {t("roomClose")}
             </button>
           ) : null}
-          {connected && !roomError ? (
+          {address.trim() && !roomError ? (
             <button
               className="chat-identity-toggle"
               type="button"
               aria-expanded={true}
               aria-label={t("chatIdentityCollapse")}
-              onClick={() => setDetailsOpen(false)}
+              onClick={() => collapseDetails()}
             >
               <ChevronIcon up />
             </button>

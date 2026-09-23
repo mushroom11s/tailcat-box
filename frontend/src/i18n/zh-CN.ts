@@ -278,6 +278,7 @@ export const zhCN = {
   chatPeerConnected: "对方已连接",
   chatIdentityExpand: "展开房间信息",
   chatIdentityCollapse: "收起房间信息",
+  chatNotConnected: "未连接",
   chatHearMeow: "they're hear meow",
   chatRetry: "重试",
   chatMessageLabel: "消息",

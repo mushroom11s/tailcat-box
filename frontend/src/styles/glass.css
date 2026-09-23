@@ -1730,6 +1730,15 @@ textarea {
   letter-spacing: -0.02em;
 }
 
+.chat-identity-peer.is-quiet {
+  font-weight: 500;
+  color: var(--faint);
+}
+
+.chat-identity-compact .btn {
+  flex-shrink: 0;
+}
+
 .chat-identity-toggle {
   appearance: none;
   flex: none;

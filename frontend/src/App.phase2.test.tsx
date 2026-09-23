@@ -38,6 +38,7 @@ describe("phase 2 files and burn", () => {
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     await user.type(screen.getByLabelText("Peer"), "tc:fake-official");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.click(screen.getByRole("switch", { name: "Burn" }));
@@ -56,6 +57,7 @@ describe("phase 2 files and burn", () => {
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     await user.type(screen.getByLabelText("Peer"), "tc:fake-box");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.click(screen.getByRole("switch", { name: "Burn" }));

@@ -126,6 +126,7 @@ describe("peer remarks", () => {
   it("stays disabled until the peer field has a tc address, including before connect", async () => {
     const user = userEvent.setup();
     render(<RemarkChat peer="" />);
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     const field = screen.getByLabelText("Remark") as HTMLInputElement;
     expect(field.disabled).toBe(true);
     await user.type(screen.getByLabelText("Peer"), "nope");
@@ -207,28 +208,36 @@ describe("peer remarks", () => {
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    const first = (await screen.findByText(/^tc:fake-room-/)).textContent ?? "";
+    let first = "";
+    await waitFor(() => {
+      first = document.querySelector(".chat-identity-addr")?.getAttribute("title") ?? "";
+      expect(first.startsWith("tc:fake-room-")).toBe(true);
+    });
     expect(roomButton(abbrev(first))).toBeTruthy();
     expect(roomButton("Alice")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.type(screen.getByLabelText("Remark"), "Bob");
     fireEvent.blur(screen.getByLabelText("Remark"));
     expect(roomButton(abbrev(first))).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Connect" }));
-    await user.click(await screen.findByRole("button", { name: "Show room details" }));
     expect(screen.getByText("Peer connected")).toBeTruthy();
     expect(roomButton("Bob")).toBeTruthy();
     expect(roomButton("Alice")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "+ New room" }));
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    const second = (await screen.findByText(/^tc:fake-room-/)).textContent ?? "";
+    let second = "";
+    await waitFor(() => {
+      second = document.querySelector(".chat-identity-addr")?.getAttribute("title") ?? "";
+      expect(second.startsWith("tc:fake-room-")).toBe(true);
+    });
     expect(second).not.toBe(first);
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     await user.type(screen.getByLabelText("Peer"), "tc:fake-official");
     await user.type(screen.getByLabelText("Remark"), "Bob");
     fireEvent.blur(screen.getByLabelText("Remark"));
     await user.click(screen.getByRole("button", { name: "Connect" }));
-    await user.click(await screen.findByRole("button", { name: "Show room details" }));
     expect(screen.getByText("Peer connected")).toBeTruthy();
     expect(roomButton(`Bob · ${abbrev(first)}`)).toBeTruthy();
     expect(roomButton(`Bob · ${abbrev(second)}`)).toBeTruthy();
