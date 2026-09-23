@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import ChatPage from "./pages/ChatPage";
+import ChatPage, { type ChatMessage } from "./pages/ChatPage";
 import LobbyPage from "./pages/LobbyPage";
 import SettingsPage from "./pages/SettingsPage";
 import TunnelPage from "./pages/TunnelPage";
 import { forwardPortMappings, parsePortMappings } from "./lib/ports";
 import { sameKeys, sameSessions } from "./lib/snapshot";
-import { useI18n } from "./i18n";
+import { translate, useI18n } from "./i18n";
 import iconUrl from "./assets/icon.png";
+import { inboundAlertBody, inboundAlertTitle, isInboundAlert, readingOpenTranscript } from "./lib/chatNotify";
 import { localizeChatError } from "./lib/chatText";
 import { NICKNAME_KEY, readNickname } from "./lib/nickname";
+import { ensureOsNotifications, sendOsNotification } from "./lib/osNotify";
 import { roomPrimaryLabel, roomTooltip } from "./lib/roomLabel";
 import { applyRoomEvent, emptyRoom, type RoomSlice } from "./lib/roomState";
 import {
@@ -71,7 +73,7 @@ function readTheme(): Theme {
 }
 
 export default function App() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [page, setPageState] = useState<Page>("chat");
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const [nickname, setNickname] = useState(() => readNickname());
@@ -98,7 +100,12 @@ export default function App() {
   const lobbyRef = useRef(lobby);
   const pageRef = useRef(page);
   const pendingRef = useRef<TailcatEvent[]>([]);
+  const localeRef = useRef(locale);
+  const notifiedIds = useRef(new Set<string>());
+  const [notifyDenied, setNotifyDenied] = useState(false);
   netRef.current = { region, derp: derpMapURL };
+  pageRef.current = page;
+  localeRef.current = locale;
   const fallback = !hasWailsBindings();
   function setPage(next: Page): void {
     if (next !== "chat") {
@@ -151,12 +158,45 @@ export default function App() {
     };
   }
 
+  function noteInbound(room: RoomSlice, ev: TailcatEvent): void {
+    if (ev.Kind !== "message" || !ev.Data) {
+      return;
+    }
+    let msg: ChatMessage;
+    try {
+      msg = JSON.parse(ev.Data) as ChatMessage;
+    } catch {
+      return;
+    }
+    if (!msg.id || !isInboundAlert(msg) || notifiedIds.current.has(msg.id)) {
+      return;
+    }
+    notifiedIds.current.add(msg.id);
+    const viewingThisRoom =
+      pageRef.current === "chat" && !lobbyRef.current && focusRef.current === room.id;
+    if (readingOpenTranscript(document, viewingThisRoom)) {
+      return;
+    }
+    const loc = localeRef.current;
+    const tr = (key: Parameters<typeof translate>[1]) => translate(loc, key);
+    void sendOsNotification({
+      id: msg.id,
+      title: inboundAlertTitle(room.peer, tr("productName")),
+      body: inboundAlertBody(msg, tr),
+    }).then((result) => {
+      if (result === "denied") {
+        setNotifyDenied(true);
+      }
+    });
+  }
+
   function adoptRoom(sess: Session, peerDraft: string, keyName = ""): void {
     let room = emptyRoom(sess.ID, peerDraft);
     room.keyName = keyName;
     room.address = sess.Address || "";
     room.error = sess.Err || "";
-    for (const ev of drain(sess.ID)) {
+    const queued = drain(sess.ID);
+    for (const ev of queued) {
       room = applyRoomEvent(room, ev);
     }
     room = stampApplied(room);
@@ -164,6 +204,9 @@ export default function App() {
     commitOrder([sess.ID, ...orderRef.current.filter((item) => item !== sess.ID)]);
     commitFocus(sess.ID);
     commitLobby(false);
+    for (const ev of queued) {
+      noteInbound(room, ev);
+    }
     roomKeyRef.current = keyName;
     setRoomKey(keyName);
     setLiveSignal(null);
@@ -250,6 +293,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    void ensureOsNotifications();
+  }, []);
+
+  useEffect(() => {
     void refresh();
     const off = onTailcatEvent((ev) => {
       setEvents((prev) => [...prev, ev]);
@@ -274,6 +321,7 @@ export default function App() {
         room = stampApplied(room);
       }
       commitRooms({ ...roomsRef.current, [id]: room });
+      noteInbound(room, ev);
       void refresh();
     });
     const timer = window.setInterval(() => {
@@ -538,6 +586,7 @@ export default function App() {
               onResend={(messageID) => resendChatFile(chatRoom.id, messageID)}
               onSave={(messageID) => saveChatFile(chatRoom.id, messageID)}
               onRetry={() => onRestart(chatRoom.keyName)}
+              notifyNote={notifyDenied ? t("chatNotifyDenied") : ""}
             />
           )
         ) : page === "tunnel" ? (
