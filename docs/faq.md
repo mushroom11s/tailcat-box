@@ -23,7 +23,7 @@ Hiding the window is not quitting, so every room stays up. Quitting stops every 
 
 Inside any one of those rooms, the answer above still applies. Several people can connect to that one address, and it is still not a group chat.
 
-A nickname, when this computer has one, is only a label in the room list. It is not sent to the peer.
+The room list shows a short form of each room’s address. A local name for that room’s current peer will replace the abbreviation once peer remarks exist. A nickname for yourself is not the room name, and it is not sent to the peer.
 
 ## Can I use a temporary address again after it is closed?
 

@@ -1,15 +1,6 @@
-export const NICKNAME_KEY = "tailcat-nickname";
-
-// readNickname reads the Settings nickname when that store exists.
-// The value stays on this computer and is never put on the wire.
-export function readNickname(): string {
-  try {
-    return (localStorage.getItem(NICKNAME_KEY) ?? "").trim();
-  } catch {
-    return "";
-  }
-}
-
+// Room list labels are the short address until a local peer-remark
+// map (current peer address → display name) exists. The Settings
+// self nickname is for outgoing bubbles, not the room list.
 export function abbreviateAddress(address: string): string {
   const chars = Array.from(address);
   if (chars.length <= 8) {
@@ -18,16 +9,8 @@ export function abbreviateAddress(address: string): string {
   return `tc…${chars.slice(-4).join("")}`;
 }
 
-export function roomPrimaryLabel(nickname: string, address: string, startingLabel: string, openRooms: number): string {
-  const abbrev = address ? abbreviateAddress(address) : startingLabel;
-  const nick = nickname.trim();
-  if (!nick) {
-    return abbrev;
-  }
-  if (openRooms >= 2) {
-    return `${nick} · ${abbrev}`;
-  }
-  return nick;
+export function roomPrimaryLabel(address: string, startingLabel: string): string {
+  return address ? abbreviateAddress(address) : startingLabel;
 }
 
 export function roomTooltip(address: string, keyName: string): string {

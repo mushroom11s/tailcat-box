@@ -3,18 +3,19 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import App from "./App";
 import { LocaleProvider } from "./i18n";
-import { NICKNAME_KEY } from "./lib/roomLabel";
 import { emitBrowserEvent, listSessions, resetBrowserRooms } from "./lib/wails";
+
+const SELF_NICKNAME_KEY = "tailcat-nickname";
 
 beforeEach(() => {
   resetBrowserRooms();
   localStorage.setItem("tailcat-locale", "en");
-  localStorage.removeItem(NICKNAME_KEY);
+  localStorage.removeItem(SELF_NICKNAME_KEY);
 });
 
 afterEach(() => {
   cleanup();
-  localStorage.removeItem(NICKNAME_KEY);
+  localStorage.removeItem(SELF_NICKNAME_KEY);
 });
 
 function renderApp() {
@@ -106,16 +107,15 @@ describe("phase A multi-room lobby", () => {
     expect(screen.getByText(firstAddress)).toBeTruthy();
   });
 
-  it("labels rooms with the settings nickname and keeps that name off the transcript", async () => {
-    localStorage.setItem(NICKNAME_KEY, "Alice");
+  it("labels rooms with the address abbreviation and ignores a self nickname", async () => {
+    localStorage.setItem(SELF_NICKNAME_KEY, "Alice");
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    expect(await screen.findByRole("button", { name: "Alice" })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "+ New room" }));
-    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    const labeled = await screen.findAllByRole("button", { name: /Alice · tc…/ });
-    expect(labeled).toHaveLength(2);
+    const address = (await screen.findByText(/^tc:fake-room-/)).textContent ?? "";
+    expect(screen.getByRole("button", { name: abbrev(address) })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Alice" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Alice ·/ })).toBeNull();
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.type(screen.getByLabelText("Message"), "ping");

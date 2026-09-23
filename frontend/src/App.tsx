@@ -9,7 +9,7 @@ import { useI18n } from "./i18n";
 import iconUrl from "./assets/icon.png";
 import { localizeChatError } from "./lib/chatText";
 import { NICKNAME_KEY, readNickname } from "./lib/nickname";
-import { readNickname, roomPrimaryLabel, roomTooltip } from "./lib/roomLabel";
+import { roomPrimaryLabel, roomTooltip } from "./lib/roomLabel";
 import { applyRoomEvent, emptyRoom, type RoomSlice } from "./lib/roomState";
 import {
   connectChatPeer,
@@ -100,8 +100,6 @@ export default function App() {
   const pendingRef = useRef<TailcatEvent[]>([]);
   netRef.current = { region, derp: derpMapURL };
   const fallback = !hasWailsBindings();
-  const nickname = readNickname();
-
   function setPage(next: Page): void {
     if (next !== "chat") {
       setLiveSignal(null);
@@ -469,7 +467,7 @@ export default function App() {
                     if (!room) {
                       return null;
                     }
-                    const label = roomPrimaryLabel(nickname, room.address, t("roomStarting"), nickname.trim() ? order.length : 0);
+                    const label = roomPrimaryLabel(room.address, t("roomStarting"));
                     const selected = page === "chat" && !showLobby && focus === id;
                     return (
                       <button

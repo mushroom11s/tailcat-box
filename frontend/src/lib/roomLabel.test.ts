@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { abbreviateAddress, readNickname, roomPrimaryLabel, roomTooltip, NICKNAME_KEY } from "./roomLabel";
+import { abbreviateAddress, roomPrimaryLabel, roomTooltip } from "./roomLabel";
 
 describe("room labels", () => {
   it("abbreviates long addresses and keeps short ones", () => {
@@ -8,18 +8,10 @@ describe("room labels", () => {
     expect(abbreviateAddress("")).toBe("");
   });
 
-  it("prefers a nickname and disambiguates when several rooms share it", () => {
-    expect(roomPrimaryLabel("Alice", "tc:abcdef1234", "Starting…", 1)).toBe("Alice");
-    expect(roomPrimaryLabel("Alice", "tc:abcdef1234", "Starting…", 2)).toBe("Alice · tc…1234");
-    expect(roomPrimaryLabel("  ", "tc:abcdef1234", "Starting…", 2)).toBe("tc…1234");
-    expect(roomPrimaryLabel("", "", "Starting…", 1)).toBe("Starting…");
-  });
-
-  it("reads the settings nickname from local storage", () => {
-    localStorage.setItem(NICKNAME_KEY, "  Alice  ");
-    expect(readNickname()).toBe("Alice");
-    localStorage.removeItem(NICKNAME_KEY);
-    expect(readNickname()).toBe("");
+  it("uses the address abbreviation and ignores a self nickname", () => {
+    expect(roomPrimaryLabel("tc:abcdef1234", "Starting…")).toBe("tc…1234");
+    expect(roomPrimaryLabel("tc:abcd", "Starting…")).toBe("tc:abcd");
+    expect(roomPrimaryLabel("", "Starting…")).toBe("Starting…");
   });
 
   it("puts the address and key name in the tooltip", () => {
