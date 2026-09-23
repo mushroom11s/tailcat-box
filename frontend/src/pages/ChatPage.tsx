@@ -9,6 +9,7 @@ import { createLiveCall, type CallMode, type CallView, type LiveCall, type LiveD
 import { startVoiceCapture, type VoiceCapture } from "../lib/voiceCapture";
 import { displayNickname } from "../lib/nickname";
 import { labelPeerAddress, remarkAddress, remarkFor, type RemarkMap } from "../lib/remark";
+import { abbreviateAddress } from "../lib/roomLabel";
 import { hasWailsBindings, selectFiles } from "../lib/wails";
 
 export type ChatMessage = {
@@ -59,6 +60,7 @@ type Props = {
   onResend?: (id: string) => Promise<void>;
   onSave?: (id: string) => Promise<void>;
   onRetry: () => Promise<void>;
+  onCloseRoom?: () => void;
   initialPeerDraft?: string;
   initialComposer?: string;
   initialBurn?: boolean;
@@ -95,11 +97,17 @@ function stamp(iso: string): string {
   return d.toLocaleTimeString();
 }
 
+const BURN_SECONDS = 3;
+
 function burnChoice(on: boolean): { burn: boolean; ttl: number } {
   if (on) {
-    return { burn: true, ttl: 0 };
+    return { burn: true, ttl: BURN_SECONDS };
   }
   return { burn: false, ttl: 0 };
+}
+
+function fillCount(template: string, n: number): string {
+  return template.replaceAll("{n}", String(n));
 }
 
 const DISSOLVE_MS = 480;
@@ -140,6 +148,7 @@ export default function ChatPage({
   onResend,
   onSave,
   onRetry,
+  onCloseRoom,
   initialPeerDraft,
   initialComposer,
   initialBurn,
@@ -155,6 +164,15 @@ export default function ChatPage({
 }: Props) {
   const { t } = useI18n();
   const ownLabel = displayNickname(nickname) || t("chatYou");
+  const connected = peer.trim().length > 0;
+  const [detailsOpen, setDetailsOpen] = useState(() => !peer.trim() || Boolean(roomError));
+  useEffect(() => {
+    if (roomError) {
+      setDetailsOpen(true);
+      return;
+    }
+    setDetailsOpen(!peer.trim());
+  }, [peer, roomError]);
   const peerRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const burnRef = useRef(false);
@@ -180,6 +198,7 @@ export default function ChatPage({
   const [dissolving, setDissolving] = useState<Set<string>>(() => new Set());
   const sendingRef = useRef(false);
   const dissolvingRef = useRef(new Set<string>());
+  const burnTimer = useRef<number | null>(null);
   const captureRef = useRef<VoiceCapture | null>(null);
   const holdRef = useRef<number | null>(null);
   const pendingRef = useRef(false);
@@ -484,12 +503,21 @@ export default function ChatPage({
       left -= 1;
       if (left <= 0) {
         window.clearInterval(timer);
+        if (burnTimer.current === timer) {
+          burnTimer.current = null;
+        }
         void finishBurn(messageID);
         return;
       }
       setViewer({ id: messageID, left });
     }, 1000);
-    return () => window.clearInterval(timer);
+    burnTimer.current = timer;
+    return () => {
+      window.clearInterval(timer);
+      if (burnTimer.current === timer) {
+        burnTimer.current = null;
+      }
+    };
     // Restart only when a different burned item is opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countdownID, onDiscard]);
@@ -797,12 +825,16 @@ export default function ChatPage({
     if (dissolvingRef.current.has(msg.id)) {
       return;
     }
-    setViewer({ id: msg.id, left: msg.ttlSec && msg.ttlSec > 0 ? msg.ttlSec : null });
+    setViewer({ id: msg.id, left: BURN_SECONDS });
   }
 
   async function finishBurn(id: string): Promise<void> {
     if (dissolvingRef.current.has(id)) {
       return;
+    }
+    if (burnTimer.current != null) {
+      window.clearInterval(burnTimer.current);
+      burnTimer.current = null;
     }
     dissolvingRef.current.add(id);
     setDissolving(new Set(dissolvingRef.current));
@@ -843,7 +875,7 @@ export default function ChatPage({
       actions.push(
         <button
           key="view"
-          className="chat-outside-action"
+          className="chat-outside-action chat-burn-eye"
           type="button"
           aria-label={label}
           title={label}
@@ -888,11 +920,65 @@ export default function ChatPage({
     return <div className="chat-outside-actions">{actions}</div>;
   }
 
+  function outsideFilePreview(msg: ChatMessage): ReactNode {
+    const inboundBurn = Boolean(msg.burn && msg.direction === "in");
+    const image = (msg.mime ?? "").startsWith("image/") && Boolean(msg.preview);
+    if (msg.type !== "file" || !image || inboundBurn) {
+      return null;
+    }
+    const label = msg.name || t("chatPreview");
+    return (
+      <button
+        type="button"
+        className="chat-file-preview"
+        aria-label={label}
+        title={label}
+        onClick={() => {
+          void onSave?.(msg.id);
+        }}
+      >
+        <img alt={msg.name || ""} src={msg.preview} />
+      </button>
+    );
+  }
+
   return (
     <section className="page chat-page">
       <div className="chat-layout">
       <div className="chat-main">
-      <div className="glass chat-identity">
+      <div className={`glass chat-identity${detailsOpen ? "" : " is-compact"}`}>
+        {detailsOpen ? null : (
+          <div className="chat-identity-compact" onClick={() => setDetailsOpen(true)}>
+            <span className={`status-dot${roomError ? " bad" : ""}`} aria-hidden="true" />
+            {roomError ? <span className="err">{roomError}</span> : <span className="status-pill">{t("chatListening")}</span>}
+            <span className="chat-identity-addr" title={address}>{abbreviateAddress(address)}</span>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              disabled={!address}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                void copyText(address);
+              }}
+            >
+              {t("copy")}
+            </button>
+            <span className="chat-identity-peer" title={peer}>{remarkFor(remarks, peer) || abbreviateAddress(peer)}</span>
+            <button
+              className="chat-identity-toggle"
+              type="button"
+              aria-expanded={false}
+              aria-label={t("chatIdentityExpand")}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                setDetailsOpen(true);
+              }}
+            >
+              <ChevronIcon />
+            </button>
+          </div>
+        )}
+        {detailsOpen ? (
         <div className="chat-room-bar">
           <span className={`status-dot${roomError ? " bad" : ""}`} aria-hidden="true" />
           <span className="chat-kicker">{t("chatRoomLabel")}</span>
@@ -906,8 +992,32 @@ export default function ChatPage({
               {t("chatRetry")}
             </button>
           ) : null}
+          {onCloseRoom ? (
+            <button
+              className="btn btn-ghost chat-room-close"
+              type="button"
+              aria-label={`${t("roomClose")} ${address || t("roomCloseTitle")}`}
+              onClick={onCloseRoom}
+            >
+              {t("roomClose")}
+            </button>
+          ) : null}
+          {connected && !roomError ? (
+            <button
+              className="chat-identity-toggle"
+              type="button"
+              aria-expanded={true}
+              aria-label={t("chatIdentityCollapse")}
+              onClick={() => setDetailsOpen(false)}
+            >
+              <ChevronIcon up />
+            </button>
+          ) : null}
         </div>
-        <p className="chat-quiet chat-help">{t("chatCopyHelper")}</p>
+        ) : null}
+        {detailsOpen ? <p className="chat-quiet chat-help">{t("chatCopyHelper")}</p> : null}
+        {detailsOpen ? (
+        <>
         <div className="chat-peer-bar">
           <label htmlFor="chat-peer"><LockIcon />{t("chatPeerLabel")}</label>
           <input
@@ -949,6 +1059,8 @@ export default function ChatPage({
           />
         </div>
         <p id="chat-remark-help" className="chat-quiet chat-help">{t("chatRemarkHelp")}</p>
+        </>
+        ) : null}
         {inline ? <p className="err">{inline}</p> : null}
       </div>
       <div className="chat-stage">
@@ -1046,10 +1158,11 @@ export default function ChatPage({
               </header>
               {msg.burn && msg.direction === "in" && openMessage?.id !== msg.id ? (
                 <div className="chat-burn-mask" aria-hidden="true">
-                  <FlameIcon />
+                  <FlameIcon filled />
                 </div>
               ) : null}
             </article>
+            {outsideFilePreview(msg)}
             {sideActions(msg)}
             </div>
             </div>
@@ -1114,6 +1227,7 @@ export default function ChatPage({
               onChange={(e) => setBurnOn(e.target.checked)}
             />
           </label>
+          {burnOn ? <span className="chat-burn-hint">{t("chatBurnHint")}</span> : null}
           <button className="btn composer-send" type="button" disabled={sending} onClick={() => void send()}>
             {t("send")}
           </button>
@@ -1303,21 +1417,14 @@ function BubbleBody({
           audio={msg.audio ?? ""}
           autoPlay={msg.direction === "in"}
           onEnded={() => {
-            if (inboundBurn && !msg.ttlSec) {
+            if (inboundBurn) {
               void onClose();
             }
           }}
           canPlayMime={canPlayMime}
           decodeVoice={decodeVoice}
         />
-        {open && left != null ? <p>{left}</p> : null}
-        {open ? (
-          <div className="chat-actions">
-            <button className="btn" type="button" onClick={() => void onClose()}>
-              {t("chatClose")}
-            </button>
-          </div>
-        ) : null}
+        {open ? <BurnCountdown left={left} /> : null}
         {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} /> : null}
       </>
     );
@@ -1335,24 +1442,18 @@ function BubbleBody({
       <div className="chat-viewer">
         {msg.type === "text" ? <p>{msg.body}</p> : null}
         {msg.type === "file" && image && msg.preview ? <img alt={msg.name || ""} src={msg.preview} /> : null}
-        {msg.type === "file" && !image ? (
+        {msg.type === "file" ? (
           <p className="chat-file-meta">
             {msg.name} · {msg.size ?? 0}
           </p>
         ) : null}
-        {left != null ? <p>{left}</p> : null}
-        <div className="chat-actions">
-          <button className="btn" type="button" onClick={() => void onClose()}>
-            {t("chatClose")}
-          </button>
-        </div>
+        <BurnCountdown left={left} />
       </div>
     );
   }
   if (msg.type === "file") {
     return (
       <div className="chat-file">
-        {image && msg.preview ? <img alt={msg.name || ""} src={msg.preview} /> : null}
         <p className="chat-file-meta">
           {msg.name} · {msg.size ?? 0}
         </p>
@@ -1415,8 +1516,35 @@ function LockIcon() {
   return <StrokeIcon d="M8 11V8a4 4 0 0 1 8 0v3M7 11h10v9H7z" />;
 }
 
-function FlameIcon() {
+function ChevronIcon({ up = false }: { up?: boolean }) {
+  return <StrokeIcon d={up ? "M6 14l6-6 6 6" : "M6 10l6 6 6-6"} />;
+}
+
+function FlameIcon({ filled = false }: { filled?: boolean }) {
+  if (filled) {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M12 1.8c.4 2.8-.4 4.4-1.6 5.8 1-.4 1.8-1.2 2.2-2.2.8 1.5 3.2 3.1 3.2 6.2a5.8 5.8 0 0 1-11.6.4c0-2 .9-3.3 1.9-4.2.2 1.6 1.1 2.5 2.2 2.8C8.8 8.2 9.2 5.2 12 1.8z"
+        />
+      </svg>
+    );
+  }
   return <StrokeIcon d="M12 3s5 4.2 5 8.2A5 5 0 0 1 7 11.2C7 8.4 9.2 7 9.2 7S9.6 9 12 9c0-2.6 0-6 0-6z" />;
+}
+
+function BurnCountdown({ left }: { left: number | null }) {
+  const { t } = useI18n();
+  if (left == null) {
+    return null;
+  }
+  return (
+    <p className="chat-burn-count" role="timer" aria-live="polite" aria-label={fillCount(t("chatBurnCountdown"), left)}>
+      <span className="chat-burn-count-num">{left}</span>
+      <span className="chat-burn-count-unit">{t("chatBurnCountUnit")}</span>
+    </p>
+  );
 }
 
 function EyeIcon() {

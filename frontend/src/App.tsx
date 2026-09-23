@@ -38,6 +38,7 @@ import {
   startForward,
   startPing,
   startPortServe,
+  stopChatRoom,
   stopSession,
   tailcatVersion,
   type KeyInfo,
@@ -91,6 +92,9 @@ export default function App() {
   const [lobby, setLobby] = useState(true);
   const [lobbyPeer, setLobbyPeer] = useState("");
   const [lobbyError, setLobbyError] = useState("");
+  const [lobbyKey, setLobbyKey] = useState("");
+  const [lobbyKeyDraft, setLobbyKeyDraft] = useState("");
+  const [closeAsk, setCloseAsk] = useState("");
   const [tunnelError, setTunnelError] = useState("");
   const [liveSignal, setLiveSignal] = useState<{ seq: number; data: string } | null>(null);
   const [roomKey, setRoomKey] = useState("");
@@ -370,6 +374,90 @@ export default function App() {
     }
   }
 
+  async function createPermanent(): Promise<void> {
+    const name = lobbyKey.trim();
+    if (!name) {
+      setLobbyError(t("lobbyKeyRequired"));
+      return;
+    }
+    setLobbyError("");
+    const draft = lobbyPeer;
+    try {
+      const sess = await startChatRoom(name);
+      adoptRoom(sess, draft, name);
+      setLobbyPeer("");
+      setPage("chat");
+    } catch (err) {
+      setLobbyError(showError(err));
+    }
+  }
+
+  async function saveLobbyKey(): Promise<void> {
+    const name = lobbyKeyDraft.trim();
+    if (!name) {
+      setLobbyError(t("lobbyKeyNameRequired"));
+      return;
+    }
+    setLobbyError("");
+    try {
+      await createKey(name, false, region);
+      setLobbyKey(name);
+      setLobbyKeyDraft("");
+      const next = await listKeys();
+      setKeys((prev) => (sameKeys(prev, next) ? prev : next));
+    } catch (err) {
+      setLobbyError(showError(err));
+    }
+  }
+
+  function roomHasUserMessage(room: RoomSlice | undefined): boolean {
+    return Boolean(room?.messages.some((msg) => msg.direction === "in" || msg.direction === "out"));
+  }
+
+  function requestCloseRoom(id: string): void {
+    const room = roomsRef.current[id];
+    if (!room) {
+      return;
+    }
+    if (!roomHasUserMessage(room)) {
+      void closeRoom(id);
+      return;
+    }
+    setCloseAsk(id);
+  }
+
+  async function closeRoom(id: string): Promise<void> {
+    setCloseAsk((current) => (current === id ? "" : current));
+    try {
+      await stopChatRoom(id);
+    } catch (err) {
+      const current = roomsRef.current[id];
+      if (current) {
+        commitRooms({ ...roomsRef.current, [id]: { ...current, error: showError(err) } });
+      }
+      return;
+    }
+    pendingRef.current = pendingRef.current.filter((ev) => ev.SessionID !== id);
+    const next = { ...roomsRef.current };
+    delete next[id];
+    commitRooms(next);
+    const remaining = orderRef.current.filter((item) => item !== id && next[item]);
+    commitOrder(remaining);
+    if (focusRef.current === id) {
+      if (remaining.length === 0) {
+        commitFocus("");
+        commitLobby(true);
+        roomKeyRef.current = "";
+        setRoomKey("");
+      } else {
+        const nextID = remaining[0];
+        commitFocus(nextID);
+        syncKey(nextID);
+      }
+    }
+    setLiveSignal(null);
+  }
+
   async function connectLobby(): Promise<void> {
     const addr = lobbyPeer.trim();
     if (!addr.startsWith("tc")) {
@@ -511,7 +599,7 @@ export default function App() {
                 <div className="nav-rooms">
                   <button
                     type="button"
-                    className={`nav-btn nav-child nav-new ${showLobby ? "active" : ""}`}
+                    className={`nav-btn nav-child nav-new${showLobby ? " open" : ""}`}
                     onClick={openLobby}
                   >
                     {t("navNewRoom")}
@@ -531,18 +619,27 @@ export default function App() {
                     );
                     const selected = page === "chat" && !showLobby && focus === id;
                     return (
-                      <button
-                        key={id}
-                        type="button"
-                        className={`nav-btn nav-child ${selected ? "active" : ""}`}
-                        title={roomTooltip(room.address, room.keyName)}
-                        onClick={() => selectRoom(id)}
-                      >
-                        <span className="nav-room-label">
-                          <span className="nav-room-primary">{label}</span>
-                          {room.keyName ? <span className="nav-room-key">{room.keyName}</span> : null}
-                        </span>
-                      </button>
+                      <div key={id} className="nav-room-row">
+                        <button
+                          type="button"
+                          className={`nav-btn nav-child ${selected ? "active" : ""}`}
+                          title={roomTooltip(room.address, room.keyName)}
+                          onClick={() => selectRoom(id)}
+                        >
+                          <span className="nav-room-label">
+                            <span className="nav-room-primary">{label}</span>
+                            {room.keyName ? <span className="nav-room-key">{room.keyName}</span> : null}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="nav-room-close"
+                          aria-label={`${t("roomClose")} ${label}`}
+                          onClick={() => requestCloseRoom(id)}
+                        >
+                          {t("roomClose")}
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -568,8 +665,15 @@ export default function App() {
             <LobbyPage
               peer={lobbyPeer}
               error={lobbyError}
+              keys={keys.map((key) => ({ name: key.Name, source: key.Source }))}
+              keyName={lobbyKey}
+              keyDraft={lobbyKeyDraft}
               onPeer={setLobbyPeer}
+              onKey={setLobbyKey}
+              onKeyDraft={setLobbyKeyDraft}
               onCreate={() => void createTemporary()}
+              onCreatePermanent={() => void createPermanent()}
+              onSaveKey={() => void saveLobbyKey()}
               onConnect={() => void connectLobby()}
             />
           ) : (
@@ -603,6 +707,7 @@ export default function App() {
               onResend={(messageID) => resendChatFile(chatRoom.id, messageID)}
               onSave={(messageID) => saveChatFile(chatRoom.id, messageID)}
               onRetry={() => onRestart(chatRoom.keyName)}
+              onCloseRoom={() => requestCloseRoom(chatRoom.id)}
               notifyNote={notifyDenied ? t("chatNotifyDenied") : ""}
             />
           )
@@ -649,6 +754,29 @@ export default function App() {
           />
         )}
       </main>
+      {closeAsk ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setCloseAsk("")}>
+          <div
+            className="glass modal modal-compact"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="room-close-title"
+            aria-describedby="room-close-body"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <h3 id="room-close-title">{t("roomCloseTitle")}</h3>
+            <p id="room-close-body">{t("roomCloseConfirm")}</p>
+            <div className="row">
+              <button className="btn btn-ghost" type="button" onClick={() => setCloseAsk("")}>
+                {t("cancel")}
+              </button>
+              <button className="btn btn-danger" type="button" onClick={() => void closeRoom(closeAsk)}>
+                {t("roomClose")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

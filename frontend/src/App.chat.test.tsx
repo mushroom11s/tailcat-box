@@ -69,6 +69,7 @@ describe("phase 1 chat shell", () => {
     await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Chat" }));
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     expect(screen.getByText(copied)).toBeTruthy();
   });
 

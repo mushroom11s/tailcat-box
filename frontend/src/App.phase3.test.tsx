@@ -79,7 +79,7 @@ describe("phase 3 voice notes", () => {
     fireEvent.pointerDown(screen.getByRole("button", { name: "Record voice note" }));
     await screen.findByRole("button", { name: "Recording" });
     fireEvent.pointerUp(screen.getByRole("button", { name: "Recording" }));
-    await vi.waitFor(() => expect(onSendVoice).toHaveBeenCalledWith(opusMIME, 2, expect.any(Uint8Array), true, 0));
+    await vi.waitFor(() => expect(onSendVoice).toHaveBeenCalledWith(opusMIME, 2, expect.any(Uint8Array), true, 3));
   });
 
   it("focuses the peer field instead of recording when nobody is connected", () => {
@@ -210,8 +210,10 @@ describe("phase 3 voice notes", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
     expect(document.querySelector("audio")).toBeTruthy();
+    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2500);
+      await vi.advanceTimersByTimeAsync(3500);
     });
     expect(onDiscard).toHaveBeenCalledWith("voice-1");
   });

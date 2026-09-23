@@ -28,6 +28,7 @@ export function localizeChatError(message: string, t: (key: MessageKey) => strin
   switch (message) {
     case "Paste a Tailcat address that starts with tc.":
       return t("chatAddrError");
+    case "You can keep 8 rooms open. Close one to start another.":
     case "You can keep 8 rooms open. Quit the app to close rooms.":
       return t("roomCap");
     case "Unknown room.":

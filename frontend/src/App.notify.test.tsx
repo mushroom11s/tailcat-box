@@ -60,7 +60,7 @@ afterEach(() => {
 async function connectEcho(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Peer address (optional)"), "tc:fake-echo");
   await user.click(screen.getByRole("button", { name: "Connect" }));
-  expect(await screen.findByText("Peer connected")).toBeTruthy();
+  expect(await screen.findByRole("button", { name: "Show room details" })).toBeTruthy();
 }
 
 async function chatRoomId(): Promise<string> {
