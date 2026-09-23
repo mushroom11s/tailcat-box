@@ -186,7 +186,13 @@ describe("confirm delete and purge", () => {
     const bar = await screen.findByRole("toolbar", { name: "2 selected" });
     await user.click(within(bar).getByRole("button", { name: "Delete" }));
     const dialog = await screen.findByRole("dialog");
+    expect(dialog.className).toContain("modal-compact");
+    expect(dialog.className).toContain("glass");
+    expect(dialog.getAttribute("aria-labelledby")).toBe("chat-select-delete-title");
+    expect(dialog.getAttribute("aria-describedby")).toBe("chat-select-delete-body");
+    expect(document.activeElement).toBe(dialog);
     expect(dialog.textContent).toContain("Delete 2 local messages? Your peer is not affected.");
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeTruthy();
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
     expect(onDiscard.mock.calls.map((c) => c[0])).toEqual(["b", "sys-c", "d"]);
     expect(screen.queryByText(/selected/)).toBeNull();

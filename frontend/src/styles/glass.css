@@ -1023,6 +1023,35 @@ textarea {
   line-height: 1.45;
 }
 
+/* Short confirms only. Longer dialogs (for example no-auth SSH) stay on .modal. */
+.modal.modal-compact {
+  width: min(380px, 100%);
+  padding: 16px 18px;
+}
+
+.modal.modal-compact h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.modal.modal-compact p {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.modal.modal-compact .row {
+  margin-bottom: 0;
+}
+
+.modal.modal-compact:focus {
+  outline: none;
+}
+
+.modal.modal-compact:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .check {
   display: flex;
   align-items: center;
