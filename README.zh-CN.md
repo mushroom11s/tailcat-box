@@ -10,7 +10,7 @@ macOS 和 Windows 上的 [Tailscale Tailcat](https://github.com/tailscale/tailca
   <img src="docs/assets/icon.png" alt="猫砂盆" width="256" />
 </p>
 
-中文叫 **猫砂盆**，英文叫 **Tailcat Box**。GitHub 仓库是 `tailcat-box`：[mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box)。
+英文名 **Tailcat Box**，中文名 **猫砂盆**。仓库：[mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box)。
 
 ## 功能
 
@@ -142,7 +142,7 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 - `internal/tray` — 打开、会话数量、退出
 - `frontend/` — 聊天、穿透和设置
 
-GitHub 仓库是 `tailcat-box`（https://github.com/mushroom11s/tailcat-box）。`go.mod` 里的 module 路径是 `github.com/mushroom11s/tailcat-box`。
+`go.mod` 里的 module 路径是 `github.com/mushroom11s/tailcat-box`。
 
 ## 致谢
 
