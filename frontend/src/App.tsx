@@ -20,11 +20,13 @@ import {
   deleteKey,
   discardChatMessage,
   getNetworkSettings,
+  getUpdateStatus,
   hasWailsBindings,
   listKeys,
   listSessions,
   onTailcatEvent,
   onTrayNavigate,
+  onUpdateStatus,
   resendChatFile,
   restartChatRoom,
   saveChatFile,
@@ -44,6 +46,7 @@ import {
   type KeyInfo,
   type Session,
   type TailcatEvent,
+  type UpdateStatus,
 } from "./lib/wails";
 
 type Page = "chat" | "tunnel" | "settings";
@@ -109,6 +112,8 @@ export default function App() {
   const localeRef = useRef(locale);
   const notifiedIds = useRef(new Set<string>());
   const [notifyDenied, setNotifyDenied] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
+  const [updateFocus, setUpdateFocus] = useState(0);
   netRef.current = { region, derp: derpMapURL };
   pageRef.current = page;
   localeRef.current = locale;
@@ -119,6 +124,14 @@ export default function App() {
     }
     pageRef.current = next;
     setPageState(next);
+    setUpdateFocus(0);
+  }
+
+  function openUpdateSettings(): void {
+    setLiveSignal(null);
+    pageRef.current = "settings";
+    setPageState("settings");
+    setUpdateFocus((n) => n + 1);
   }
 
   function commitRooms(next: Record<string, RoomSlice>): void {
@@ -287,10 +300,34 @@ export default function App() {
 
   useEffect(() => {
     const node = mainRef.current;
-    if (node) {
-      node.scrollTop = 0;
+    if (!node) {
+      return;
     }
-  }, [page]);
+    if (page === "settings" && updateFocus > 0) {
+      try {
+        document.getElementById("settings-update")?.scrollIntoView({ block: "center" });
+      } catch {
+        // The in-browser test DOM may not implement scrolling.
+      }
+      return;
+    }
+    node.scrollTop = 0;
+  }, [page, updateFocus]);
+
+  useEffect(() => {
+    let revision = 0;
+    const off = onUpdateStatus((status) => {
+      revision += 1;
+      setUpdateStatus(status);
+    });
+    const ticket = revision;
+    void getUpdateStatus().then((status) => {
+      if (revision === ticket) {
+        setUpdateStatus(status);
+      }
+    });
+    return off;
+  }, []);
 
   useEffect(() => {
     return onTrayNavigate((next) => {
@@ -568,7 +605,14 @@ export default function App() {
     <div className="shell">
       <aside className="glass sidebar">
         <div className="brand">
-          <img className="brand-mark" src={iconUrl} alt="" />
+          <div className="brand-logo-row">
+            <img className="brand-mark" src={iconUrl} alt="" />
+            {showUpdateBadge(updateStatus) ? (
+              <button type="button" className="update-new" onClick={openUpdateSettings} aria-label={t("updateNewBadge")}>
+                {t("updateNew")}
+              </button>
+            ) : null}
+          </div>
           <div>
             <h1>{t("productName")}</h1>
             <p>{t("brandTagline")}</p>
@@ -723,6 +767,7 @@ export default function App() {
           />
         ) : (
           <SettingsPage
+            highlightUpdate={updateFocus > 0}
             theme={theme}
             onTheme={setTheme}
             nickname={nickname}
@@ -786,6 +831,13 @@ function RoomCloseIcon() {
       <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" d="M6 6l12 12M18 6 6 18" />
     </svg>
   );
+}
+
+function showUpdateBadge(status: UpdateStatus | null): boolean {
+  if (!status?.UpdateAvailable) {
+    return false;
+  }
+  return status.Status !== "error" && status.Status !== "unsupported";
 }
 
 function NavGlyph({ name }: { name: "chat" | "tunnel" | "settings" }) {

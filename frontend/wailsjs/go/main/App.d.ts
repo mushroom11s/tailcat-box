@@ -5,6 +5,8 @@ import {main} from '../models';
 import {store} from '../models';
 import {adapter} from '../models';
 
+export function CheckForUpdate():Promise<main.UpdateStatus>;
+
 export function ConnectChatPeer(arg1:string,arg2:string):Promise<void>;
 
 export function CreateKey(arg1:string,arg2:boolean,arg3:string):Promise<string>;
@@ -17,11 +19,15 @@ export function DialPipe(arg1:string,arg2:string):Promise<session.Session>;
 
 export function DiscardChatMessage(arg1:string,arg2:string):Promise<void>;
 
+export function DownloadUpdate():Promise<main.UpdateStatus>;
+
 export function GetClientInfo():Promise<main.ClientInfo>;
 
 export function GetNetworkSettings():Promise<store.Settings>;
 
 export function GetSystemInfo():Promise<main.SystemInfo>;
+
+export function GetUpdateStatus():Promise<main.UpdateStatus>;
 
 export function Greet(arg1:string):Promise<string>;
 
@@ -38,6 +44,8 @@ export function RecordUpdateCheck():Promise<main.ClientInfo>;
 export function ResendChatFile(arg1:string,arg2:string):Promise<void>;
 
 export function ResolveAddr(arg1:string):Promise<string>;
+
+export function RevealDownloadedUpdate():Promise<void>;
 
 export function RestartChatRoom(arg1:string,arg2:string):Promise<session.Session>;
 

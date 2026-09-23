@@ -1,15 +1,18 @@
 import {
+  CheckForUpdate as bindCheckForUpdate,
   ConnectChatPeer as bindConnectChatPeer,
   CreateKey as bindCreateKey,
   DecodeChatVoice as bindDecodeChatVoice,
   DeleteKey as bindDeleteKey,
   DiscardChatMessage as bindDiscardChatMessage,
+  DownloadUpdate as bindDownloadUpdate,
   DialPipe as bindDialPipe,
   GetNetworkSettings as bindGetNetworkSettings,
   ListKeys as bindListKeys,
   ListSessions as bindListSessions,
   ParseAddr as bindParseAddr,
   ResolveAddr as bindResolveAddr,
+  RevealDownloadedUpdate as bindRevealDownloadedUpdate,
   StartBrowse as bindStartBrowse,
   StartForward as bindStartForward,
   StartPing as bindStartPing,
@@ -40,11 +43,11 @@ import {
   TailcatVersion as bindTailcatVersion,
   GetClientInfo as bindGetClientInfo,
   GetSystemInfo as bindGetSystemInfo,
-  RecordUpdateCheck as bindRecordUpdateCheck,
+  GetUpdateStatus as bindGetUpdateStatus,
   SetLaunchAtLogin as bindSetLaunchAtLogin,
   SetUILocale as bindSetUILocale,
 } from "../../wailsjs/go/main/App";
-import { EventsOn } from "../../wailsjs/runtime/runtime";
+import { BrowserOpenURL, EventsOn } from "../../wailsjs/runtime/runtime";
 import { adapter, main, session, store } from "../../wailsjs/go/models";
 import { createBrowserHub } from "./chatBrowser";
 
@@ -101,6 +104,29 @@ export type ClientInfo = {
   LastUpdateCheck: string;
 };
 
+export type UpdateStatus = {
+  CurrentVersion: string;
+  LatestVersion: string;
+  LatestTag: string;
+  UpdateAvailable: boolean;
+  Notes: string;
+  ReleaseURL: string;
+  AssetName: string;
+  DownloadURL: string;
+  LastChecked: string;
+  Status: string;
+  Error: string;
+  DownloadedPath: string;
+  ProgressPercent: number;
+  Platform: string;
+};
+
+export type UpdateProgress = {
+  Received: number;
+  Total: number;
+  Percent: number;
+};
+
 export type SystemInfo = {
   OSVersion: string;
   LaunchAtLogin: boolean;
@@ -111,6 +137,8 @@ export type SystemInfo = {
 
 const TAILCAT_EVENT = "tailcat:event";
 export const TRAY_NAVIGATE_EVENT = "tailcat:navigate";
+export const UPDATE_EVENT = "tailcat:update";
+export const UPDATE_PROGRESS_EVENT = "tailcat:update-progress";
 
 type GoWindow = Window & {
   go?: { main?: { App?: { StartChatRoom?: unknown } } };
@@ -167,6 +195,8 @@ type FakeState = {
   keys: KeyInfo[];
   listeners: Array<(ev: TailcatEvent) => void>;
   navListeners: Array<(page: string) => void>;
+  updateListeners: Array<(status: UpdateStatus) => void>;
+  progressListeners: Array<(progress: UpdateProgress) => void>;
   serveStops: Map<string, () => void>;
   ports: Map<string, string>;
   files: Map<string, string>;
@@ -174,13 +204,36 @@ type FakeState = {
   startedAt: string;
   lastUpdateCheck: string;
   launchAtLogin: boolean;
+  update: UpdateStatus;
+  updateChecks: number;
 };
+
+function emptyUpdateStatus(): UpdateStatus {
+  return {
+    CurrentVersion: "0.1.0-dev",
+    LatestVersion: "",
+    LatestTag: "",
+    UpdateAvailable: false,
+    Notes: "",
+    ReleaseURL: "",
+    AssetName: "",
+    DownloadURL: "",
+    LastChecked: "",
+    Status: "",
+    Error: "",
+    DownloadedPath: "",
+    ProgressPercent: 0,
+    Platform: "linux",
+  };
+}
 
 const fake: FakeState = {
   sessions: [],
   keys: [],
   listeners: [],
   navListeners: [],
+  updateListeners: [],
+  progressListeners: [],
   serveStops: new Map(),
   ports: new Map(),
   files: new Map(),
@@ -188,6 +241,8 @@ const fake: FakeState = {
   startedAt: new Date().toISOString(),
   lastUpdateCheck: "",
   launchAtLogin: false,
+  update: emptyUpdateStatus(),
+  updateChecks: 0,
 };
 
 function newID(): string {
@@ -1055,6 +1110,34 @@ function asClientInfo(info: main.ClientInfo): ClientInfo {
   };
 }
 
+export function normalizeUpdateStatus(source: Partial<UpdateStatus> | null | undefined): UpdateStatus {
+  const status = source ?? {};
+  return {
+    CurrentVersion: status.CurrentVersion ?? "",
+    LatestVersion: status.LatestVersion ?? "",
+    LatestTag: status.LatestTag ?? "",
+    UpdateAvailable: Boolean(status.UpdateAvailable),
+    Notes: status.Notes ?? "",
+    ReleaseURL: status.ReleaseURL ?? "",
+    AssetName: status.AssetName ?? "",
+    DownloadURL: status.DownloadURL ?? "",
+    LastChecked: status.LastChecked ?? "",
+    Status: status.Status ?? "",
+    Error: status.Error ?? "",
+    DownloadedPath: status.DownloadedPath ?? "",
+    ProgressPercent: Number(status.ProgressPercent ?? 0),
+    Platform: status.Platform ?? "",
+  };
+}
+
+function publishUpdate(status: UpdateStatus): void {
+  fake.update = status;
+  fake.lastUpdateCheck = status.LastChecked;
+  for (const listener of [...fake.updateListeners]) {
+    listener(status);
+  }
+}
+
 function asSystemInfo(info: main.SystemInfo): SystemInfo {
   return {
     OSVersion: info.OSVersion ?? "",
@@ -1100,11 +1183,120 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 }
 
 export async function recordUpdateCheck(): Promise<ClientInfo> {
+  await checkForUpdate();
+  return getClientInfo();
+}
+
+export async function getUpdateStatus(): Promise<UpdateStatus> {
   if (hasWailsBindings()) {
-    return asClientInfo(await bindRecordUpdateCheck());
+    return normalizeUpdateStatus(await bindGetUpdateStatus());
   }
-  fake.lastUpdateCheck = new Date().toISOString();
-  return fakeClientInfo();
+  return normalizeUpdateStatus(fake.update);
+}
+
+export async function checkForUpdate(): Promise<UpdateStatus> {
+  if (hasWailsBindings()) {
+    return normalizeUpdateStatus(await bindCheckForUpdate());
+  }
+  fake.updateChecks += 1;
+  // The browser preview has no Go checker. Keep whatever status a test
+  // already published, and only move the last-checked clock.
+  const next = normalizeUpdateStatus({
+    ...fake.update,
+    LastChecked: new Date().toISOString(),
+  });
+  publishUpdate(next);
+  return next;
+}
+
+export async function downloadUpdate(): Promise<UpdateStatus> {
+  if (hasWailsBindings()) {
+    return normalizeUpdateStatus(await bindDownloadUpdate());
+  }
+  if (!fake.update.UpdateAvailable || !fake.update.DownloadURL) {
+    throw new Error("no update to download");
+  }
+  const name = fake.update.AssetName || "tailcat-box.zip";
+  for (const listener of [...fake.progressListeners]) {
+    listener({ Received: 4, Total: 4, Percent: 100 });
+  }
+  const next = normalizeUpdateStatus({
+    ...fake.update,
+    Status: "downloaded",
+    DownloadedPath: `Downloads/${name}`,
+    ProgressPercent: 100,
+    Error: "",
+    UpdateAvailable: true,
+  });
+  publishUpdate(next);
+  return next;
+}
+
+export async function revealDownloadedUpdate(): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindRevealDownloadedUpdate();
+    return;
+  }
+  if (!fake.update.DownloadedPath) {
+    throw new Error("no downloaded update");
+  }
+}
+
+export function openReleasePage(url: string): void {
+  if (!url.startsWith("https://github.com/mushroom11s/tailcat-box/")) {
+    return;
+  }
+  if (hasWailsBindings() && goWindow().runtime) {
+    BrowserOpenURL(url);
+    return;
+  }
+  if (typeof window !== "undefined") {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
+export function onUpdateStatus(callback: (status: UpdateStatus) => void): () => void {
+  if (hasWailsBindings() && goWindow().runtime) {
+    return EventsOn(UPDATE_EVENT, (status: UpdateStatus) => {
+      callback(normalizeUpdateStatus(status));
+    });
+  }
+  fake.updateListeners.push(callback);
+  return () => {
+    fake.updateListeners = fake.updateListeners.filter((listener) => listener !== callback);
+  };
+}
+
+export function onUpdateProgress(callback: (progress: UpdateProgress) => void): () => void {
+  if (hasWailsBindings() && goWindow().runtime) {
+    return EventsOn(UPDATE_PROGRESS_EVENT, (progress: UpdateProgress) => {
+      callback({
+        Received: Number(progress?.Received ?? 0),
+        Total: Number(progress?.Total ?? 0),
+        Percent: Number(progress?.Percent ?? 0),
+      });
+    });
+  }
+  fake.progressListeners.push(callback);
+  return () => {
+    fake.progressListeners = fake.progressListeners.filter((listener) => listener !== callback);
+  };
+}
+
+export function emitUpdateStatus(status: UpdateStatus): void {
+  publishUpdate(normalizeUpdateStatus(status));
+}
+
+export function updateCheckCount(): number {
+  return fake.updateChecks;
+}
+
+export function resetFakeUpdateState(): void {
+  fake.update = emptyUpdateStatus();
+  fake.updateChecks = 0;
+  fake.updateListeners = [];
+  fake.progressListeners = [];
+  fake.lastUpdateCheck = "";
 }
 
 export async function setUILocale(locale: string): Promise<void> {

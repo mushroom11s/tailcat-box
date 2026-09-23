@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"encoding/base64"
@@ -22,14 +24,17 @@ import (
 	"github.com/mushroom11s/tailcat-box/internal/store"
 	"github.com/mushroom11s/tailcat-box/internal/sysinfo"
 	"github.com/mushroom11s/tailcat-box/internal/tray"
+	"github.com/mushroom11s/tailcat-box/internal/update"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
-	tailcatEventName    = "tailcat:event"
-	updateCheckInterval = 24 * time.Hour
-	configDirName       = "tailcat-box"
-	legacyConfigDirName = "tailcat-desktop-client"
+	tailcatEventName        = "tailcat:event"
+	updateEventName         = "tailcat:update"
+	updateProgressEventName = "tailcat:update-progress"
+	updateCheckInterval     = 24 * time.Hour
+	configDirName           = "tailcat-box"
+	legacyConfigDirName     = "tailcat-desktop-client"
 	// windowTitle is the native OS caption. It stays English when the UI
 	// locale changes the sidebar brand and tray name.
 	windowTitle = "Tailcat Box"
@@ -55,6 +60,8 @@ type App struct {
 	tray       *tray.Controller
 	trayIcon   []byte
 	settings   *settings.Store
+	updates    *update.Checker
+	updateMu   sync.Mutex
 	uiLocale   string
 	// windowFullscreen tracks the View menu label (Enter vs Exit Full Screen).
 	// The native window title stays windowTitle in both states.
@@ -68,6 +75,31 @@ type ClientInfo struct {
 	AppVersion      string
 	TailcatVersion  string
 	LastUpdateCheck string
+}
+
+// UpdateStatus is the in-app update card: cached GitHub release plus this build.
+type UpdateStatus struct {
+	CurrentVersion  string
+	LatestVersion   string
+	LatestTag       string
+	UpdateAvailable bool
+	Notes           string
+	ReleaseURL      string
+	AssetName       string
+	DownloadURL     string
+	LastChecked     string
+	Status          string
+	Error           string
+	DownloadedPath  string
+	ProgressPercent int
+	Platform        string
+}
+
+// UpdateProgress is emitted on tailcat:update-progress while a zip downloads.
+type UpdateProgress struct {
+	Received int64
+	Total    int64
+	Percent  int
 }
 
 // SystemInfo is host metadata shown on Settings.
@@ -227,11 +259,15 @@ func (a *App) maybeRecordDailyUpdateCheck() {
 	if a.settings == nil {
 		return
 	}
+	cached := a.GetUpdateStatus()
+	if cached.LastChecked != "" || cached.UpdateAvailable {
+		a.emitUpdate(cached)
+	}
 	_, last := a.settings.Snapshot()
 	if !last.IsZero() && time.Since(last) < updateCheckInterval {
 		return
 	}
-	_, _ = a.RecordUpdateCheck()
+	_, _ = a.CheckForUpdate()
 }
 
 func (a *App) showWindow() {
@@ -617,15 +653,191 @@ func (a *App) GetClientInfo() ClientInfo {
 	return info
 }
 
-// RecordUpdateCheck stores the current time as the last Tailcat version inspection.
+// RecordUpdateCheck runs a real GitHub release check and returns client info.
+// Prefer CheckForUpdate when the caller needs the update card.
 func (a *App) RecordUpdateCheck() (ClientInfo, error) {
-	if a.settings == nil {
-		return a.GetClientInfo(), fmt.Errorf("settings store is not available")
-	}
-	if err := a.settings.SetLastUpdateCheck(time.Now()); err != nil {
+	if _, err := a.CheckForUpdate(); err != nil {
 		return a.GetClientInfo(), err
 	}
 	return a.GetClientInfo(), nil
+}
+
+// GetUpdateStatus returns the persisted update card without contacting GitHub.
+func (a *App) GetUpdateStatus() UpdateStatus {
+	var st settings.UpdateState
+	if a.settings != nil {
+		st = a.settings.UpdateState()
+	}
+	return composeUpdateStatus(st, appinfo.ClientVersion(), goruntime.GOOS)
+}
+
+// CheckForUpdate fetches the latest stable GitHub Release and stores the result.
+func (a *App) CheckForUpdate() (UpdateStatus, error) {
+	a.updateMu.Lock()
+	defer a.updateMu.Unlock()
+	if a.settings == nil {
+		return UpdateStatus{}, fmt.Errorf("settings store is not available")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	result := a.checkerLocked().Check(ctx)
+	next := foldUpdateResult(a.settings.UpdateState(), result, time.Now())
+	if err := a.settings.SetUpdateState(next); err != nil {
+		return composeUpdateStatus(a.settings.UpdateState(), appinfo.ClientVersion(), goruntime.GOOS), err
+	}
+	status := composeUpdateStatus(a.settings.UpdateState(), appinfo.ClientVersion(), goruntime.GOOS)
+	a.emitUpdate(status)
+	return status, nil
+}
+
+// DownloadUpdate writes the stored release zip into the Downloads folder.
+func (a *App) DownloadUpdate() (UpdateStatus, error) {
+	a.updateMu.Lock()
+	defer a.updateMu.Unlock()
+	if a.settings == nil {
+		return UpdateStatus{}, fmt.Errorf("settings store is not available")
+	}
+	st := a.settings.UpdateState()
+	status := composeUpdateStatus(st, appinfo.ClientVersion(), goruntime.GOOS)
+	if !status.UpdateAvailable || st.DownloadURL == "" || st.AssetName == "" {
+		return status, fmt.Errorf("no update to download")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	path, err := a.checkerLocked().Download(ctx, st.DownloadURL, st.AssetName, func(p update.Progress) {
+		a.emitProgress(UpdateProgress{Received: p.Received, Total: p.Total, Percent: p.Percent})
+	})
+	if err != nil {
+		status.Error = update.ErrDownload
+		status.Status = update.StatusAvailable
+		status.UpdateAvailable = true
+		status.DownloadedPath = ""
+		a.emitUpdate(status)
+		return status, nil
+	}
+	st.DownloadedPath = path
+	st.Status = update.StatusDownloaded
+	st.Error = ""
+	if err := a.settings.SetUpdateState(st); err != nil {
+		return composeUpdateStatus(a.settings.UpdateState(), appinfo.ClientVersion(), goruntime.GOOS), err
+	}
+	status = composeUpdateStatus(a.settings.UpdateState(), appinfo.ClientVersion(), goruntime.GOOS)
+	status.ProgressPercent = 100
+	a.emitUpdate(status)
+	return status, nil
+}
+
+// RevealDownloadedUpdate shows the downloaded zip in Finder or Explorer.
+func (a *App) RevealDownloadedUpdate() error {
+	status := a.GetUpdateStatus()
+	if status.DownloadedPath == "" {
+		return fmt.Errorf("no downloaded update")
+	}
+	if !fileExists(status.DownloadedPath) {
+		return fmt.Errorf("downloaded update is missing")
+	}
+	return update.Reveal(status.DownloadedPath)
+}
+
+func (a *App) checkerLocked() *update.Checker {
+	if a.updates != nil {
+		return a.updates
+	}
+	a.updates = update.New(update.Config{
+		CurrentVersion: appinfo.ClientVersion(),
+		LatestURL:      os.Getenv("TAILCAT_UPDATE_URL"),
+		DownloadsDir:   os.Getenv("TAILCAT_DOWNLOADS_DIR"),
+		GOOS:           goruntime.GOOS,
+		GOARCH:         goruntime.GOARCH,
+		UserAgent:      update.UserAgent(appinfo.ClientVersion()),
+	})
+	return a.updates
+}
+
+func (a *App) emitUpdate(status UpdateStatus) {
+	if a.ctx == nil {
+		return
+	}
+	runtime.EventsEmit(a.ctx, updateEventName, status)
+}
+
+func (a *App) emitProgress(progress UpdateProgress) {
+	if a.ctx == nil {
+		return
+	}
+	runtime.EventsEmit(a.ctx, updateProgressEventName, progress)
+}
+
+func foldUpdateResult(prev settings.UpdateState, result update.Result, now time.Time) settings.UpdateState {
+	next := prev
+	next.CheckedAt = now.UTC()
+	if result.Status == update.StatusError {
+		next.Status = update.StatusError
+		next.Error = result.Error
+		return next
+	}
+	next.Status = result.Status
+	next.Error = result.Error
+	next.LatestTag = result.LatestTag
+	next.LatestVersion = result.LatestVersion
+	next.ReleaseURL = result.ReleaseURL
+	next.Notes = result.Notes
+	next.AssetName = result.AssetName
+	next.DownloadURL = result.DownloadURL
+	if result.AssetName == "" || result.AssetName != prev.AssetName {
+		next.DownloadedPath = ""
+	}
+	if next.Status == update.StatusUpToDate || next.Status == update.StatusUnsupported {
+		next.DownloadedPath = ""
+	}
+	if next.Status == update.StatusAvailable && next.DownloadedPath != "" && fileExists(next.DownloadedPath) {
+		next.Status = update.StatusDownloaded
+	}
+	return next
+}
+
+func composeUpdateStatus(st settings.UpdateState, current, goos string) UpdateStatus {
+	out := UpdateStatus{
+		CurrentVersion: current,
+		LatestVersion:  st.LatestVersion,
+		LatestTag:      st.LatestTag,
+		Notes:          st.Notes,
+		ReleaseURL:     st.ReleaseURL,
+		AssetName:      st.AssetName,
+		DownloadURL:    st.DownloadURL,
+		DownloadedPath: st.DownloadedPath,
+		Status:         st.Status,
+		Error:          st.Error,
+		Platform:       goos,
+	}
+	if !st.CheckedAt.IsZero() {
+		out.LastChecked = st.CheckedAt.UTC().Format(time.RFC3339)
+	}
+	switch st.Status {
+	case update.StatusAvailable, update.StatusDownloaded:
+		newer, err := update.IsNewer(st.LatestVersion, current)
+		if err != nil || !newer || st.DownloadURL == "" {
+			if err == nil && !newer {
+				out.Status = update.StatusUpToDate
+				out.DownloadedPath = ""
+			}
+			return out
+		}
+		if st.Status == update.StatusDownloaded && !fileExists(st.DownloadedPath) {
+			out.Status = update.StatusAvailable
+			out.DownloadedPath = ""
+		}
+		out.UpdateAvailable = true
+	}
+	return out
+}
+
+func fileExists(path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	return err == nil && info != nil && !info.IsDir()
 }
 
 // GetSystemInfo returns OS version, launch-at-login state, and a local network summary.

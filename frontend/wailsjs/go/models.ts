@@ -78,6 +78,44 @@ export namespace main {
 	        this.LastUpdateCheck = source["LastUpdateCheck"];
 	    }
 	}
+	export class UpdateStatus {
+	    CurrentVersion: string;
+	    LatestVersion: string;
+	    LatestTag: string;
+	    UpdateAvailable: boolean;
+	    Notes: string;
+	    ReleaseURL: string;
+	    AssetName: string;
+	    DownloadURL: string;
+	    LastChecked: string;
+	    Status: string;
+	    Error: string;
+	    DownloadedPath: string;
+	    ProgressPercent: number;
+	    Platform: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.CurrentVersion = source["CurrentVersion"];
+	        this.LatestVersion = source["LatestVersion"];
+	        this.LatestTag = source["LatestTag"];
+	        this.UpdateAvailable = source["UpdateAvailable"];
+	        this.Notes = source["Notes"];
+	        this.ReleaseURL = source["ReleaseURL"];
+	        this.AssetName = source["AssetName"];
+	        this.DownloadURL = source["DownloadURL"];
+	        this.LastChecked = source["LastChecked"];
+	        this.Status = source["Status"];
+	        this.Error = source["Error"];
+	        this.DownloadedPath = source["DownloadedPath"];
+	        this.ProgressPercent = source["ProgressPercent"];
+	        this.Platform = source["Platform"];
+	    }
+	}
 	export class SystemInfo {
 	    OSVersion: string;
 	    LaunchAtLogin: boolean;
