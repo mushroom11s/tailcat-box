@@ -4,3 +4,4 @@
 - [Tailcat Box (猫砂盆) chat redesign](2026-09-22-tailcat-box-chat-design.md) — chat-centric UI with Tailcatchat interoperability.
 - [Local transcript multi-select delete](2026-09-22-tailcat-box-chat-multiselect-delete-design.md) — replace burn-bubble Delete with drag-rect multi-select and top-bar local discard. Design only.
 - [Tailcat Box Liquid Glass](2026-09-22-tailcat-box-liquid-glass-design.md) — stronger frosted-glass visual pass over the existing Chat, Tunnel, and Settings shell.
+- [Multi-room chat](2026-09-23-tailcat-box-multi-room-chat-design.md) — concurrent listeners under Chat, with a create lobby when no room is open. Design only.
