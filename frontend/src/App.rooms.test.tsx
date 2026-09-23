@@ -277,4 +277,60 @@ describe("phase A multi-room lobby", () => {
     expect(await screen.findByRole("heading", { name: "New room" })).toBeTruthy();
     expect((await listSessions()).filter((item) => item.Kind === "chat")).toHaveLength(0);
   });
+
+  it("restarts only the room open before Settings and leaves the other room's transcript and peer", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
+    await openRoomDetails(user);
+    await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
+    await user.click(screen.getByRole("button", { name: "Connect" }));
+    await user.type(screen.getByLabelText("Message"), "alpha-only");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("alpha-only")).toBeTruthy();
+    const firstAddress = await waitRoomAddress();
+
+    await user.click(screen.getByRole("button", { name: "+ New room" }));
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
+    await openRoomDetails(user);
+    await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
+    await user.click(screen.getByRole("button", { name: "Connect" }));
+    await user.type(screen.getByLabelText("Message"), "beta-only");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("beta-only")).toBeTruthy();
+    expect(screen.queryByText("alpha-only")).toBeNull();
+    const secondAddress = await waitRoomAddress();
+    expect(secondAddress).not.toBe(firstAddress);
+    expect(screen.getByText("Peer connected")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByText(`Restarts this room only: ${secondAddress}. Other rooms stay connected.`)).toBeTruthy();
+    await user.type(screen.getByLabelText("Name"), "home");
+    await user.click(screen.getByRole("button", { name: "Create key" }));
+    await user.selectOptions(screen.getByLabelText("Room key"), "home");
+    expect(screen.getByText("Restart room to apply")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Restart room" }));
+
+    await user.click(screen.getByRole("button", { name: "Chat" }));
+    expect(await screen.findByText("beta-only")).toBeTruthy();
+    expect(screen.getByText("Room restarted. Send the new address.")).toBeTruthy();
+    expect(screen.queryByText("alpha-only")).toBeNull();
+    await openRoomDetails(user);
+    expect(screen.queryByText("Peer connected")).toBeNull();
+    await waitFor(() => {
+      expect(shownRoomAddress().startsWith("tc:fake-room-key-")).toBe(true);
+    });
+    const restartedAddress = shownRoomAddress();
+    expect(restartedAddress).not.toBe(secondAddress);
+
+    await user.click(screen.getByRole("button", { name: abbrev(firstAddress) }));
+    expect(await screen.findByText("alpha-only")).toBeTruthy();
+    expect(screen.queryByText("beta-only")).toBeNull();
+    expect(screen.queryByText("Room restarted. Send the new address.")).toBeNull();
+    expect(shownRoomAddress()).toBe(firstAddress);
+    await openRoomDetails(user);
+    expect(screen.getByText("Peer connected")).toBeTruthy();
+    expect((await listSessions()).filter((item) => item.Kind === "chat")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: `${abbrev(restartedAddress)} home` })).toBeTruthy();
+  });
 });

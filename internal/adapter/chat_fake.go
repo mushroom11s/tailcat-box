@@ -267,7 +267,11 @@ func (f *Fake) deliver(addr string, port uint16, frame []byte) error {
 func (r *fakeRoom) Close() error {
 	r.once.Do(func() {
 		r.owner.mu.Lock()
-		delete(r.owner.chatRooms, r.addr)
+		// A newer room may already be listening at this address. Deleting by
+		// address alone unregisters that room and drops its session.
+		if r.owner.chatRooms[r.addr] == r {
+			delete(r.owner.chatRooms, r.addr)
+		}
 		ch := r.events
 		r.events = nil
 		r.owner.mu.Unlock()
