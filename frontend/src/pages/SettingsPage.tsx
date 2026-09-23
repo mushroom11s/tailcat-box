@@ -2,23 +2,31 @@ import { useEffect, useState, type ReactNode } from "react";
 import DiagnosticsSection from "../components/DiagnosticsSection";
 import KeysDERPSection from "../components/KeysDERPSection";
 import iconUrl from "../assets/icon.png";
-import { useI18n, type Locale } from "../i18n";
+import { useI18n, type Locale, type MessageKey } from "../i18n";
 import { displayNickname, sanitizeNickname } from "../lib/nickname";
 import {
+  checkForUpdate,
+  downloadUpdate,
   getClientInfo,
   getSystemInfo,
-  recordUpdateCheck,
+  getUpdateStatus,
+  onUpdateProgress,
+  onUpdateStatus,
+  openReleasePage,
+  revealDownloadedUpdate,
   setLaunchAtLogin,
   type ClientInfo,
   type KeyInfo,
   type Session,
   type SystemInfo,
   type TailcatEvent,
+  type UpdateStatus,
 } from "../lib/wails";
 
 export type Theme = "system" | "light" | "dark";
 
 type Props = {
+  highlightUpdate?: boolean;
   theme: Theme;
   onTheme: (theme: Theme) => void;
   nickname: string;
@@ -105,12 +113,16 @@ function BadgeIcon() {
 }
 
 function InfoCard({
+  id,
+  className,
   title,
   icon,
   tone,
   action,
   children,
 }: {
+  id?: string;
+  className?: string;
   title: string;
   icon: ReactNode;
   tone: "warning" | "danger";
@@ -118,7 +130,7 @@ function InfoCard({
   children: ReactNode;
 }) {
   return (
-    <article className="glass info-card">
+    <article id={id} className={`glass info-card${className ? ` ${className}` : ""}`}>
       <header className="info-card-head">
         <div className="info-card-title">
           <span className={`info-card-icon ${tone}`}>{icon}</span>
@@ -155,6 +167,7 @@ function InfoRow({
 }
 
 export default function SettingsPage({
+  highlightUpdate = false,
   theme,
   onTheme,
   nickname,
@@ -182,6 +195,10 @@ export default function SettingsPage({
 }: Props) {
   const { locale, setLocale, t } = useI18n();
   const [client, setClient] = useState<ClientInfo | null>(null);
+  const [update, setUpdate] = useState<UpdateStatus | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [downloading, setDownloading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [browserOnline, setBrowserOnline] = useState(() =>
@@ -200,6 +217,31 @@ export default function SettingsPage({
     void refresh().catch((err) => {
       setError(err instanceof Error ? err.message : String(err));
     });
+  }, []);
+
+  useEffect(() => {
+    let revision = 0;
+    const offStatus = onUpdateStatus((status) => {
+      revision += 1;
+      setUpdate(status);
+    });
+    const offProgress = onUpdateProgress((next) => {
+      setProgress(next.Percent);
+    });
+    const ticket = revision;
+    void getUpdateStatus()
+      .then((status) => {
+        if (revision === ticket) {
+          setUpdate(status);
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      offStatus();
+      offProgress();
+    };
   }, []);
 
   useEffect(() => {
@@ -226,9 +268,40 @@ export default function SettingsPage({
 
   async function onCheckNow(): Promise<void> {
     setBusy(true);
+    setChecking(true);
     setError("");
     try {
-      setClient(await recordUpdateCheck());
+      const [nextUpdate, nextClient] = await Promise.all([checkForUpdate(), getClientInfo()]);
+      setUpdate(nextUpdate);
+      setClient(nextClient);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setChecking(false);
+      setBusy(false);
+    }
+  }
+
+  async function onDownload(): Promise<void> {
+    setBusy(true);
+    setDownloading(true);
+    setProgress(0);
+    setError("");
+    try {
+      setUpdate(await downloadUpdate());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDownloading(false);
+      setBusy(false);
+    }
+  }
+
+  async function onReveal(): Promise<void> {
+    setBusy(true);
+    setError("");
+    try {
+      await revealDownloadedUpdate();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -250,6 +323,11 @@ export default function SettingsPage({
 
   void now;
   const uptime = client ? formatUptime(client.StartedAt) : "—";
+  const checkedAt = update?.LastChecked || client?.LastUpdateCheck || "";
+  const downloaded = update?.Status === "downloaded" && Boolean(update.DownloadedPath);
+  const canDownload = Boolean(update?.UpdateAvailable && update.DownloadURL);
+  const statusText = update ? describeUpdate(update, t) : "";
+  const downloadError = update?.Error === "download" ? t("updateErrDownload") : "";
 
   const goOnline = system?.NetworkOnline;
   const online = goOnline ?? browserOnline;
@@ -330,23 +408,71 @@ export default function SettingsPage({
 
       <div className="settings-cards">
         <InfoCard
+          id="settings-update"
+          className={highlightUpdate ? "update-focus" : undefined}
           title={t("clientInfoTitle")}
           icon={<img className="info-card-mark" src={iconUrl} alt="" />}
           tone="warning"
           action={
             <button className="btn-link" type="button" disabled={localBusy} onClick={() => void onCheckNow()}>
-              {t("checkNow")}
+              {checking ? t("updateChecking") : t("checkNow")}
             </button>
           }
         >
           <InfoRow label={t("uptime")} value={uptime} mono />
-          <InfoRow label={t("appVersion")} value={client?.AppVersion ?? "—"} mono />
+          <InfoRow label={t("appVersion")} value={client?.AppVersion ?? update?.CurrentVersion ?? "—"} mono />
           <InfoRow label={t("tailcatVersion")} value={client?.TailcatVersion ?? "—"} mono />
-          <InfoRow
-            label={t("lastUpdateCheck")}
-            value={formatChecked(client?.LastUpdateCheck ?? "", locale, t("never"))}
-          />
+          <InfoRow label={t("latestVersion")} value={update?.LatestVersion || "—"} mono />
+          <InfoRow label={t("lastUpdateCheck")} value={formatChecked(checkedAt, locale, t("never"))} />
+          {statusText ? <p className="update-status">{statusText}</p> : null}
+          {update?.Notes ? (
+            <div className="update-notes">
+              <span className="info-card-label">{t("releaseNotes")}</span>
+              <p>{update.Notes}</p>
+            </div>
+          ) : null}
           <p className="info-card-note">{t("updateCheckHint")}</p>
+          {downloading ? (
+            <div
+              className="update-progress"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              aria-label={t("downloadingUpdate")}
+            >
+              <span style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
+            </div>
+          ) : null}
+          {downloadError ? <p className="err">{downloadError}</p> : null}
+          <div className="update-actions">
+            {canDownload && !downloaded ? (
+              <button className="btn btn-small" type="button" disabled={localBusy} onClick={() => void onDownload()}>
+                {downloading ? t("downloadingUpdate") : t("downloadUpdate")}
+              </button>
+            ) : null}
+            {downloaded ? (
+              <button className="btn btn-small" type="button" disabled={localBusy} onClick={() => void onReveal()}>
+                {revealLabel(update?.Platform ?? "", t)}
+              </button>
+            ) : null}
+            {downloaded ? (
+              <button className="btn-link" type="button" disabled={localBusy} onClick={() => void onDownload()}>
+                {downloading ? t("downloadingUpdate") : t("downloadAgain")}
+              </button>
+            ) : null}
+            {update?.ReleaseURL ? (
+              <button className="btn-link" type="button" onClick={() => openReleasePage(update.ReleaseURL)}>
+                {t("viewRelease")}
+              </button>
+            ) : null}
+          </div>
+          {downloaded ? (
+            <div className="update-install">
+              <h4>{t("updateInstallTitle")}</h4>
+              <p>{installSteps(update?.Platform ?? "", t)}</p>
+            </div>
+          ) : null}
         </InfoCard>
 
         <InfoCard title={t("systemInfoTitle")} icon={<MonitorIcon />} tone="danger">
@@ -398,4 +524,60 @@ export default function SettingsPage({
       />
     </section>
   );
+}
+
+function describeUpdate(update: UpdateStatus, t: (key: MessageKey) => string): string {
+  if (update.Status === "error") {
+    return updateErrorText(update.Error || "parse", t);
+  }
+  switch (update.Status) {
+    case "upToDate":
+      return t("updateUpToDate");
+    case "available":
+      return t("updateAvailableLabel");
+    case "downloaded":
+      return t("updateDownloaded");
+    case "unsupported":
+      return t("updateNoPackage");
+    default:
+      return "";
+  }
+}
+
+function updateErrorText(code: string, t: (key: MessageKey) => string): string {
+  switch (code) {
+    case "network":
+      return t("updateErrNetwork");
+    case "rate_limit":
+      return t("updateErrRateLimit");
+    case "parse":
+      return t("updateErrParse");
+    case "no_asset":
+    case "unsupported":
+      return t("updateNoPackage");
+    case "download":
+      return t("updateErrDownload");
+    default:
+      return code;
+  }
+}
+
+function revealLabel(platform: string, t: (key: MessageKey) => string): string {
+  if (platform === "darwin") {
+    return t("revealUpdateMac");
+  }
+  if (platform === "windows") {
+    return t("revealUpdateWin");
+  }
+  return t("revealUpdate");
+}
+
+function installSteps(platform: string, t: (key: MessageKey) => string): string {
+  if (platform === "darwin") {
+    return t("updateInstallMac");
+  }
+  if (platform === "windows") {
+    return t("updateInstallWin");
+  }
+  return t("updateInstallOther");
 }

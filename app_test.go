@@ -354,6 +354,7 @@ func TestAppSettingsBindings(t *testing.T) {
 		t.Fatalf("expected no last check, got %q", info.LastUpdateCheck)
 	}
 
+	useLocalUpdateServer(t)
 	updated, err := a.RecordUpdateCheck()
 	if err != nil {
 		t.Fatal(err)
@@ -621,6 +622,7 @@ func TestSetUILocaleWithoutWindow(t *testing.T) {
 func TestMaybeRecordDailyUpdateCheck(t *testing.T) {
 	t.Setenv("TAILCAT_ADAPTER", "fake")
 	t.Setenv("TAILCAT_SETTINGS_DIR", t.TempDir())
+	hits := useCountingUpdateServer(t)
 	a := NewApp()
 	if a.GetClientInfo().LastUpdateCheck != "" {
 		t.Fatal("expected empty last check before watcher")
@@ -630,9 +632,15 @@ func TestMaybeRecordDailyUpdateCheck(t *testing.T) {
 	if first == "" {
 		t.Fatal("expected daily check to record a timestamp")
 	}
+	if hits.Load() != 1 {
+		t.Fatalf("github checks=%d", hits.Load())
+	}
 	a.maybeRecordDailyUpdateCheck()
 	if a.GetClientInfo().LastUpdateCheck != first {
 		t.Fatal("should not rewrite last check within 24h")
+	}
+	if hits.Load() != 1 {
+		t.Fatalf("second startup check hit GitHub, checks=%d", hits.Load())
 	}
 }
 

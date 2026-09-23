@@ -197,6 +197,49 @@ textarea {
   padding: 6px 10px 22px;
 }
 
+.brand-logo-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.update-new {
+  appearance: none;
+  cursor: pointer;
+  margin: 0 0 6px;
+  padding: 5px 6px 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  color: #2b1604;
+  background: #ffe14a;
+  border: 0;
+  border-radius: 0;
+  image-rendering: pixelated;
+  box-shadow:
+    -2px 0 0 #2b1604,
+    2px 0 0 #2b1604,
+    0 -2px 0 #2b1604,
+    0 2px 0 #2b1604,
+    -2px -2px 0 #2b1604,
+    2px -2px 0 #2b1604,
+    -2px 2px 0 #2b1604,
+    2px 2px 0 #2b1604,
+    4px 4px 0 #e4572e;
+}
+
+.update-new:hover {
+  background: #fff1a8;
+}
+
+.update-new:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
 .brand-mark {
   width: 68px;
   height: 68px;
@@ -628,6 +671,11 @@ textarea {
   cursor: not-allowed;
 }
 
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
 .composer-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1031,6 +1079,54 @@ textarea {
   font-size: 11px;
   line-height: 1.45;
   color: var(--faint);
+}
+
+.info-card.update-focus {
+  outline: 2px solid var(--warn);
+  outline-offset: 3px;
+}
+
+.update-status,
+.update-notes p,
+.update-install p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.update-notes p,
+.update-install p {
+  color: var(--muted);
+  font-size: 12px;
+  max-height: 9em;
+  overflow: auto;
+}
+
+.update-install h4 {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.update-progress {
+  height: 8px;
+  margin-top: 8px;
+  background: var(--icon-bg);
+  border: 2px solid var(--hairline);
+}
+
+.update-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--ok);
 }
 
 .btn-link {
