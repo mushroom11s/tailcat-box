@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, act } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
@@ -196,7 +196,8 @@ describe("phase 3 voice notes", () => {
     const audio = document.querySelector("audio");
     expect(audio).toBeTruthy();
     fireEvent.ended(audio!);
-    expect(onDiscard).toHaveBeenCalledWith("voice-1");
+    expect(document.querySelector(".chat-msg.dissolving")).toBeTruthy();
+    await waitFor(() => expect(onDiscard).toHaveBeenCalledWith("voice-1"));
   });
 
   it("discards a burned voice note when the countdown reaches zero", async () => {

@@ -280,6 +280,7 @@ export const zhCN = {
   chatDownload: "下载",
   chatClose: "关闭",
   chatDelete: "删除",
+  chatSelectToggle: "选择消息",
   chatSelectCount: "已选择 {n} 条",
   chatSelectDelete: "删除",
   chatSelectClose: "关闭",
