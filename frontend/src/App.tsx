@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import ChatPage, { type ChatMessage, type ChatTransfer } from "./pages/ChatPage";
+import ChatPage from "./pages/ChatPage";
+import LobbyPage from "./pages/LobbyPage";
 import SettingsPage from "./pages/SettingsPage";
 import TunnelPage from "./pages/TunnelPage";
 import { forwardPortMappings, parsePortMappings } from "./lib/ports";
@@ -8,6 +9,8 @@ import { useI18n } from "./i18n";
 import iconUrl from "./assets/icon.png";
 import { localizeChatError } from "./lib/chatText";
 import { NICKNAME_KEY, readNickname } from "./lib/nickname";
+import { readNickname, roomPrimaryLabel, roomTooltip } from "./lib/roomLabel";
+import { applyRoomEvent, emptyRoom, type RoomSlice } from "./lib/roomState";
 import {
   connectChatPeer,
   createKey,
@@ -38,10 +41,12 @@ import {
   type Session,
   type TailcatEvent,
 } from "./lib/wails";
+
 type Page = "chat" | "tunnel" | "settings";
 type Theme = "system" | "light" | "dark";
 
 const THEME_KEY = "tailcat-theme";
+const CHAT_KINDS = new Set(["room-ready", "peer", "message", "transfer", "discard"]);
 
 const NAV: Array<{ id: Exclude<Page, "settings">; labelKey: "navChat" | "navTunnel" }> = [
   { id: "chat", labelKey: "navChat" },
@@ -65,21 +70,9 @@ function readTheme(): Theme {
   return "system";
 }
 
-function asMessage(data: string): ChatMessage | null {
-  try {
-    const msg = JSON.parse(data) as ChatMessage;
-    if (!msg.id || !msg.direction) {
-      return null;
-    }
-    return msg;
-  } catch {
-    return null;
-  }
-}
-
 export default function App() {
   const { t } = useI18n();
-  const [page, setPage] = useState<Page>("chat");
+  const [page, setPageState] = useState<Page>("chat");
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const [nickname, setNickname] = useState(() => readNickname());
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -88,21 +81,131 @@ export default function App() {
   const [region, setRegion] = useState("");
   const [derpMapURL, setDerpMapURL] = useState("");
   const [version, setVersion] = useState("");
-  const [chatAddress, setChatAddress] = useState("");
-  const [chatPeer, setChatPeer] = useState("");
-  const [chatCaps, setChatCaps] = useState<string[]>([]);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [transfers, setTransfers] = useState<ChatTransfer[]>([]);
-  const [roomError, setRoomError] = useState("");
+  const [rooms, setRooms] = useState<Record<string, RoomSlice>>({});
+  const [order, setOrder] = useState<string[]>([]);
+  const [focus, setFocus] = useState("");
+  const [lobby, setLobby] = useState(true);
+  const [lobbyPeer, setLobbyPeer] = useState("");
+  const [lobbyError, setLobbyError] = useState("");
   const [tunnelError, setTunnelError] = useState("");
   const [liveSignal, setLiveSignal] = useState<{ seq: number; data: string } | null>(null);
   const [roomKey, setRoomKey] = useState("");
-  const [appliedRoom, setAppliedRoom] = useState({ key: "", region: "", derp: "" });
   const roomKeyRef = useRef("");
-  const peerRef = useRef("");
   const netRef = useRef({ region: "", derp: "" });
+  const roomsRef = useRef(rooms);
+  const orderRef = useRef(order);
+  const focusRef = useRef(focus);
+  const lobbyRef = useRef(lobby);
+  const pageRef = useRef(page);
+  const pendingRef = useRef<TailcatEvent[]>([]);
   netRef.current = { region, derp: derpMapURL };
   const fallback = !hasWailsBindings();
+  const nickname = readNickname();
+
+  function setPage(next: Page): void {
+    if (next !== "chat") {
+      setLiveSignal(null);
+    }
+    pageRef.current = next;
+    setPageState(next);
+  }
+
+  function commitRooms(next: Record<string, RoomSlice>): void {
+    roomsRef.current = next;
+    setRooms(next);
+  }
+
+  function commitOrder(next: string[]): void {
+    orderRef.current = next;
+    setOrder(next);
+  }
+
+  function commitFocus(id: string): void {
+    focusRef.current = id;
+    setFocus(id);
+  }
+
+  function commitLobby(open: boolean): void {
+    lobbyRef.current = open;
+    setLobby(open);
+  }
+
+  function showError(err: unknown): string {
+    const message = err instanceof Error ? err.message : String(err);
+    return localizeChatError(message, t) || message;
+  }
+
+  function drain(id: string): TailcatEvent[] {
+    const queued = pendingRef.current.filter((ev) => ev.SessionID === id);
+    pendingRef.current = pendingRef.current.filter((ev) => ev.SessionID !== id);
+    return queued;
+  }
+
+  function stampApplied(room: RoomSlice): RoomSlice {
+    if (!room.address) {
+      return room;
+    }
+    return {
+      ...room,
+      appliedKey: room.keyName,
+      appliedRegion: netRef.current.region,
+      appliedDERP: netRef.current.derp,
+    };
+  }
+
+  function adoptRoom(sess: Session, peerDraft: string, keyName = ""): void {
+    let room = emptyRoom(sess.ID, peerDraft);
+    room.keyName = keyName;
+    room.address = sess.Address || "";
+    room.error = sess.Err || "";
+    for (const ev of drain(sess.ID)) {
+      room = applyRoomEvent(room, ev);
+    }
+    room = stampApplied(room);
+    commitRooms({ ...roomsRef.current, [sess.ID]: room });
+    commitOrder([sess.ID, ...orderRef.current.filter((item) => item !== sess.ID)]);
+    commitFocus(sess.ID);
+    commitLobby(false);
+    roomKeyRef.current = keyName;
+    setRoomKey(keyName);
+    setLiveSignal(null);
+  }
+
+  function syncKey(id: string): void {
+    const key = roomsRef.current[id]?.keyName ?? "";
+    roomKeyRef.current = key;
+    setRoomKey(key);
+  }
+
+  function openLobby(): void {
+    setPage("chat");
+    commitLobby(true);
+    setLiveSignal(null);
+  }
+
+  function selectRoom(id: string): void {
+    setPage("chat");
+    commitLobby(false);
+    commitFocus(id);
+    syncKey(id);
+    setLiveSignal(null);
+  }
+
+  function openChat(): void {
+    setPage("chat");
+    setLiveSignal(null);
+    if (orderRef.current.length === 0) {
+      commitLobby(true);
+      return;
+    }
+    commitLobby(false);
+    let id = focusRef.current;
+    if (!id || !roomsRef.current[id]) {
+      id = orderRef.current[0];
+      commitFocus(id);
+    }
+    syncKey(id);
+  }
 
   const refresh = useCallback(async () => {
     try {
@@ -116,7 +219,7 @@ export default function App() {
       setDerpMapURL((prev) => (prev === net.DERPMapURL ? prev : net.DERPMapURL));
       setVersion((prev) => (prev === ver ? prev : ver));
     } catch {
-      // Session refresh keeps the last good snapshot. Room listen errors use roomError.
+      // Session refresh keeps the last good snapshot.
     }
   }, []);
 
@@ -139,9 +242,11 @@ export default function App() {
   }, [page]);
 
   useEffect(() => {
-    return onTrayNavigate((page) => {
-      if (page === "chat" || page === "tunnel" || page === "settings") {
-        setPage(page);
+    return onTrayNavigate((next) => {
+      if (next === "chat") {
+        openChat();
+      } else if (next === "tunnel" || next === "settings") {
+        setPage(next);
       }
     });
   }, []);
@@ -150,141 +255,92 @@ export default function App() {
     void refresh();
     const off = onTailcatEvent((ev) => {
       setEvents((prev) => [...prev, ev]);
-      if (ev.Kind === "room-ready" && ev.Data) {
-        try {
-          const data = JSON.parse(ev.Data) as { address?: string };
-          if (data.address) {
-            setChatAddress(data.address);
-            setRoomError("");
-            setAppliedRoom({
-              key: roomKeyRef.current,
-              region: netRef.current.region,
-              derp: netRef.current.derp,
-            });
-          }
-        } catch {
-          // ignore malformed event data
+      const id = ev.SessionID;
+      if (ev.Kind === "signal") {
+        if (pageRef.current === "chat" && !lobbyRef.current && focusRef.current === id && ev.Data) {
+          const data = ev.Data;
+          setLiveSignal((prev) => ({ seq: (prev?.seq ?? 0) + 1, data }));
         }
-      } else if (ev.Kind === "peer" && ev.Data) {
-        try {
-          const data = JSON.parse(ev.Data) as { address?: string; caps?: string[] };
-          const next = data.address ?? "";
-          if (Array.isArray(data.caps)) {
-            setChatCaps(data.caps);
-          } else if (next !== peerRef.current) {
-            setChatCaps([]);
-          }
-          peerRef.current = next;
-          setChatPeer(next);
-        } catch {
-          // ignore malformed event data
-        }
-      } else if (ev.Kind === "message" && ev.Data) {
-        const msg = asMessage(ev.Data);
-        if (msg) {
-          setChatMessages((prev) => (prev.some((item) => item.id === msg.id) ? prev : [...prev, msg]));
-          if (msg.code === "room-restarted") {
-            peerRef.current = "";
-            setChatPeer("");
-            setChatCaps([]);
-          }
-        }
-      } else if (ev.Kind === "transfer" && ev.Data) {
-        try {
-          const tr = JSON.parse(ev.Data) as ChatTransfer;
-          if (tr.id) {
-            setTransfers((prev) => {
-              const index = prev.findIndex((item) => item.id === tr.id);
-              if (index < 0) {
-                return [...prev, tr];
-              }
-              const next = prev.slice();
-              next[index] = tr;
-              return next;
-            });
-          }
-        } catch {
-          // ignore malformed event data
-        }
-      } else if (ev.Kind === "signal" && ev.Data) {
-        const data = ev.Data;
-        setLiveSignal((prev) => ({ seq: (prev?.seq ?? 0) + 1, data }));
-      } else if (ev.Kind === "discard" && ev.Data) {
-        try {
-          const data = JSON.parse(ev.Data) as { id?: string };
-          if (data.id) {
-            setChatMessages((prev) => prev.filter((item) => item.id !== data.id));
-          }
-        } catch {
-          // ignore malformed event data
-        }
+        void refresh();
+        return;
       }
+      if (!id || !roomsRef.current[id]) {
+        if (id && CHAT_KINDS.has(ev.Kind)) {
+          pendingRef.current.push(ev);
+        }
+        void refresh();
+        return;
+      }
+      let room = applyRoomEvent(roomsRef.current[id], ev);
+      if (ev.Kind === "room-ready") {
+        room = stampApplied(room);
+      }
+      commitRooms({ ...roomsRef.current, [id]: room });
       void refresh();
     });
-    const id = window.setInterval(() => {
+    const timer = window.setInterval(() => {
       void refresh();
     }, 2000);
     return () => {
       off();
-      window.clearInterval(id);
+      window.clearInterval(timer);
     };
   }, [refresh]);
 
   useEffect(() => {
-    setAppliedRoom((prev) => {
-      if (prev.key !== roomKeyRef.current) {
-        return prev;
+    if (!region && !derpMapURL) {
+      return;
+    }
+    const prev = roomsRef.current;
+    let changed = false;
+    const next = { ...prev };
+    for (const [id, room] of Object.entries(prev)) {
+      if (room.address && room.appliedRegion === "" && room.appliedDERP === "" && (region !== "" || derpMapURL !== "")) {
+        next[id] = { ...room, appliedRegion: region, appliedDERP: derpMapURL };
+        changed = true;
       }
-      if (prev.region === region && prev.derp === derpMapURL) {
-        return prev;
-      }
-      if (prev.region === "" && prev.derp === "" && (region !== "" || derpMapURL !== "")) {
-        return { key: prev.key, region, derp: derpMapURL };
-      }
-      return prev;
-    });
+    }
+    if (changed) {
+      commitRooms(next);
+    }
   }, [region, derpMapURL]);
 
-  useEffect(() => {
-    let live = true;
-    void (async () => {
-      try {
-        const sess = await startChatRoom();
-        if (!live) {
-          return;
-        }
-        if (sess.Address) {
-          setChatAddress(sess.Address);
-          setRoomError("");
-        }
-      } catch (err) {
-        if (!live) {
-          return;
-        }
-        const message = err instanceof Error ? err.message : String(err);
-        const text = localizeChatError(message, t);
-        if (!text && message === "room is starting") {
-          return;
-        }
-        setRoomError(text || message);
-      }
-    })();
-    return () => {
-      live = false;
-    };
-  }, [t]);
-
-  async function retryRoom(): Promise<void> {
-    setRoomError("");
+  async function createTemporary(): Promise<void> {
+    setLobbyError("");
+    const draft = lobbyPeer;
     try {
-      const sess = await startChatRoom();
-      if (sess.Address) {
-        setChatAddress(sess.Address);
-        setRoomError("");
+      const sess = await startChatRoom("");
+      adoptRoom(sess, draft, "");
+      setLobbyPeer("");
+      setPage("chat");
+    } catch (err) {
+      setLobbyError(showError(err));
+    }
+  }
+
+  async function connectLobby(): Promise<void> {
+    const addr = lobbyPeer.trim();
+    if (!addr.startsWith("tc")) {
+      setLobbyError(t("chatAddrError"));
+      return;
+    }
+    setLobbyError("");
+    const draft = lobbyPeer;
+    try {
+      const sess = await startChatRoom("");
+      adoptRoom(sess, draft, "");
+      setLobbyPeer("");
+      setPage("chat");
+      try {
+        await connectChatPeer(sess.ID, addr);
+      } catch (err) {
+        const current = roomsRef.current[sess.ID];
+        if (current) {
+          commitRooms({ ...roomsRef.current, [sess.ID]: { ...current, error: showError(err) } });
+        }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setRoomError(localizeChatError(message, t) || message);
+      setLobbyError(showError(err));
     }
   }
 
@@ -294,8 +350,7 @@ export default function App() {
       await action();
       await refresh();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setTunnelError(message);
+      setTunnelError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -304,28 +359,69 @@ export default function App() {
       await action();
       await refresh();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setRoomError(localizeChatError(message, t) || message);
+      const message = showError(err);
+      const id = focusRef.current;
+      const current = !lobbyRef.current && id ? roomsRef.current[id] : undefined;
+      if (current && id) {
+        commitRooms({ ...roomsRef.current, [id]: { ...current, error: message } });
+      } else {
+        setLobbyError(message);
+      }
     }
   }
 
   async function onRestart(keyName: string): Promise<void> {
+    const id = focusRef.current;
+    if (!id || lobbyRef.current || !roomsRef.current[id]) {
+      return;
+    }
     roomKeyRef.current = keyName;
-    setRoomError("");
+    setRoomKey(keyName);
+    setLiveSignal(null);
     try {
-      const sess = await restartChatRoom(keyName);
-      setAppliedRoom({ key: keyName, region, derp: derpMapURL });
-      if (sess.Address) {
-        setChatAddress(sess.Address);
+      const sess = await restartChatRoom(id, keyName);
+      const prev = roomsRef.current[id];
+      let room: RoomSlice = prev
+        ? { ...prev, id: sess.ID, keyName, address: sess.Address || "", peer: "", caps: [], error: sess.Err || "" }
+        : emptyRoom(sess.ID);
+      room.keyName = keyName;
+      for (const ev of drain(sess.ID)) {
+        room = applyRoomEvent(room, ev);
       }
+      room = stampApplied(room);
+      const next = { ...roomsRef.current };
+      delete next[id];
+      next[sess.ID] = room;
+      commitRooms(next);
+      commitOrder(orderRef.current.map((item) => (item === id ? sess.ID : item)));
+      commitFocus(sess.ID);
+      commitLobby(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setRoomError(localizeChatError(message, t) || message);
+      const current = roomsRef.current[id];
+      if (!current) {
+        return;
+      }
+      commitRooms({ ...roomsRef.current, [id]: { ...current, error: showError(err) } });
     }
   }
 
-  const listed = sessions.find((s) => s.Kind === "chat" && s.Status === "running");
-  const address = chatAddress || listed?.Address || "";
+  function rememberDraft(draft: { peer: string; composer: string; burn: boolean }): void {
+    const id = focusRef.current;
+    const current = roomsRef.current[id];
+    if (!current) {
+      return;
+    }
+    if (current.peerDraft === draft.peer && current.composer === draft.composer && current.burn === draft.burn) {
+      return;
+    }
+    commitRooms({
+      ...roomsRef.current,
+      [id]: { ...current, peerDraft: draft.peer, composer: draft.composer, burn: draft.burn },
+    });
+  }
+
+  const chatRoom = !lobby && focus && rooms[focus] ? rooms[focus] : undefined;
+  const showLobby = page === "chat" && !chatRoom;
   void version;
 
   return (
@@ -339,16 +435,61 @@ export default function App() {
           </div>
         </div>
         <nav className="nav">
-          {NAV.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`nav-btn ${page === item.id ? "active" : ""}`}
-              onClick={() => setPage(item.id)}
-            >
-              <NavGlyph name={item.id} />{t(item.labelKey)}
-            </button>
-          ))}
+          {NAV.map((item) =>
+            item.id === "tunnel" ? (
+              <button
+                key={item.id}
+                type="button"
+                className={`nav-btn ${page === item.id ? "active" : ""}`}
+                onClick={() => setPage(item.id)}
+              >
+                <NavGlyph name={item.id} />
+                {t(item.labelKey)}
+              </button>
+            ) : (
+              <span key={item.id} className="nav-chat">
+                <button
+                  type="button"
+                  className={`nav-btn ${page === "chat" ? "active" : ""}`}
+                  onClick={openChat}
+                >
+                  <NavGlyph name="chat" />
+                  {t("navChat")}
+                </button>
+                <div className="nav-rooms">
+                  <button
+                    type="button"
+                    className={`nav-btn nav-child nav-new ${showLobby ? "active" : ""}`}
+                    onClick={openLobby}
+                  >
+                    {t("navNewRoom")}
+                  </button>
+                  {order.map((id) => {
+                    const room = rooms[id];
+                    if (!room) {
+                      return null;
+                    }
+                    const label = roomPrimaryLabel(nickname, room.address, t("roomStarting"), nickname.trim() ? order.length : 0);
+                    const selected = page === "chat" && !showLobby && focus === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`nav-btn nav-child ${selected ? "active" : ""}`}
+                        title={roomTooltip(room.address, room.keyName)}
+                        onClick={() => selectRoom(id)}
+                      >
+                        <span className="nav-room-label">
+                          <span className="nav-room-primary">{label}</span>
+                          {room.keyName ? <span className="nav-room-key">{room.keyName}</span> : null}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </span>
+            ),
+          )}
         </nav>
         <div className="sidebar-footer">
           <button
@@ -356,33 +497,51 @@ export default function App() {
             className={`nav-btn ${page === "settings" ? "active" : ""}`}
             onClick={() => setPage("settings")}
           >
-            <NavGlyph name="settings" />{t("navSettings")}
+            <NavGlyph name="settings" />
+            {t("navSettings")}
           </button>
           {fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}
         </div>
       </aside>
       <main ref={mainRef} className="glass main">
         {page === "chat" ? (
-          <ChatPage
-            address={address}
-            peer={chatPeer}
-            caps={chatCaps}
-            messages={chatMessages}
-            transfers={transfers}
-            roomError={roomError}
-            onConnect={connectChatPeer}
-            onSend={sendChatText}
-            onSendVoice={sendChatVoice}
-            onSendSignal={sendChatSignal}
-            incomingSignal={liveSignal}
-            onSendPath={sendChatFile}
-            onSendBrowserFile={sendChatFileBytes}
-            onDiscard={discardChatMessage}
-            onResend={resendChatFile}
-            onSave={saveChatFile}
-            onRetry={retryRoom}
-            nickname={nickname}
-          />
+          showLobby || !chatRoom ? (
+            <LobbyPage
+              peer={lobbyPeer}
+              error={lobbyError}
+              onPeer={setLobbyPeer}
+              onCreate={() => void createTemporary()}
+              onConnect={() => void connectLobby()}
+            />
+          ) : (
+            <ChatPage
+              key={chatRoom.id}
+              address={chatRoom.address}
+              peer={chatRoom.peer}
+              caps={chatRoom.caps}
+              messages={chatRoom.messages}
+              transfers={chatRoom.transfers}
+              roomError={chatRoom.error}
+              initialPeerDraft={chatRoom.peerDraft}
+              initialComposer={chatRoom.composer}
+              initialBurn={chatRoom.burn}
+              onRoomDraft={rememberDraft}
+              nickname={nickname}
+              onConnect={(addr) => connectChatPeer(chatRoom.id, addr)}
+              onSend={(body, burn, ttl) => sendChatText(chatRoom.id, body, burn, ttl)}
+              onSendVoice={(mime, duration, audio, burn, ttl) =>
+                sendChatVoice(chatRoom.id, mime, duration, audio, burn, ttl)
+              }
+              onSendSignal={(meta) => sendChatSignal(chatRoom.id, meta)}
+              incomingSignal={liveSignal}
+              onSendPath={(path, burn, ttl) => sendChatFile(chatRoom.id, path, burn, ttl)}
+              onSendBrowserFile={(file, burn, ttl) => sendChatFileBytes(chatRoom.id, file, burn, ttl)}
+              onDiscard={(messageID) => discardChatMessage(chatRoom.id, messageID)}
+              onResend={(messageID) => resendChatFile(chatRoom.id, messageID)}
+              onSave={(messageID) => saveChatFile(chatRoom.id, messageID)}
+              onRetry={() => onRestart(chatRoom.keyName)}
+            />
+          )
         ) : page === "tunnel" ? (
           <TunnelPage
             sessions={sessions}
@@ -406,16 +565,17 @@ export default function App() {
             region={region}
             derpMapURL={derpMapURL}
             roomKey={roomKey}
-            appliedKey={appliedRoom.key}
-            appliedRegion={appliedRoom.region}
-            appliedDERP={appliedRoom.derp}
+            appliedKey={chatRoom?.appliedKey ?? ""}
+            appliedRegion={chatRoom?.appliedRegion ?? ""}
+            appliedDERP={chatRoom?.appliedDERP ?? ""}
             onRoomKey={(name) => {
               roomKeyRef.current = name;
               setRoomKey(name);
             }}
             sessions={sessions}
             events={events}
-            peer={chatPeer}
+            peer={chatRoom?.peer ?? ""}
+            canRestart={Boolean(chatRoom)}
             onCreate={(name, client, keyRegion) => run(() => createKey(name, client, keyRegion))}
             onDelete={(name) => run(() => deleteKey(name))}
             onSaveNetwork={(nextRegion, nextDERP) => run(() => setNetworkSettings(nextRegion, nextDERP))}

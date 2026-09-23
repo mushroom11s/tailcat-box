@@ -19,12 +19,12 @@ const maxPipeBytes = 1 << 20
 
 // Real embeds github.com/tailscale/tailcat for Plan 1 and Plan 2 modes.
 type Real struct {
-	mu       sync.Mutex
-	serves   map[string]*serveRun
-	forwards map[string]*forwardRun
-	cancels  map[string]context.CancelFunc
-	net      NetworkOpts
-	chat     *realRoom
+	mu        sync.Mutex
+	serves    map[string]*serveRun
+	forwards  map[string]*forwardRun
+	cancels   map[string]context.CancelFunc
+	net       NetworkOpts
+	chatRooms map[string]*realRoom
 }
 
 type serveRun struct {

@@ -54,6 +54,37 @@ func TestFakeTwoRoomsDeliverText(t *testing.T) {
 	}
 }
 
+func TestFakeCloseOneRoomLeavesTheOther(t *testing.T) {
+	fake := NewFake()
+	ctx := context.Background()
+	a, err := fake.StartRoom(ctx, RoomOpts{SessionID: "aaa"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := fake.StartRoom(ctx, RoomOpts{SessionID: "bbb"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	addrA := readReady(t, a)
+	addrB := readReady(t, b)
+	if err := a.Close(); err != nil {
+		t.Fatal(err)
+	}
+	fake.mu.Lock()
+	_, aLive := fake.chatRooms[addrA]
+	_, bLive := fake.chatRooms[addrB]
+	fake.mu.Unlock()
+	if aLive || !bLive {
+		t.Fatalf("aLive=%v bLive=%v", aLive, bLive)
+	}
+	if err := b.SetPeer("tc:fake-echo"); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.SendEnvelope(ctx, 101, []byte("still-open")); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestFakeEchoAnswersTextOnly(t *testing.T) {
 	fake := NewFake()
 	ctx := context.Background()

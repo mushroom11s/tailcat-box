@@ -50,7 +50,7 @@ type App struct {
 	ctx        context.Context
 	svc        *service.Service
 	svcAdapter adapter.TailcatAdapter
-	chat       *chat.Service
+	rooms      *chat.Manager
 	keys       *store.Store
 	tray       *tray.Controller
 	trayIcon   []byte
@@ -175,12 +175,11 @@ func NewApp() *App {
 	if settings, err := keys.LoadSettings(); err == nil {
 		svc.SetNetworkOpts(adapter.NetworkOpts{Region: settings.Region, DERPMapURL: settings.DERPMapURL})
 	}
-	chatSvc := chat.New(chatAd)
-	chatSvc.SetDataDir(chatDataDir())
+	rooms := chat.NewManager(chatAd, chatDataDir())
 	return &App{
 		svc:        svc,
 		svcAdapter: ad,
-		chat:       chatSvc,
+		rooms:      rooms,
 		keys:       keys,
 		settings:   newSettingsStore(),
 		trayIcon:   tray.DefaultIcon,
@@ -215,6 +214,13 @@ func (a *App) startup(ctx context.Context) {
 	a.tray.Start(a.trayIcon)
 	go a.forwardEvents()
 	go a.maybeRecordDailyUpdateCheck()
+}
+
+func (a *App) shutdown(ctx context.Context) {
+	if a.rooms != nil {
+		a.rooms.StopAll()
+	}
+	_ = ctx
 }
 
 func (a *App) maybeRecordDailyUpdateCheck() {
@@ -283,7 +289,10 @@ func (a *App) forwardEvents() {
 			emit(ev)
 		}
 	}()
-	for ev := range a.chat.Events() {
+	if a.rooms == nil {
+		return
+	}
+	for ev := range a.rooms.Events() {
 		emit(ev)
 	}
 }
@@ -361,10 +370,8 @@ func (a *App) StopSession(id string) error {
 // ListSessions returns a snapshot of all sessions.
 func (a *App) ListSessions() []session.Session {
 	out := a.svc.List()
-	if a.chat != nil {
-		if sess, ok := a.chat.Session(); ok {
-			out = append(out, sess)
-		}
+	if a.rooms != nil {
+		out = append(out, a.rooms.Sessions()...)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if !out[i].CreatedAt.Equal(out[j].CreatedAt) {
@@ -410,40 +417,40 @@ func (a *App) chatOpts(keyName string) (chat.StartOpts, error) {
 	return opts, nil
 }
 
-func (a *App) StartChatRoom() (session.Session, error) {
-	opts, err := a.chatOpts("")
+func (a *App) StartChatRoom(keyName string) (session.Session, error) {
+	opts, err := a.chatOpts(keyName)
 	if err != nil {
 		return session.Session{}, err
 	}
-	return a.chat.Start(opts)
+	return a.rooms.Start(opts)
 }
 
-func (a *App) ConnectChatPeer(addr string) error {
-	return a.chat.Connect(addr)
+func (a *App) ConnectChatPeer(roomID string, addr string) error {
+	return a.rooms.Connect(roomID, addr)
 }
 
-func (a *App) SendChatText(body string, burn bool, ttlSec int) error {
-	return a.chat.SendTextBurn(body, burn, ttlSec)
+func (a *App) SendChatText(roomID string, body string, burn bool, ttlSec int) error {
+	return a.rooms.SendText(roomID, body, burn, ttlSec)
 }
 
-func (a *App) SendChatFile(path string, burn bool, ttlSec int) (string, error) {
-	return a.chat.SendFile(path, burn, ttlSec)
+func (a *App) SendChatFile(roomID string, path string, burn bool, ttlSec int) (string, error) {
+	return a.rooms.SendFile(roomID, path, burn, ttlSec)
 }
 
 // SendChatVoice sends a port 103 voice note. audioBase64 is standard base64 of the
 // audio bytes. Burn follows the composer choice.
-func (a *App) SendChatVoice(mime string, durationSec int, audioBase64 string, burn bool, ttlSec int) error {
+func (a *App) SendChatVoice(roomID string, mime string, durationSec int, audioBase64 string, burn bool, ttlSec int) error {
 	audio, err := decodeVoiceBase64(audioBase64)
 	if err != nil {
 		return err
 	}
-	return a.chat.SendVoice(mime, durationSec, audio, burn, ttlSec)
+	return a.rooms.SendVoice(roomID, mime, durationSec, audio, burn, ttlSec)
 }
 
 // SendChatSignal sends one port 100 WebRTC control envelope. metaJSON is the
 // control object (rtc-offer, rtc-answer, or rtc-hangup). The payload is empty.
-func (a *App) SendChatSignal(metaJSON string) error {
-	return a.chat.SendSignal(metaJSON)
+func (a *App) SendChatSignal(roomID string, metaJSON string) error {
+	return a.rooms.SendSignal(roomID, metaJSON)
 }
 
 // DecodeChatVoice turns a voice payload the webview cannot play into WAV bytes.
@@ -471,36 +478,46 @@ func decodeVoiceBase64(s string) ([]byte, error) {
 	return raw, nil
 }
 
-func (a *App) DiscardChatMessage(id string) error {
-	return a.chat.Discard(id)
+func (a *App) DiscardChatMessage(roomID string, id string) error {
+	return a.rooms.Discard(roomID, id)
 }
 
-func (a *App) ResendChatFile(id string) error {
-	_, err := a.chat.Resend(id)
-	return err
+func (a *App) ResendChatFile(roomID string, id string) error {
+	return a.rooms.Resend(roomID, id)
 }
 
-func (a *App) SaveChatFile(id string) error {
+func (a *App) SaveChatFile(roomID string, id string) error {
 	if a.ctx == nil {
 		return fmt.Errorf("save dialog requires a running window")
 	}
-	dest, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{DefaultFilename: a.chat.FileName(id)})
+	name, err := a.rooms.FileName(roomID, id)
+	if err != nil {
+		return err
+	}
+	dest, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{DefaultFilename: name})
 	if err != nil || dest == "" {
 		return err
 	}
-	return a.chat.CopyFile(id, dest)
+	return a.rooms.CopyFile(roomID, id, dest)
 }
 
-func (a *App) RestartChatRoom(keyName string) (session.Session, error) {
+func (a *App) RestartChatRoom(roomID string, keyName string) (session.Session, error) {
+	if strings.TrimSpace(roomID) == "" {
+		return session.Session{}, chat.ErrNoRoom
+	}
 	opts, err := a.chatOpts(keyName)
 	if err != nil {
 		return session.Session{}, err
 	}
-	return a.chat.Restart(opts)
+	sess, err := a.rooms.Restart(roomID, opts)
+	if sess.ID != "" {
+		return sess, nil
+	}
+	return sess, err
 }
 
-func (a *App) StopChatRoom() error {
-	return a.chat.Stop()
+func (a *App) StopChatRoom(roomID string) error {
+	return a.rooms.Stop(roomID)
 }
 
 // StartRecv starts a write-only receive inbox (CLI `recv`).

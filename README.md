@@ -155,7 +155,7 @@ The Go module path in `go.mod` is `github.com/mushroom11s/tailcat-box`.
 
 ## FAQ
 
-Several people on one room address, and whether a closed address can be used again, are answered in the [usage FAQ](docs/faq.md).
+Several rooms at once, several people on one room address, and whether a closed address can be used again, are answered in the [usage FAQ](docs/faq.md).
 
 ## Credits
 

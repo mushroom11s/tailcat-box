@@ -57,6 +57,10 @@ type Props = {
   onResend?: (id: string) => Promise<void>;
   onSave?: (id: string) => Promise<void>;
   onRetry: () => Promise<void>;
+  initialPeerDraft?: string;
+  initialComposer?: string;
+  initialBurn?: boolean;
+  onRoomDraft?: (draft: { peer: string; composer: string; burn: boolean }) => void;
   onSendSignal?: (metaJSON: string) => Promise<void>;
   incomingSignal?: { seq: number; data: string } | null;
   liveMedia?: LiveDevices;
@@ -129,6 +133,10 @@ export default function ChatPage({
   onResend,
   onSave,
   onRetry,
+  initialPeerDraft,
+  initialComposer,
+  initialBurn,
+  onRoomDraft,
   onSendSignal,
   incomingSignal,
   liveMedia,
@@ -140,11 +148,16 @@ export default function ChatPage({
   const peerRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const burnRef = useRef(false);
-  const [draftPeer, setDraftPeer] = useState("");
-  const [draft, setDraft] = useState("");
+  const [draftPeer, setDraftPeer] = useState(initialPeerDraft ?? "");
+  const [draft, setDraft] = useState(initialComposer ?? "");
   const [inline, setInline] = useState("");
   const [notice, setNotice] = useState("");
-  const [burnOn, setBurnOn] = useState(false);
+  const [burnOn, setBurnOn] = useState(initialBurn ?? false);
+  const draftSink = useRef(onRoomDraft);
+  draftSink.current = onRoomDraft;
+  useEffect(() => {
+    draftSink.current?.({ peer: draftPeer, composer: draft, burn: burnOn });
+  }, [draftPeer, draft, burnOn]);
   const [viewer, setViewer] = useState<{ id: string; left: number | null } | null>(null);
   const [recording, setRecording] = useState(false);
   const [multiSelectActive, setMultiSelectActive] = useState(false);

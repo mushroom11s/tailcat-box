@@ -24,7 +24,7 @@ describe("tray navigation", () => {
   it("opens Chat, Tunnel, or Settings when the tray event fires", async () => {
     expect(TRAY_NAVIGATE_EVENT).toBe("tailcat:navigate");
     renderApp();
-    expect(document.querySelector(".chat-page")).toBeTruthy();
+    expect(document.querySelector(".chat-lobby")).toBeTruthy();
 
     emitTrayNavigate("settings");
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeTruthy();
@@ -34,10 +34,10 @@ describe("tray navigation", () => {
 
     emitTrayNavigate("chat");
     await waitFor(() => {
-      expect(document.querySelector(".chat-page")).toBeTruthy();
+      expect(document.querySelector(".chat-lobby")).toBeTruthy();
     });
 
     emitTrayNavigate("nope");
-    expect(document.querySelector(".chat-page")).toBeTruthy();
+    expect(document.querySelector(".chat-lobby")).toBeTruthy();
   });
 });

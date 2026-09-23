@@ -30,11 +30,12 @@ describe("phase 1 chat shell", () => {
     renderApp();
 
     const nav = document.querySelectorAll(".nav-btn");
-    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["Chat", "Tunnel", "Settings"]);
+    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["Chat", "+ New room", "Tunnel", "Settings"]);
     expect(document.querySelector(".sidebar-footer .nav-btn")?.textContent).toBe("Settings");
     expect(document.querySelector(".brand-mark")?.tagName).toBe("IMG");
     expect(screen.getByRole("heading", { name: "Tailcat Box" })).toBeTruthy();
 
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     const copy = await screen.findByRole("button", { name: "Copy" });
     await waitFor(() => {
       expect(copy.hasAttribute("disabled")).toBe(false);
@@ -74,6 +75,7 @@ describe("phase 1 chat shell", () => {
   it("keeps the draft when send fails and inserts a newline on Shift+Enter", async () => {
     const user = userEvent.setup();
     renderApp();
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.type(screen.getByLabelText("Peer"), "tc:fake-room-missing");
     await user.click(screen.getByRole("button", { name: "Connect" }));
@@ -105,8 +107,10 @@ describe("phase 1 chat shell", () => {
     localStorage.setItem("tailcat-locale", "zh-CN");
     renderApp();
     const nav = document.querySelectorAll(".nav-btn");
-    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["聊天", "穿透", "设置"]);
+    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["聊天", "+ 新房间", "穿透", "设置"]);
     expect(document.querySelector(".sidebar-footer .nav-btn")?.textContent).toBe("设置");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "新建临时房间" }));
     expect(screen.getByRole("button", { name: "添加文件" }).getAttribute("title")).toBe("添加文件");
     const send = screen.getByRole("button", { name: "发送" });
     const burn = screen.getByRole("switch", { name: "阅后即焚" });
@@ -125,6 +129,7 @@ describe("phase 1 chat shell", () => {
   it("reaches Keys & DERP and Diagnostics inside Settings", async () => {
     const user = userEvent.setup();
     renderApp();
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
@@ -145,6 +150,6 @@ describe("phase 1 chat shell", () => {
     });
     expect(screen.queryByText("Peer connected")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Services" })).toBeNull();
-    expect(document.querySelectorAll(".nav-btn").length).toBe(3);
+    expect(document.querySelectorAll(".nav-btn").length).toBe(5);
   });
 });

@@ -35,7 +35,7 @@ describe("shell scroll", () => {
 
     main.scrollTop = 90;
     await user.click(screen.getByRole("button", { name: "Chat" }));
-    expect(document.querySelector(".chat-page")).toBeTruthy();
+    expect(document.querySelector(".chat-lobby")).toBeTruthy();
     expect(main.scrollTop).toBe(0);
   });
 });

@@ -5,7 +5,7 @@ import {main} from '../models';
 import {store} from '../models';
 import {adapter} from '../models';
 
-export function ConnectChatPeer(arg1:string):Promise<void>;
+export function ConnectChatPeer(arg1:string,arg2:string):Promise<void>;
 
 export function CreateKey(arg1:string,arg2:boolean,arg3:string):Promise<string>;
 
@@ -15,7 +15,7 @@ export function DeleteKey(arg1:string):Promise<void>;
 
 export function DialPipe(arg1:string,arg2:string):Promise<session.Session>;
 
-export function DiscardChatMessage(arg1:string):Promise<void>;
+export function DiscardChatMessage(arg1:string,arg2:string):Promise<void>;
 
 export function GetClientInfo():Promise<main.ClientInfo>;
 
@@ -35,25 +35,25 @@ export function ParseAddr(arg1:string):Promise<string>;
 
 export function RecordUpdateCheck():Promise<main.ClientInfo>;
 
-export function ResendChatFile(arg1:string):Promise<void>;
+export function ResendChatFile(arg1:string,arg2:string):Promise<void>;
 
 export function ResolveAddr(arg1:string):Promise<string>;
 
-export function RestartChatRoom(arg1:string):Promise<session.Session>;
+export function RestartChatRoom(arg1:string,arg2:string):Promise<session.Session>;
 
-export function SaveChatFile(arg1:string):Promise<void>;
+export function SaveChatFile(arg1:string,arg2:string):Promise<void>;
 
 export function SelectDirectory(arg1:string):Promise<string>;
 
 export function SelectFiles(arg1:string):Promise<Array<string>>;
 
-export function SendChatFile(arg1:string,arg2:boolean,arg3:number):Promise<string>;
+export function SendChatFile(arg1:string,arg2:string,arg3:boolean,arg4:number):Promise<string>;
 
-export function SendChatSignal(arg1:string):Promise<void>;
+export function SendChatSignal(arg1:string,arg2:string):Promise<void>;
 
-export function SendChatText(arg1:string,arg2:boolean,arg3:number):Promise<void>;
+export function SendChatText(arg1:string,arg2:string,arg3:boolean,arg4:number):Promise<void>;
 
-export function SendChatVoice(arg1:string,arg2:number,arg3:string,arg4:boolean,arg5:number):Promise<void>;
+export function SendChatVoice(arg1:string,arg2:string,arg3:number,arg4:string,arg5:boolean,arg6:number):Promise<void>;
 
 export function SetLaunchAtLogin(arg1:boolean):Promise<main.SystemInfo>;
 
@@ -63,7 +63,7 @@ export function SetUILocale(arg1:string):Promise<void>;
 
 export function StartBrowse(arg1:string):Promise<session.Session>;
 
-export function StartChatRoom():Promise<session.Session>;
+export function StartChatRoom(arg1:string):Promise<session.Session>;
 
 export function StartCopy(arg1:string,arg2:Array<string>,arg3:string):Promise<session.Session>;
 
@@ -89,7 +89,7 @@ export function StartSSHClient(arg1:string,arg2:string,arg3:string,arg4:string):
 
 export function StartSSHServe(arg1:boolean,arg2:string,arg3:boolean):Promise<session.Session>;
 
-export function StopChatRoom():Promise<void>;
+export function StopChatRoom(arg1:string):Promise<void>;
 
 export function StopSession(arg1:string):Promise<void>;
 

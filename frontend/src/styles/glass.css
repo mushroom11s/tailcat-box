@@ -275,6 +275,56 @@ textarea {
   cursor: not-allowed;
 }
 
+.nav-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 4px 12px;
+}
+
+.nav-btn.nav-child {
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 12px;
+}
+
+.nav-btn.nav-new {
+  border: 1px dashed color-mix(in srgb, var(--text) 35%, transparent);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.nav-btn.nav-new.active {
+  color: white;
+  border-color: transparent;
+}
+
+.nav-room-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.nav-room-primary,
+.nav-room-key {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-room-key {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
 .nav-hint {
   display: block;
   font-size: 11px;

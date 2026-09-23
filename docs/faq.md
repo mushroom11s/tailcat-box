@@ -15,6 +15,16 @@ Suppose A opens a room, and both B and C connect to A:
 
 So many people can drop messages into the room, but the host talks back only with the latest peer. Separate identities and replies aimed at a chosen person would have to be built separately. That does not exist today.
 
+## Can I open more than one room?
+
+Yes. Each room has its own address, its own listener, its own current peer, and its own transcript. A message in one room does not appear in another. Listeners keep running while you look at a different room, at Tunnel, or at Settings. You can keep 8 rooms open. This version does not close a room on its own: quit the app to stop them.
+
+Hiding the window is not quitting, so every room stays up. Quitting stops every room and retires every ephemeral address. A saved key keeps its address until you delete it. This version starts each new room on a temporary key. Deleting a saved key still destroys that address.
+
+Inside any one of those rooms, the answer above still applies. Several people can connect to that one address, and it is still not a group chat.
+
+A nickname, when this computer has one, is only a label in the room list. It is not sent to the peer.
+
 ## Can I use a temporary address again after it is closed?
 
 It depends on where the address came from.

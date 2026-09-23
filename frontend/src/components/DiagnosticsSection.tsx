@@ -26,7 +26,7 @@ export default function DiagnosticsSection({ sessions, events, peer, busy, error
     .join("\n");
 
   useEffect(() => {
-    if (!dirty) {
+    if (!dirty && peer) {
       setAddr(peer);
     }
   }, [peer, dirty]);

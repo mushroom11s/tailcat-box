@@ -40,6 +40,7 @@ type Props = {
   onDelete: (name: string) => void | Promise<void>;
   onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
   onRestart: (keyName: string) => void | Promise<void>;
+  canRestart: boolean;
   onPing: (addr: string, untilDirect: boolean) => void | Promise<void>;
   onStop: (id: string) => void | Promise<void>;
 };
@@ -175,6 +176,7 @@ export default function SettingsPage({
   onDelete,
   onSaveNetwork,
   onRestart,
+  canRestart,
   onPing,
   onStop,
 }: Props) {
@@ -383,6 +385,7 @@ export default function SettingsPage({
         onDelete={onDelete}
         onSaveNetwork={onSaveNetwork}
         onRestart={onRestart}
+        canRestart={canRestart}
       />
       <DiagnosticsSection
         sessions={sessions}

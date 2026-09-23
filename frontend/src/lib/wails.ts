@@ -612,19 +612,19 @@ function asFileEntry(e: adapter.FileEntry): FileEntry {
   };
 }
 
-export async function startChatRoom(): Promise<Session> {
+export async function startChatRoom(keyName = ""): Promise<Session> {
   if (hasWailsBindings()) {
-    return asSession(await bindStartChatRoom());
+    return asSession(await bindStartChatRoom(keyName));
   }
-  return fakeStartChatRoom();
+  return fakeStartChatRoom(keyName);
 }
 
-export async function connectChatPeer(addr: string): Promise<void> {
+export async function connectChatPeer(roomID: string, addr: string): Promise<void> {
   if (hasWailsBindings()) {
-    await bindConnectChatPeer(addr);
+    await bindConnectChatPeer(roomID, addr);
     return;
   }
-  await fakeConnectChatPeer(addr);
+  await fakeConnectChatPeer(roomID, addr);
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -637,6 +637,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 export async function sendChatVoice(
+  roomID: string,
   mime: string,
   durationSec: number,
   audio: Uint8Array,
@@ -644,10 +645,10 @@ export async function sendChatVoice(
   ttlSec = 0,
 ): Promise<void> {
   if (hasWailsBindings()) {
-    await bindSendChatVoice(mime, durationSec, bytesToBase64(audio), burn, ttlSec);
+    await bindSendChatVoice(roomID, mime, durationSec, bytesToBase64(audio), burn, ttlSec);
     return;
   }
-  await browserChat.sendVoice(mime, durationSec, audio, burn, ttlSec);
+  await requireRoom(roomID).hub.sendVoice(mime, durationSec, audio, burn, ttlSec);
 }
 
 export async function decodeChatVoice(mime: string, audioBase64: string): Promise<string> {
@@ -660,69 +661,87 @@ export async function decodeChatVoice(mime: string, audioBase64: string): Promis
   throw new Error("Cannot play this voice message.");
 }
 
-export async function sendChatSignal(metaJSON: string): Promise<void> {
+export async function sendChatSignal(roomID: string, metaJSON: string): Promise<void> {
   if (hasWailsBindings()) {
-    await bindSendChatSignal(metaJSON);
+    await bindSendChatSignal(roomID, metaJSON);
     return;
   }
-  browserChat.sendSignal(metaJSON);
+  requireRoom(roomID).hub.sendSignal(metaJSON);
 }
 
-export async function sendChatText(body: string, burn = false, ttlSec = 0): Promise<void> {
+export async function sendChatText(roomID: string, body: string, burn = false, ttlSec = 0): Promise<void> {
   if (hasWailsBindings()) {
-    await bindSendChatText(body, burn, ttlSec);
+    await bindSendChatText(roomID, body, burn, ttlSec);
     return;
   }
-  await fakeSendChatText(body, burn, ttlSec);
+  await requireRoom(roomID).hub.sendText(body, burn, ttlSec);
 }
 
-export async function sendChatFile(path: string, burn = false, ttlSec = 0): Promise<string> {
+export async function sendChatFile(roomID: string, path: string, burn = false, ttlSec = 0): Promise<string> {
   if (hasWailsBindings()) {
-    return (await bindSendChatFile(path, burn, ttlSec)) ?? "";
+    return (await bindSendChatFile(roomID, path, burn, ttlSec)) ?? "";
   }
   throw new Error("file picker requires a running window");
 }
 
-export async function sendChatFileBytes(file: File, burn = false, ttlSec = 0): Promise<string> {
+export async function sendChatFileBytes(roomID: string, file: File, burn = false, ttlSec = 0): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  return browserChat.sendFile({ name: file.name, mime: file.type || "application/octet-stream", bytes }, burn, ttlSec);
+  return requireRoom(roomID).hub.sendFile(
+    { name: file.name, mime: file.type || "application/octet-stream", bytes },
+    burn,
+    ttlSec,
+  );
 }
 
-export async function discardChatMessage(id: string): Promise<void> {
+export async function discardChatMessage(roomID: string, id: string): Promise<void> {
   if (hasWailsBindings()) {
-    await bindDiscardChatMessage(id);
+    await bindDiscardChatMessage(roomID, id);
     return;
   }
-  browserChat.discard(id);
+  requireRoom(roomID).hub.discard(id);
 }
 
-export async function resendChatFile(id: string): Promise<void> {
+export async function resendChatFile(roomID: string, id: string): Promise<void> {
   if (hasWailsBindings()) {
-    await bindResendChatFile(id);
+    await bindResendChatFile(roomID, id);
     return;
   }
-  await browserChat.resend(id);
+  await requireRoom(roomID).hub.resend(id);
 }
 
-export async function saveChatFile(id: string): Promise<void> {
+export async function saveChatFile(roomID: string, id: string): Promise<void> {
   if (hasWailsBindings()) {
-    await bindSaveChatFile(id);
+    await bindSaveChatFile(roomID, id);
   }
 }
 
-export async function restartChatRoom(keyName: string): Promise<Session> {
+export async function restartChatRoom(roomID: string, keyName: string): Promise<Session> {
   if (hasWailsBindings()) {
-    return asSession(await bindRestartChatRoom(keyName));
+    return asSession(await bindRestartChatRoom(roomID, keyName));
   }
-  return fakeRestartChatRoom(keyName);
+  return fakeRestartChatRoom(roomID, keyName);
 }
 
-export async function stopChatRoom(): Promise<void> {
+export async function stopChatRoom(roomID: string): Promise<void> {
   if (hasWailsBindings()) {
-    await bindStopChatRoom();
+    await bindStopChatRoom(roomID);
     return;
   }
-  await fakeStopChatRoom();
+  await fakeStopChatRoom(roomID);
+}
+
+export function emitBrowserEvent(ev: TailcatEvent): void {
+  emitFake(ev);
+}
+
+export function resetBrowserRooms(): void {
+  for (const [id, room] of browserRooms) {
+    room.stopListen();
+    room.hub.stop();
+    fake.serveStops.delete(id);
+  }
+  browserRooms.clear();
+  fake.sessions = fake.sessions.filter((item) => item.Kind !== "chat");
 }
 
 export async function startPipeServe(): Promise<Session> {
@@ -805,73 +824,105 @@ export async function deleteKey(name: string): Promise<void> {
 }
 
 let fakeSettings: NetworkSettings = { Region: "", DERPMapURL: "" };
-const browserChat = createBrowserHub();
-let browserChatSession: Session | null = null;
+const ROOM_CAP = 8;
+type BrowserRoom = {
+  session: Session;
+  hub: ReturnType<typeof createBrowserHub>;
+  stopListen: () => void;
+  keyName: string;
+};
+const browserRooms = new Map<string, BrowserRoom>();
 const browserKeyJSON = new Map<string, string>();
+
+function requireRoom(roomID: string): BrowserRoom {
+  const room = browserRooms.get(roomID);
+  if (!room) {
+    throw new Error("Unknown room.");
+  }
+  return room;
+}
 
 function emitBrowser(ev: { Kind: string; Data?: string; Address?: string; SessionID: string }): void {
   emitFake({ SessionID: ev.SessionID, Kind: ev.Kind, Address: ev.Address, Data: ev.Data });
 }
 
-async function fakeStartChatRoom(): Promise<Session> {
-  if (browserChatSession && (browserChatSession.Status === "starting" || browserChatSession.Status === "running")) {
-    return { ...browserChatSession };
-  }
-  const sess = newSess("chat");
-  browserChatSession = sess;
-  const off = browserChat.onEvent((ev) => {
-    if (ev.Kind === "room-ready" && ev.Address && browserChatSession) {
-      browserChatSession.Status = "running";
-      browserChatSession.Address = ev.Address;
+function listenRoom(entry: BrowserRoom): void {
+  entry.stopListen();
+  const off = entry.hub.onEvent((ev) => {
+    if (ev.Kind === "room-ready" && ev.Address && ev.SessionID === entry.session.ID) {
+      entry.session.Status = "running";
+      entry.session.Address = ev.Address;
     }
     emitBrowser(ev);
   });
-  fake.serveStops.set(sess.ID, off);
-  await browserChat.start(sess.ID, "");
-  return { ...sess, Address: browserChatSession.Address, Status: browserChatSession.Status };
-}
-
-async function fakeConnectChatPeer(addr: string): Promise<void> {
-  await browserChat.connect(addr);
-}
-
-async function fakeSendChatText(body: string, burn: boolean, ttlSec: number): Promise<void> {
-  await browserChat.sendText(body, burn, ttlSec);
-}
-
-async function fakeRestartChatRoom(keyName: string): Promise<Session> {
-  if (browserChatSession) {
-    browserChatSession.Status = "stopped";
-    const stop = fake.serveStops.get(browserChatSession.ID);
-    if (stop) {
-      stop();
-    }
-  }
-  const sess = newSess("chat");
-  browserChatSession = sess;
-  const off = browserChat.onEvent((ev) => {
-    if (ev.Kind === "room-ready" && ev.Address && browserChatSession && browserChatSession.ID === sess.ID) {
-      browserChatSession.Status = "running";
-      browserChatSession.Address = ev.Address;
-    }
-    emitBrowser(ev);
+  entry.stopListen = off;
+  fake.serveStops.set(entry.session.ID, () => {
+    off();
+    entry.hub.stop();
+    browserRooms.delete(entry.session.ID);
   });
-  fake.serveStops.set(sess.ID, off);
-  const material = keyName ? (browserKeyJSON.get(keyName) ?? "") : "";
-  if (keyName && !material) {
+}
+
+async function fakeStartChatRoom(keyName: string): Promise<Session> {
+  const name = keyName.trim();
+  if (browserRooms.size >= ROOM_CAP) {
+    throw new Error("You can keep 8 rooms open. Quit the app to close rooms.");
+  }
+  if (name && [...browserRooms.values()].some((room) => room.keyName === name)) {
+    throw new Error("That key is already listening in another room.");
+  }
+  const material = name ? (browserKeyJSON.get(name) ?? "") : "";
+  if (name && !material) {
     throw new Error("saved key is not a Tailcat private key");
   }
-  await browserChat.restart(sess.ID, material);
-  return { ...browserChatSession };
+  const sess = newSess("chat");
+  const entry: BrowserRoom = { session: sess, hub: createBrowserHub(), stopListen: () => undefined, keyName: name };
+  browserRooms.set(sess.ID, entry);
+  listenRoom(entry);
+  await entry.hub.start(sess.ID, material);
+  return { ...entry.session };
 }
 
-async function fakeStopChatRoom(): Promise<void> {
-  browserChat.stop();
-  if (!browserChatSession) {
-    return;
+async function fakeConnectChatPeer(roomID: string, addr: string): Promise<void> {
+  await requireRoom(roomID).hub.connect(addr);
+}
+
+async function fakeRestartChatRoom(roomID: string, keyName: string): Promise<Session> {
+  const current = browserRooms.get(roomID);
+  if (!current) {
+    throw new Error("Unknown room.");
   }
-  browserChatSession.Status = "stopped";
-  browserChatSession = null;
+  const name = keyName.trim();
+  if (name && [...browserRooms.values()].some((room) => room !== current && room.keyName === name)) {
+    throw new Error("That key is already listening in another room.");
+  }
+  const material = name ? (browserKeyJSON.get(name) ?? "") : "";
+  if (name && !material) {
+    throw new Error("saved key is not a Tailcat private key");
+  }
+  current.stopListen();
+  fake.serveStops.delete(roomID);
+  browserRooms.delete(roomID);
+  fake.sessions = fake.sessions.filter((item) => item.ID !== roomID);
+  const sess = newSess("chat");
+  current.session = sess;
+  current.keyName = name;
+  browserRooms.set(sess.ID, current);
+  listenRoom(current);
+  await current.hub.restart(sess.ID, material);
+  return { ...current.session };
+}
+
+async function fakeStopChatRoom(roomID: string): Promise<void> {
+  const entry = browserRooms.get(roomID);
+  if (!entry) {
+    throw new Error("Unknown room.");
+  }
+  entry.stopListen();
+  entry.hub.stop();
+  browserRooms.delete(roomID);
+  fake.serveStops.delete(roomID);
+  fake.sessions = fake.sessions.filter((item) => item.ID !== roomID);
 }
 
 export async function getNetworkSettings(): Promise<NetworkSettings> {
