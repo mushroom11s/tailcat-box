@@ -14,22 +14,22 @@ macOS 和 Windows 上的 [Tailscale Tailcat](https://github.com/tailscale/tailca
 
 <p align="center">
   <b>聊天 — 发送与阅后即焚</b><br />
-  <video src="docs/assets/demo/chat-send-and-burn.mp4" controls width="640"></video>
+  <img src="docs/assets/demo/chat-send-and-burn.gif" alt="聊天 — 发送与阅后即焚" width="640" />
 </p>
 
 <p align="center">
   <b>语音留言 — 按住与阅后即焚</b><br />
-  <video src="docs/assets/demo/voice-note-burn.mp4" controls width="640"></video>
+  <img src="docs/assets/demo/voice-note-burn.gif" alt="语音留言 — 按住与阅后即焚" width="640" />
 </p>
 
 <p align="center">
   <b>实时语音 / 视频</b><br />
-  <video src="docs/assets/demo/voice-video-call.mp4" controls width="640"></video>
+  <img src="docs/assets/demo/voice-video-call.gif" alt="实时语音和视频" width="640" />
 </p>
 
 <p align="center">
   <b>穿透 — 转发并打开浏览器</b><br />
-  <video src="docs/assets/demo/tunnel-forward.mp4" controls width="640"></video>
+  <img src="docs/assets/demo/tunnel-forward.gif" alt="穿透 — 转发并打开浏览器" width="640" />
 </p>
 
 英文名 **Tailcat Box**，中文名 **猫砂盆**。仓库：[mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box)。
