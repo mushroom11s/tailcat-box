@@ -18,6 +18,7 @@ Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on mac
 - **Tunnel** — serve TCP ports, forward them to this machine, or browse the peer’s web port
 - **Settings** — system / light / dark theme, English and 简体中文, keys and DERP, diagnostics, client and system info, launch at login
 - **Tray** — Open, Hide, Chat, Tunnel, Settings, and Quit on macOS and Windows. Left-click the icon to show the window. The macOS app menu has the same actions. The tray icon is the same pixel-art cat as the app icon. Closing the window hides it so sessions keep running
+- **macOS window** — The standard title bar stays visible and shows Tailcat Box. The green button, and View → Enter Full Screen / Exit Full Screen (⌃⌘F), use native fullscreen. Windows and Linux are unchanged
 
 The UI talks to a Go service layer. Only `internal/adapter` imports `github.com/tailscale/tailcat` (pinned at **v0.7.0**).
 

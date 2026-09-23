@@ -56,7 +56,10 @@ type App struct {
 	trayIcon   []byte
 	settings   *settings.Store
 	uiLocale   string
-	startedAt  time.Time
+	// windowFullscreen tracks the View menu label (Enter vs Exit Full Screen).
+	// The native window title stays windowTitle in both states.
+	windowFullscreen bool
+	startedAt        time.Time
 }
 
 // ClientInfo is desktop-client metadata shown on Settings.
