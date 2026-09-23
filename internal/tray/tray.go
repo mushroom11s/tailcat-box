@@ -2,6 +2,7 @@ package tray
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 )
@@ -83,6 +84,12 @@ type Controller struct {
 	labels       MenuLabels
 	applyProduct func(title, tooltip string)
 	applyLabels  func(MenuLabels)
+}
+
+// skipTray reports whether Start should return before touching the OS tray.
+// TAILCAT_NO_TRAY skips the icon on every platform; a nil controller does too.
+func skipTray(c *Controller) bool {
+	return c == nil || os.Getenv("TAILCAT_NO_TRAY") != ""
 }
 
 func New(open, quit func(), count func() int) *Controller {
