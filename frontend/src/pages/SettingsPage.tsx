@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import DiagnosticsSection from "../components/DiagnosticsSection";
 import KeysDERPSection from "../components/KeysDERPSection";
+import ReleaseNotes from "../components/ReleaseNotes";
 import iconUrl from "../assets/icon.png";
 import { useI18n, type Locale, type MessageKey } from "../i18n";
 import { displayNickname, sanitizeNickname } from "../lib/nickname";
@@ -49,6 +50,7 @@ type Props = {
   onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
   onRestart: (keyName: string) => void | Promise<void>;
   canRestart: boolean;
+  restartLabel: string;
   onPing: (addr: string, untilDirect: boolean) => void | Promise<void>;
   onStop: (id: string) => void | Promise<void>;
 };
@@ -190,6 +192,7 @@ export default function SettingsPage({
   onSaveNetwork,
   onRestart,
   canRestart,
+  restartLabel,
   onPing,
   onStop,
 }: Props) {
@@ -428,10 +431,9 @@ export default function SettingsPage({
           {update?.Notes ? (
             <div className="update-notes">
               <span className="info-card-label">{t("releaseNotes")}</span>
-              <p>{update.Notes}</p>
+              <ReleaseNotes markdown={update.Notes} />
             </div>
           ) : null}
-          <p className="info-card-note">{t("updateCheckHint")}</p>
           {downloading ? (
             <div
               className="update-progress"
@@ -512,6 +514,7 @@ export default function SettingsPage({
         onSaveNetwork={onSaveNetwork}
         onRestart={onRestart}
         canRestart={canRestart}
+        restartLabel={restartLabel}
       />
       <DiagnosticsSection
         sessions={sessions}

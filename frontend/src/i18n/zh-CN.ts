@@ -72,8 +72,6 @@ export const zhCN = {
   checkNow: "现在检查",
   updateNew: "NEW!",
   updateNewBadge: "NEW! 有新版本",
-  updateCheckHint:
-    "猫砂盆会到 GitHub Releases 检查新版本，把适合这台电脑的压缩包下载到「下载」文件夹，并告诉你怎么换上。还不能一键替换正在运行的程序，也不会自动重启。",
   latestVersion: "最新版本",
   updateStatus: "更新",
   releaseNotes: "更新说明",
@@ -317,6 +315,7 @@ export const zhCN = {
   chatRoomRestarted: "房间已重启。把新地址发给对方。",
   chatRestartRoom: "重启房间",
   chatRestartHint: "重启房间后才会生效",
+  chatRestartTarget: "只重启这个房间：{label}。其他房间保持连接。",
   chatNewRoomKey: "新的房间密钥",
   chatRoomKey: "房间密钥",
   keysDERPTitle: "密钥和 DERP",

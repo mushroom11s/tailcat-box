@@ -35,6 +35,7 @@ type Props = {
   onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
   onRestart: (keyName: string) => void | Promise<void>;
   canRestart: boolean;
+  restartLabel: string;
 };
 
 export default function KeysDERPSection({
@@ -53,6 +54,7 @@ export default function KeysDERPSection({
   onSaveNetwork,
   onRestart,
   canRestart,
+  restartLabel,
 }: Props) {
   const { t } = useI18n();
   const [name, setName] = useState("");
@@ -175,6 +177,7 @@ export default function KeysDERPSection({
           ))}
         </select>
       </div>
+      {canRestart && restartLabel ? <p>{t("chatRestartTarget").replaceAll("{label}", restartLabel)}</p> : null}
       {canRestart && dirty ? <p>{t("chatRestartHint")}</p> : null}
       {!canRestart ? <p>{t("chatNoRoomRestart")}</p> : null}
       <div className="row">

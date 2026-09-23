@@ -558,21 +558,46 @@ export default function App() {
     try {
       const sess = await restartChatRoom(id, keyName);
       const prev = roomsRef.current[id];
-      let room: RoomSlice = prev
-        ? { ...prev, id: sess.ID, keyName, address: sess.Address || "", peer: "", caps: [], error: sess.Err || "" }
-        : emptyRoom(sess.ID);
-      room.keyName = keyName;
+      // The room was closed while restart was in flight. Do not put it back.
+      if (!prev) {
+        if (sess.ID && sess.ID !== id) {
+          void stopChatRoom(sess.ID);
+        }
+        return;
+      }
+      // A new session id must not overwrite a different room's slice.
+      if (sess.ID !== id && roomsRef.current[sess.ID]) {
+        return;
+      }
+      let room: RoomSlice = {
+        ...prev,
+        id: sess.ID,
+        keyName,
+        address: sess.Address || prev.address,
+        peer: "",
+        caps: [],
+        messages: prev.messages.slice(),
+        transfers: prev.transfers.slice(),
+        error: sess.Err || "",
+      };
       for (const ev of drain(sess.ID)) {
         room = applyRoomEvent(room, ev);
       }
       room = stampApplied(room);
       const next = { ...roomsRef.current };
-      delete next[id];
+      if (sess.ID !== id) {
+        delete next[id];
+      }
       next[sess.ID] = room;
       commitRooms(next);
       commitOrder(orderRef.current.map((item) => (item === id ? sess.ID : item)));
-      commitFocus(sess.ID);
-      commitLobby(false);
+      // Only move focus when the user is still on the room that was restarted.
+      if (focusRef.current === id) {
+        commitFocus(sess.ID);
+        if (!lobbyRef.current) {
+          commitLobby(false);
+        }
+      }
     } catch (err) {
       const current = roomsRef.current[id];
       if (!current) {
@@ -599,6 +624,9 @@ export default function App() {
 
   const chatRoom = !lobby && focus && rooms[focus] ? rooms[focus] : undefined;
   const showLobby = page === "chat" && !chatRoom;
+  const restartLabel = chatRoom
+    ? [chatRoom.address || t("roomStarting"), chatRoom.keyName].filter(Boolean).join(" · ")
+    : "";
   void version;
 
   return (
@@ -789,6 +817,7 @@ export default function App() {
             events={events}
             peer={chatRoom?.peer ?? ""}
             canRestart={Boolean(chatRoom)}
+            restartLabel={restartLabel}
             onCreate={(name, client, keyRegion) => run(() => createKey(name, client, keyRegion))}
             onDelete={(name) => run(() => deleteKey(name))}
             onSaveNetwork={(nextRegion, nextDERP) => run(() => setNetworkSettings(nextRegion, nextDERP))}

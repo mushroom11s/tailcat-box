@@ -53,6 +53,26 @@ describe("browser hub", () => {
     expect(messages[0]?.audio).toBe(btoa("\u0001\u0002"));
   });
 
+  it("does not steal another room's address when restarting onto the same key", async () => {
+    const a = createBrowserHub();
+    const b = createBrowserHub();
+    const key = `{"fake":"shared"}`;
+    await a.start("room-a", "");
+    const addrB = (await b.start("room-b", key)).address;
+    await a.restart("room-a2", key);
+    const seen: string[] = [];
+    b.onEvent((ev) => {
+      if (ev.Kind === "signal") {
+        seen.push(ev.SessionID);
+      }
+    });
+    await a.connect(addrB);
+    a.sendSignal(JSON.stringify({ type: "rtc-offer", description: { type: "offer", sdp: "v=0" } }));
+    expect(seen).toEqual(["room-b"]);
+    a.stop();
+    b.stop();
+  });
+
   it("delivers a signal envelope from one fake room to the other", async () => {
     const a = createBrowserHub();
     const b = createBrowserHub();

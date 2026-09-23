@@ -228,3 +228,113 @@ func TestManagerDataDirsArePerRoom(t *testing.T) {
 		t.Fatalf("bases %s %s", dirA, dirB)
 	}
 }
+
+func TestRestartOneRoomKeepsOtherTranscriptAndPeer(t *testing.T) {
+	m := NewManager(adapter.NewFake(), t.TempDir())
+	first, err := m.Start(StartOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := m.Start(StartOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	readyA := waitRoomRunning(t, m, first.ID)
+	readyB := waitRoomRunning(t, m, second.ID)
+	if err := m.Connect(first.ID, "tc:fake-echo"); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SendText(first.ID, "alpha-only", false, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Connect(second.ID, "tc:fake-echo"); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SendText(second.ID, "beta-only", false, 0); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.After(2 * time.Second)
+	for {
+		if managerHasBody(t, m, first.ID, "alpha-only") && managerHasBody(t, m, second.ID, "beta-only") {
+			break
+		}
+		select {
+		case <-deadline:
+			aMsgs, _ := m.Messages(first.ID)
+			bMsgs, _ := m.Messages(second.ID)
+			t.Fatalf("a=%+v b=%+v", aMsgs, bMsgs)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	restarted, err := m.Restart(second.ID, StartOpts{KeyName: "home", PrivateKeyJSON: `{"fake":"home"}`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restarted.ID == "" || restarted.ID == second.ID {
+		t.Fatalf("restart id=%s old=%s", restarted.ID, second.ID)
+	}
+	readyNext := waitRoomRunning(t, m, restarted.ID)
+	if readyNext.Address == readyB.Address || readyNext.Address == readyA.Address {
+		t.Fatalf("restarted address %s", readyNext.Address)
+	}
+	if peer, err := m.Peer(restarted.ID); err != nil || peer != "" {
+		t.Fatalf("restarted peer=%q err=%v", peer, err)
+	}
+	if !managerHasBody(t, m, restarted.ID, "beta-only") {
+		msgs, _ := m.Messages(restarted.ID)
+		t.Fatalf("restarted transcript %+v", msgs)
+	}
+	if peer, err := m.Peer(first.ID); err != nil || peer != "tc:fake-echo" {
+		t.Fatalf("other peer=%q err=%v", peer, err)
+	}
+	left, err := m.Messages(first.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !managerHasBody(t, m, first.ID, "alpha-only") || hasCode(left, "room-restarted") {
+		t.Fatalf("other transcript %+v", left)
+	}
+	still := waitRoomRunning(t, m, first.ID)
+	if still.Address != readyA.Address {
+		t.Fatalf("other address %s want %s", still.Address, readyA.Address)
+	}
+	if err := m.SendText(first.ID, "still-alpha", false, 0); err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.After(2 * time.Second)
+	for !managerHasBody(t, m, first.ID, "echo") {
+		select {
+		case <-deadline:
+			msgs, _ := m.Messages(first.ID)
+			t.Fatalf("other room stopped echoing %+v", msgs)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if managerHasBody(t, m, restarted.ID, "still-alpha") || managerHasBody(t, m, restarted.ID, "alpha-only") {
+		msgs, _ := m.Messages(restarted.ID)
+		t.Fatalf("restarted room absorbed the other transcript %+v", msgs)
+	}
+}
+
+func managerHasBody(t *testing.T, m *Manager, id, body string) bool {
+	t.Helper()
+	msgs, err := m.Messages(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, msg := range msgs {
+		if msg.Body == body {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCode(msgs []Message, code string) bool {
+	for _, msg := range msgs {
+		if msg.Code == code {
+			return true
+		}
+	}
+	return false
+}
