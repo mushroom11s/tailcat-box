@@ -55,6 +55,7 @@ type App struct {
 	tray       *tray.Controller
 	trayIcon   []byte
 	settings   *settings.Store
+	uiLocale   string
 	startedAt  time.Time
 }
 
@@ -145,12 +146,14 @@ func appConfigDir() (root string, userConfig string, err error) {
 	return root, userConfig, nil
 }
 
-// SetUILocale applies the product name for locale to the tray and, on macOS,
-// the system menu bar. The native window title stays windowTitle.
+// SetUILocale applies the product name and menu captions for locale to the
+// tray and, on macOS, the system menu bar. The native window title stays windowTitle.
 func (a *App) SetUILocale(locale string) {
+	a.uiLocale = locale
 	title := productTitle(locale)
 	if a.tray != nil {
 		a.tray.SetProductName(title, title)
+		a.tray.SetLocale(locale)
 	}
 	if a.ctx == nil {
 		return
@@ -198,6 +201,14 @@ func chatDataDir() string {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.tray = tray.New(a.showWindow, a.quitApp, a.activeSessionCount)
+	a.tray.SetHide(a.hideWindow)
+	a.tray.SetNavigate(a.navigate)
+	if a.uiLocale != "" {
+		title := productTitle(a.uiLocale)
+		a.tray.SetProductName(title, title)
+		a.tray.SetLocale(a.uiLocale)
+		a.syncApplicationMenu(title)
+	}
 	a.tray.Start(a.trayIcon)
 	go a.forwardEvents()
 	go a.maybeRecordDailyUpdateCheck()
@@ -219,6 +230,22 @@ func (a *App) showWindow() {
 		return
 	}
 	runtime.WindowShow(a.ctx)
+}
+
+func (a *App) hideWindow() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.WindowHide(a.ctx)
+}
+
+// navigate shows the window and asks the frontend to open page.
+func (a *App) navigate(page string) {
+	a.showWindow()
+	if a.ctx == nil {
+		return
+	}
+	runtime.EventsEmit(a.ctx, tray.NavigateEvent, page)
 }
 
 func (a *App) quitApp() {

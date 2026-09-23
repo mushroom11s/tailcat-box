@@ -17,7 +17,7 @@ Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on mac
 - **Chat** — open a room, exchange a Tailcat address, and send text, files, voice notes, or a live voice, video, or screen share
 - **Tunnel** — serve TCP ports, forward them to this machine, or browse the peer’s web port
 - **Settings** — system / light / dark theme, English and 简体中文, keys and DERP, diagnostics, client and system info, launch at login
-- **Tray** — Open and Quit on macOS and Windows (the app menu is the Linux fallback). The tray icon is the same pixel-art cat as the app icon. Closing the window hides it so sessions keep running
+- **Tray** — Open, Hide, Chat, Tunnel, Settings, and Quit on macOS and Windows. Left-click the icon to show the window. The macOS app menu has the same actions. The tray icon is the same pixel-art cat as the app icon. Closing the window hides it so sessions keep running
 
 The UI talks to a Go service layer. Only `internal/adapter` imports `github.com/tailscale/tailcat` (pinned at **v0.7.0**).
 
@@ -139,7 +139,7 @@ Tagging, dry-run builds, and which runners are used are described in [docs/relea
 - `internal/service` — session commands (pipe, ports, files, SSH, SOCKS, exit node, exec, ping)
 - `internal/session` — session state
 - `internal/store` — named keys and network settings
-- `internal/tray` — Open, session count, Quit
+- `internal/tray` — Open, Hide, Chat, Tunnel, Settings, session count, Quit
 - `frontend/` — Chat, Tunnel, and Settings
 
 The Go module path in `go.mod` is `github.com/mushroom11s/tailcat-box`.

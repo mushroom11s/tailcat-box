@@ -200,7 +200,7 @@ export const zhCN = {
   wiredExit: "出口节点",
   wiredExec: "每个连接跑一条命令（Exec）",
   wiredDERP: "DERP 区域 / 地图 URL",
-  wiredTray: "系统托盘：打开和退出（macOS / Windows；Linux 尽量用应用菜单）",
+  wiredTray: "系统托盘：打开、隐藏、聊天、穿透、设置和退出（macOS / Windows；左键显示窗口；Linux 尽量用应用菜单）",
   unwiredAndroid: "Android 客户端",
   unwiredPTY: "窗口里的交互式 SSH 终端（目前命令是非交互执行）",
   unwiredAllow: "Serve --allow 客户端白名单",

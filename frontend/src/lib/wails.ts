@@ -110,6 +110,7 @@ export type SystemInfo = {
 };
 
 const TAILCAT_EVENT = "tailcat:event";
+export const TRAY_NAVIGATE_EVENT = "tailcat:navigate";
 
 type GoWindow = Window & {
   go?: { main?: { App?: { StartChatRoom?: unknown } } };
@@ -165,6 +166,7 @@ type FakeState = {
   sessions: Session[];
   keys: KeyInfo[];
   listeners: Array<(ev: TailcatEvent) => void>;
+  navListeners: Array<(page: string) => void>;
   serveStops: Map<string, () => void>;
   ports: Map<string, string>;
   files: Map<string, string>;
@@ -178,6 +180,7 @@ const fake: FakeState = {
   sessions: [],
   keys: [],
   listeners: [],
+  navListeners: [],
   serveStops: new Map(),
   ports: new Map(),
   files: new Map(),
@@ -1065,6 +1068,28 @@ export async function setLaunchAtLogin(enabled: boolean): Promise<SystemInfo> {
   }
   fake.launchAtLogin = enabled;
   return fakeSystemInfo();
+}
+
+export function onTrayNavigate(callback: (page: string) => void): () => void {
+  if (hasWailsBindings() && goWindow().runtime) {
+    return EventsOn(TRAY_NAVIGATE_EVENT, (page: unknown) => {
+      if (typeof page === "string") {
+        callback(page);
+      }
+    });
+  }
+  fake.navListeners.push(callback);
+  return () => {
+    fake.navListeners = fake.navListeners.filter((l) => l !== callback);
+  };
+}
+
+// emitTrayNavigate delivers a tray page change to listeners registered
+// without the Wails runtime (browser preview and tests).
+export function emitTrayNavigate(page: string): void {
+  for (const listener of [...fake.navListeners]) {
+    listener(page);
+  }
 }
 
 export function onTailcatEvent(callback: (ev: TailcatEvent) => void): () => void {

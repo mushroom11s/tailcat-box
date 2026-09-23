@@ -17,7 +17,7 @@ macOS 和 Windows 上的 [Tailscale Tailcat](https://github.com/tailscale/tailca
 - **聊天** — 开一个房间，交换 Tailcat 地址，发文字、文件和语音，也能实时语音、视频和共享屏幕
 - **穿透** — 把 TCP 端口挂到 Tailcat 地址上，再转到这台电脑，也可以打开对方的网页端口
 - **设置** — 跟随系统 / 浅色 / 深色，中英文，密钥和 DERP，诊断，本机信息，开机启动
-- **托盘** — macOS 和 Windows 上可以打开或退出（Linux 用应用菜单）。托盘图标和应用图标是同一只像素猫。关掉窗口只是藏起来，会话还在跑
+- **托盘** — macOS 和 Windows 上可以打开、隐藏，或跳到聊天、穿透、设置，也可以退出。左键点图标会显示窗口。macOS 应用菜单里也有这些操作。托盘图标和应用图标是同一只像素猫。关掉窗口只是藏起来，会话还在跑
 
 前端不直接连 Tailcat，都走 Go。只有 `internal/adapter` 引入 `github.com/tailscale/tailcat`（固定 **v0.7.0**）。
 
@@ -139,7 +139,7 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 - `internal/service` — 会话命令（管道连接、端口、文件、SSH、SOCKS、出口节点、Exec、Ping）
 - `internal/session` — 会话状态
 - `internal/store` — 命名密钥和网络设置
-- `internal/tray` — 打开、会话数量、退出
+- `internal/tray` — 打开、隐藏、聊天、穿透、设置、会话数量、退出
 - `frontend/` — 聊天、穿透和设置
 
 `go.mod` 里的 module 路径是 `github.com/mushroom11s/tailcat-box`。
