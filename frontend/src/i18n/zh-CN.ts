@@ -6,7 +6,7 @@ import type { MessageKey } from "./en";
  */
 export const zhCN = {
   productName: "猫砂盆",
-  brandTagline: "你的聊天，你的隧道。",
+  brandTagline: "聊天、打洞，随手就成。",
   brandName: "猫砂盆",
   navChat: "聊天",
   navNewRoom: "+ 新房间",
