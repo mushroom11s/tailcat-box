@@ -303,6 +303,8 @@ export const en = {
   chatLocalPreview: "Local preview",
   chatRemoteMedia: "Remote media",
   chatMediaDock: "Live media",
+  chatCallPanel: "Calls",
+  chatCallIdle: "Start a voice call, video call, or screen share.",
   chatCamDenied: "Camera access was denied.",
   chatScreenDenied: "Screen sharing was denied.",
   chatScreenUnavailable: "Screen sharing is unavailable on this system.",
