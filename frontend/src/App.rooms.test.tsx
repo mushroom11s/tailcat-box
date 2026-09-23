@@ -107,7 +107,7 @@ describe("phase A multi-room lobby", () => {
     expect(screen.getByText(firstAddress)).toBeTruthy();
   });
 
-  it("labels rooms with the address abbreviation and ignores a self nickname", async () => {
+  it("labels rooms with the address abbreviation and outgoing bubbles with the self nickname", async () => {
     localStorage.setItem(SELF_NICKNAME_KEY, "Alice");
     const user = userEvent.setup();
     renderApp();
@@ -121,8 +121,10 @@ describe("phase A multi-room lobby", () => {
     await user.type(screen.getByLabelText("Message"), "ping");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("echo")).toBeTruthy();
-    const log = document.querySelector(".chat-log")?.textContent ?? "";
-    expect(log.includes("Alice")).toBe(false);
+    expect(document.querySelector(".chat-bubble.out .chat-who")?.textContent).toBe("Alice");
+    expect(document.querySelector(".chat-bubble.in .chat-who")?.textContent).toBe("Peer");
+    expect(screen.getByText("ping").textContent).toBe("ping");
+    expect(screen.getByText("echo").textContent).toBe("echo");
   });
 
   it("refuses the 9th room and lists every chat session", async () => {

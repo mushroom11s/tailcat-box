@@ -79,6 +79,7 @@ describe("local nickname", () => {
   it("shows You on a sent bubble when nothing is stored", async () => {
     const user = userEvent.setup();
     renderApp();
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
@@ -104,6 +105,7 @@ describe("local nickname", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Chat" }));
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
