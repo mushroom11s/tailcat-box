@@ -50,6 +50,7 @@ type Props = {
   onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
   onRestart: (keyName: string) => void | Promise<void>;
   canRestart: boolean;
+  restartLabel: string;
   onPing: (addr: string, untilDirect: boolean) => void | Promise<void>;
   onStop: (id: string) => void | Promise<void>;
 };
@@ -191,6 +192,7 @@ export default function SettingsPage({
   onSaveNetwork,
   onRestart,
   canRestart,
+  restartLabel,
   onPing,
   onStop,
 }: Props) {
@@ -512,6 +514,7 @@ export default function SettingsPage({
         onSaveNetwork={onSaveNetwork}
         onRestart={onRestart}
         canRestart={canRestart}
+        restartLabel={restartLabel}
       />
       <DiagnosticsSection
         sessions={sessions}

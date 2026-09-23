@@ -143,6 +143,36 @@ func TestFakeSavedKeyChangesAddress(t *testing.T) {
 	}
 }
 
+func TestFakeCloseLeavesReplacementAtSameAddress(t *testing.T) {
+	fake := NewFake()
+	ctx := context.Background()
+	const key = `{"fake":"same"}`
+	old, err := fake.StartRoom(ctx, RoomOpts{SessionID: "old", PrivateKeyJSON: key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := readReady(t, old)
+	replacement, err := fake.StartRoom(ctx, RoomOpts{SessionID: "new", PrivateKeyJSON: key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := readReady(t, replacement); got != addr {
+		t.Fatalf("replacement=%s old=%s", got, addr)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+	fake.mu.Lock()
+	got := fake.chatRooms[addr]
+	fake.mu.Unlock()
+	if got == nil || got.SessionID() != "new" {
+		t.Fatal("closing the previous room deleted the room now listening at that address")
+	}
+	if err := replacement.SetPeer("tc:fake-echo"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGeneratePrivateKeyJSON(t *testing.T) {
 	fake := NewFake()
 	a, err := fake.GeneratePrivateKeyJSON()

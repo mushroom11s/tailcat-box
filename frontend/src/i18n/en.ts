@@ -313,6 +313,7 @@ export const en = {
   chatRoomRestarted: "Room restarted. Send the new address.",
   chatRestartRoom: "Restart room",
   chatRestartHint: "Restart room to apply",
+  chatRestartTarget: "Restarts this room only: {label}. Other rooms stay connected.",
   chatNewRoomKey: "New room key",
   chatRoomKey: "Room key",
   keysDERPTitle: "Keys & DERP",

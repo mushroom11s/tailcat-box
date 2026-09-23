@@ -97,6 +97,12 @@ export function createBrowserHub() {
         rooms.delete(registeredAddr);
       }
     }
+    const occupant = rooms.get(next);
+    if (occupant && occupant.emit !== emit) {
+      // Another room already listens at this address. Do not steal its session.
+      registeredAddr = registeredAddr === next ? "" : registeredAddr;
+      return;
+    }
     registeredAddr = next;
     rooms.set(next, { sessionID, emit });
   }
