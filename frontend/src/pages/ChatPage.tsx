@@ -8,6 +8,7 @@ import { purgeDiscardIds } from "../lib/chatPurge";
 import { createLiveCall, type CallMode, type CallView, type LiveCall, type LiveDevices } from "../lib/liveCall";
 import { startVoiceCapture, type VoiceCapture } from "../lib/voiceCapture";
 import { displayNickname } from "../lib/nickname";
+import { labelPeerAddress, remarkAddress, remarkFor, type RemarkMap } from "../lib/remark";
 import { hasWailsBindings, selectFiles } from "../lib/wails";
 
 export type ChatMessage = {
@@ -22,6 +23,7 @@ export type ChatMessage = {
   size?: number;
   burn?: boolean;
   ttlSec?: number;
+  peer?: string;
   preview?: string;
   fileId?: string;
   duration?: number;
@@ -67,7 +69,11 @@ type Props = {
   peerConnection?: new (config?: RTCConfiguration) => RTCPeerConnection;
   nickname?: string;
   notifyNote?: string;
+  remarks?: RemarkMap;
+  onRemark?: (address: string, raw: string, commit: boolean) => void;
 };
+
+const noRemarks: RemarkMap = {};
 
 async function copyText(text: string): Promise<void> {
   try {
@@ -144,6 +150,8 @@ export default function ChatPage({
   peerConnection,
   nickname = "",
   notifyNote = "",
+  remarks = noRemarks,
+  onRemark,
 }: Props) {
   const { t } = useI18n();
   const ownLabel = displayNickname(nickname) || t("chatYou");
@@ -151,6 +159,7 @@ export default function ChatPage({
   const fileRef = useRef<HTMLInputElement>(null);
   const burnRef = useRef(false);
   const [draftPeer, setDraftPeer] = useState(initialPeerDraft ?? "");
+  const remarkAddr = remarkAddress(peer, draftPeer);
   const [draft, setDraft] = useState(initialComposer ?? "");
   const [inline, setInline] = useState("");
   const [notice, setNotice] = useState("");
@@ -918,6 +927,28 @@ export default function ChatPage({
           {peer ? " · " : null}
           {t("chatPeerHelper")}
         </p>
+        <div className="chat-peer-bar chat-remark-bar">
+          <label htmlFor="chat-remark">{t("chatRemark")}</label>
+          <input
+            id="chat-remark"
+            value={remarkAddr ? (remarks[remarkAddr] ?? "") : ""}
+            disabled={!remarkAddr}
+            autoComplete="off"
+            spellCheck={false}
+            aria-describedby="chat-remark-help"
+            onChange={(e) => {
+              if (remarkAddr) {
+                onRemark?.(remarkAddr, e.target.value, false);
+              }
+            }}
+            onBlur={(e) => {
+              if (remarkAddr) {
+                onRemark?.(remarkAddr, e.currentTarget.value, true);
+              }
+            }}
+          />
+        </div>
+        <p id="chat-remark-help" className="chat-quiet chat-help">{t("chatRemarkHelp")}</p>
         {inline ? <p className="err">{inline}</p> : null}
       </div>
       <div className="chat-stage">
@@ -1006,7 +1037,11 @@ export default function ChatPage({
                 decodeVoice={decodeVoice}
               />
               <header>
-                <span className="chat-who">{msg.direction === "out" ? ownLabel : t("chatPeerName")}</span>
+                <span className="chat-who">
+                  {msg.direction === "out"
+                    ? ownLabel
+                    : remarkFor(remarks, labelPeerAddress(msg.peer, peer)) || t("chatPeerName")}
+                </span>
                 <time>{stamp(msg.at)}</time>
               </header>
               {msg.burn && msg.direction === "in" && openMessage?.id !== msg.id ? (

@@ -155,7 +155,7 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 
 ## 常见问题
 
-同时开多个房间、多人连同一个房间、临时地址关掉后还能不能再用，见 [使用常见问题](docs/faq.zh-CN.md)。
+同时开多个房间、多人连同一个房间、临时地址关掉后还能不能再用、本机昵称和对方备注，见 [使用常见问题](docs/faq.zh-CN.md)。
 
 ## 致谢
 

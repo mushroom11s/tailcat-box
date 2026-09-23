@@ -11,7 +11,8 @@ import { inboundAlertBody, inboundAlertTitle, isInboundAlert, readingOpenTranscr
 import { localizeChatError } from "./lib/chatText";
 import { NICKNAME_KEY, readNickname } from "./lib/nickname";
 import { ensureOsNotifications, sendOsNotification } from "./lib/osNotify";
-import { roomPrimaryLabel, roomTooltip } from "./lib/roomLabel";
+import { applyRemark, readRemarks, writeRemarks, type RemarkMap } from "./lib/remark";
+import { remarkIsShared, roomPrimaryLabel, roomTooltip } from "./lib/roomLabel";
 import { applyRoomEvent, emptyRoom, type RoomSlice } from "./lib/roomState";
 import {
   connectChatPeer,
@@ -77,6 +78,7 @@ export default function App() {
   const [page, setPageState] = useState<Page>("chat");
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const [nickname, setNickname] = useState(() => readNickname());
+  const [remarks, setRemarks] = useState<RemarkMap>(() => readRemarks());
   const [sessions, setSessions] = useState<Session[]>([]);
   const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [events, setEvents] = useState<TailcatEvent[]>([]);
@@ -274,6 +276,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(NICKNAME_KEY, nickname);
   }, [nickname]);
+
+  useEffect(() => {
+    writeRemarks(remarks);
+  }, [remarks]);
 
   useEffect(() => {
     const node = mainRef.current;
@@ -515,7 +521,14 @@ export default function App() {
                     if (!room) {
                       return null;
                     }
-                    const label = roomPrimaryLabel(room.address, t("roomStarting"));
+                    const peers = order.map((roomID) => rooms[roomID]?.peer ?? "");
+                    const label = roomPrimaryLabel(
+                      room.address,
+                      t("roomStarting"),
+                      room.peer,
+                      remarks,
+                      remarkIsShared(room.peer, peers, remarks),
+                    );
                     const selected = page === "chat" && !showLobby && focus === id;
                     return (
                       <button
@@ -573,6 +586,10 @@ export default function App() {
               initialBurn={chatRoom.burn}
               onRoomDraft={rememberDraft}
               nickname={nickname}
+              remarks={remarks}
+              onRemark={(address, raw, commit) => {
+                setRemarks((prev) => applyRemark(prev, address, raw, commit));
+              }}
               onConnect={(addr) => connectChatPeer(chatRoom.id, addr)}
               onSend={(body, burn, ttl) => sendChatText(chatRoom.id, body, burn, ttl)}
               onSendVoice={(mime, duration, audio, burn, ttl) =>

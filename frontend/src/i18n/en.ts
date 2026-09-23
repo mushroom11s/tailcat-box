@@ -254,6 +254,8 @@ export const en = {
   chatCopyHelper: "Anyone with this address can send to this room while it is open.",
   chatPeerLabel: "Peer",
   chatPeerHelper: "Paste the other person’s Tailcat address.",
+  chatRemark: "Remark",
+  chatRemarkHelp: "Only on this device, for this address. The other person never sees it. This is not your nickname.",
   chatConnect: "Connect",
   chatEmptyLede: "Messages stay on this device until you quit.",
   chatYou: "You",

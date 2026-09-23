@@ -10,7 +10,7 @@ This is not a group chat. Chat keeps only one current peer.
 
 Suppose A opens a room, and both B and C connect to A:
 
-1. **Can you tell who sent a message?** No. Messages from B and C land in the same transcript. Every incoming bubble is labeled Peer (对方 in the Chinese UI). The message does not name the address, so the screen does not show whether it was B or C.
+1. **Can you tell who sent a message?** No. Messages from B and C land in the same transcript. Every incoming bubble is labeled Peer (对方 in the Chinese UI), or your local remark for the current peer if you set one. That remark stays on this computer. The message does not name the address, so the screen does not show whether it was B or C.
 2. **Where do A's replies go?** Only to the one peer locked in now: whoever completed hello most recently. If B connects first and C connects later, the transcript shows Peer changed (已更换对方 in Chinese), and the current peer becomes C. After that, what A sends goes only to C. B does not receive it. Even if B is still sending to A, A's replies still go only to C.
 
 So many people can drop messages into the room, but the host talks back only with the latest peer. Separate identities and replies aimed at a chosen person would have to be built separately. That does not exist today.
@@ -23,7 +23,7 @@ Hiding the window is not quitting, so every room stays up. Quitting stops every 
 
 Inside any one of those rooms, the answer above still applies. Several people can connect to that one address, and it is still not a group chat.
 
-The room list shows a short form of each room’s address. A local name for that room’s current peer will replace the abbreviation once peer remarks exist. A nickname for yourself is not the room name, and it is not sent to the peer.
+The room list uses your local remark for that room’s current peer when you have set one. Otherwise it shows a short form of the room address. A nickname for yourself is not the room name, and it is not sent to the peer. A remark is not sent either.
 
 ## Can I use a temporary address again after it is closed?
 
@@ -38,3 +38,7 @@ Closing the window only hides the app, so the temporary address is still live. T
 ## Can I set a nickname? Can the other person see it?
 
 Yes. Settings has a nickname field. It is stored only on this computer and replaces You in your local transcript (我 in the Chinese UI). **It is not sent to the other person, and they cannot see it.** On their side, messages from you still show as Peer (对方 in Chinese). A nickname they enter only replaces You on their own screen.
+
+## Can I set a remark for the other person? Can they see it?
+
+Yes. The chat room has a Remark field. It stores a display name on this computer for that person's Tailcat address, and incoming bubbles use it instead of Peer (对方 in the Chinese UI). **It is never sent, and the other person cannot see it.** This is separate from the Settings nickname, which only replaces You on messages you send. Clearing the field removes the remark. An empty remark shows Peer again.

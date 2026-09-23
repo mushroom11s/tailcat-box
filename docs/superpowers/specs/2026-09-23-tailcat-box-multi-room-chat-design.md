@@ -38,12 +38,12 @@ People need more than one open room in the same process: different addresses at 
 | Topic | Decision |
 | --- | --- |
 | Concurrency | Every open room keeps its Tailcat listener running. Rooms receive at the same time. This is not a single-active listener. |
-| Sidebar label | Prefer the user’s local-only Settings nickname when that string is non-empty. Otherwise a short address abbreviation. The nickname is never on the wire. A permanent key’s name may be shown as secondary text. |
+| Sidebar label | Prefer the local-only peer remark for that room’s current peer address when the remark is non-empty. Otherwise a short address abbreviation. The remark is never on the wire. Do not use the Settings nickname as the room label; that nickname stays on outgoing bubbles only. A permanent key’s name may be shown as secondary text. |
 | Lobby actions | Create an ephemeral room, or a permanent room on a saved genkey, or submit a peer address. Peer is optional. Submit of a peer address is the only lobby path that auto-creates an ephemeral room and Connects. |
 | Default view | If the process already has rooms, Chat opens on those rooms (the last selected room). The lobby is not the landing page on every visit. |
 | Nav | Under **Chat / 聊天**, the first child is a dashed **+ New room / + 新房间** control. Each room is a child under Chat. |
 | Evolution | A room manager owns N `chat.Service` values (one session each). Do not keep a single process-wide service. |
-| Nickname source | Room labels read the Settings nickname when that field exists. A separate nickname change may land first; this design does not add a second nickname store. |
+| Remark source | Room labels read the local peer-remark map for the room’s current peer address. The Settings nickname is not a room label. |
 
 ### Proposals
 
@@ -57,7 +57,7 @@ These are recommendations, not product-owner locks. The rest of this spec treats
 
 ### Non-goals
 
-- Multi-party chat inside one room. One room still has one current peer. The [usage FAQ](../../faq.md) behavior stays: several people can send into one address, incoming bubbles are all Peer / 对方, and replies go only to the peer that completed hello most recently.
+- Multi-party chat inside one room. One room still has one current peer. The [usage FAQ](../../faq.md) behavior stays: several people can send into one address, incoming bubbles are Peer / 对方 unless a local remark is set for the current peer, and replies go only to the peer that completed hello most recently. The remark is not sent and does not identify which address sent the line.
 - Putting the Settings nickname, or any display name, into hello, TCH1 envelopes, session addresses, or diagnostics as a peer identity.
 - Persisting rooms, transcripts, unread counts, or the last-selected room across quit. v1 rooms die with the process, same as today’s transcript.
 - `#invite=` links, a room directory, or discovering peers without a pasted `tc…` address.
@@ -198,18 +198,18 @@ The manager remembers the last room id the user opened or created, in memory onl
 
 Primary label, in order:
 
-1. If the Settings nickname trims to a non-empty string, that nickname is the primary label.
-2. Otherwise the short address abbreviation.
+1. If the peer remark for this room’s current peer address trims to a non-empty string, that remark is the primary label.
+2. Otherwise the short address abbreviation of the room’s own address.
 
 Abbreviation: once `room-ready` has an address, `tc…` plus the last 4 characters of the address (`tc:abcdef1234` displays `tc…1234`). An address of 8 characters or fewer is shown in full. Before the address exists, the label is **Starting…** / **正在开始…**.
 
-Disambiguation: if the nickname is set and two or more open rooms would show that same primary string, each of those rooms shows `nickname · abbrev` (for example `Alice · tc…9f3a`). A single room shows the nickname alone.
+Disambiguation: if two or more open rooms would show the same remark, each of those rooms shows `remark · abbrev` (for example `Alice · tc…9f3a`). A single room shows the remark alone. The Settings nickname is not a room label. It stays on outgoing bubbles only.
 
 Secondary text, not the primary label: when the room was started from a saved key, show that key’s name in quieter type under the label (or in the tooltip if the row is too narrow). Ephemeral rooms have no key name. The key name is never sent.
 
 The tooltip is the full local address, and the key name when there is one.
 
-The nickname is read when the sidebar renders. Changing it in Settings updates every room label. It is not copied into the room as a wire field. If the nickname field does not exist yet, treat it as empty and use the abbreviation.
+The remark map is read when the sidebar renders. Changing a remark updates that peer’s room label. It is not copied into the room as a wire field. If the current peer has no remark, use the abbreviation. `roomPrimaryLabel` in `frontend/src/lib/roomLabel.ts` is that rule.
 
 ### Unread (proposal)
 
@@ -375,7 +375,8 @@ Quit stops every listener and drops all of the above. The next launch is the lob
 What still persists, because it already does:
 
 - Saved keys and DERP settings.
-- The Settings nickname, once that separate change stores it. The nickname is not a room record.
+- The Settings nickname. It is the outgoing-bubble label, not a room label, and not a room record.
+- Peer remarks in localStorage, keyed by Tailcat address. They survive quit. They are not a room record and are not sent.
 
 Hide window does not quit and does not drop rooms. Showing the window restores the same view, including the lobby if that was what was open. Hide is not a navigation back to the last room.
 
@@ -418,16 +419,13 @@ Settings → Diagnostics already filters `Kind === "chat"` and maps session card
 
 The ping address defaults to the focused room’s peer when the ping field is not dirty, replacing today’s single global peer. On the lobby, or when the focused room has no peer, leave the field unchanged rather than inventing an address. Ping itself stays a toolbox session, not a chat room.
 
-## 11. Settings nickname (parallel work)
+## 11. Settings nickname and peer remarks
 
-A local nickname may land in Settings in a separate change. It is the user’s label for themselves on this device. It is not a per-peer name and it is not received from the network.
+The Settings nickname is the user’s label for themselves on this device. It replaces You on outgoing bubbles. It is not a per-peer name, it is not the sidebar label, and it is not received from the network.
 
-This design only reads it:
+Peer remarks are a separate local map from Tailcat address to a display name. The chat room edits the remark for the current peer, or for a pasted `tc…` address before connect. Incoming bubbles use the remark for that peer’s address. The sidebar primary label uses the same remark for the room’s current peer, otherwise the address abbreviation (section 4).
 
-- Non-empty → sidebar primary label (section 4), with the abbreviation suffix when several rooms would otherwise look the same.
-- Empty or not shipped yet → abbreviation only.
-
-Do not block multi-room on that change. Do not write the nickname into `StartOpts`, hello, message JSON, or `session.Address`. Do not add a nickname editor in the multi-room work; the sidebar consumes the string Settings already exposes, or empty.
+Do not write the nickname or a remark into `StartOpts`, hello, message JSON, or `session.Address`. Do not add a second remark editor in the multi-room work; each room’s `ChatPage` already edits the shared map. Do not fall back to the Settings nickname when a room has no remark.
 
 ## 12. FAQ updates required when shipping
 
@@ -438,7 +436,7 @@ Keep the current answers, and add multi-room around them:
 - You can open several rooms. Each room has its own address, its own listener, its own current peer, and its own transcript. Messages do not cross rooms.
 - Inside one room, the existing “several people, one address” answer stays word for word in meaning: not a group chat, one current peer, latest hello wins, replies go only to that peer, incoming bubbles do not name which address sent them.
 - Ephemeral versus saved genkey stays. Add: closing one room retires that room’s ephemeral address only; other rooms keep listening; quit retires every ephemeral room; a saved key can be started again as a new empty room; deleting the key still destroys that address.
-- The nickname, when present, is local and is not sent to the peer.
+- The nickname, when present, is local and is not sent to the peer. A peer remark is also local, is not sent, and is not the nickname: the remark names the other person on this screen only.
 
 ## 13. Milestones
 
@@ -449,7 +447,7 @@ Keep the current answers, and add multi-room around them:
 - Lobby when there are zero rooms, and when **+ New room** is used.
 - Last selected room when rooms already exist.
 - Ephemeral create with no peer. Peer-field submit creates an ephemeral room and Connects.
-- Sidebar children, labels (nickname or abbreviation), selection.
+- Sidebar children, labels (peer remark or abbreviation, never the Settings nickname), selection.
 - Event routing by room id. Transcripts isolated. Both listeners receive.
 - Cap of 8.
 - Diagnostics lists every chat session. Tray count includes them.
@@ -474,8 +472,8 @@ Keep the current answers, and add multi-room around them:
 - [ ] Clicking **Chat**, or returning from Settings or Tunnel, shows the last selected room, not the lobby, when at least one room exists.
 - [ ] **+ New room** shows the lobby and does not stop existing rooms.
 - [ ] With zero rooms, **+ New room** and the Chat parent both show the lobby.
-- [ ] Sidebar label is the Settings nickname when that string is non-empty, otherwise the short address. Two rooms that share a nickname show `nickname · abbrev`.
-- [ ] The nickname does not appear in hello or in any chat envelope.
+- [ ] Sidebar label is the peer remark for that room’s current peer address when set, otherwise the short address. It is not the Settings nickname. Two rooms that share a remark show `remark · abbrev`.
+- [ ] The nickname and any peer remark do not appear in hello or in any chat envelope.
 - [ ] The 9th room is refused with the cap error and does not start a listener.
 - [ ] Diagnostics shows one chat session card per open room. The tray session count includes each non-stopped chat room.
 - [ ] Quit drops every room. The next launch is an empty lobby.
