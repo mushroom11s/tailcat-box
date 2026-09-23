@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { translate } from "../i18n/locale";
 import { localizeChatError, systemText } from "./chatText";
+import { cameraDeniedError, micDeniedError, screenDeniedError } from "./liveCall";
 
 describe("chat text", () => {
   it("keeps they're hear meow in zh-CN and translates peer changed", () => {
@@ -8,6 +9,24 @@ describe("chat text", () => {
     expect(systemText("hear-meow", "they're hear meow", t)).toBe("they're hear meow");
     expect(systemText("peer-changed", "Peer changed", t)).toBe("已更换对方");
     expect(localizeChatError("Paste a Tailcat address that starts with tc.", t)).toBe("请粘贴以 tc 开头的 Tailcat 地址。");
+  });
+
+  it("points denied microphone, camera, and screen share at Privacy & Security", () => {
+    const en = (key: Parameters<typeof translate>[1]) => translate("en", key);
+    const zh = (key: Parameters<typeof translate>[1]) => translate("zh-CN", key);
+
+    expect(localizeChatError(micDeniedError, en)).toContain("System Settings → Privacy & Security → Microphone");
+    expect(localizeChatError(cameraDeniedError, en)).toContain("System Settings → Privacy & Security → Camera");
+    expect(localizeChatError(screenDeniedError, en)).toContain(
+      "System Settings → Privacy & Security → Screen & System Audio Recording",
+    );
+    expect(localizeChatError(screenDeniedError, en)).toContain("quit and reopen");
+
+    expect(localizeChatError(micDeniedError, zh)).toContain("系统设置 → 隐私与安全性");
+    expect(localizeChatError(micDeniedError, zh)).toContain("麦克风");
+    expect(localizeChatError(cameraDeniedError, zh)).toContain("摄像头");
+    expect(localizeChatError(screenDeniedError, zh)).toContain("屏幕与系统音频录制");
+    expect(localizeChatError(screenDeniedError, zh)).toContain("退出并重新打开");
   });
 });
 

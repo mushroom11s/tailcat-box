@@ -295,7 +295,8 @@ export const zhCN = {
   chatRecording: "正在录音",
   chatVoiceReceived: "收到语音，点一下播放",
   chatVoiceUnplayable: "这条语音没法播放。",
-  chatMicDenied: "没有麦克风权限。",
+  chatMicDenied:
+    "没有麦克风权限。请到系统设置 → 隐私与安全性（System Settings → Privacy & Security）→ 麦克风，允许猫砂盆后再试一次。",
   chatPlay: "播放",
   chatCallVoice: "语音",
   chatCallVideo: "视频",
@@ -308,8 +309,10 @@ export const zhCN = {
   chatMediaDock: "实时媒体",
   chatCallPanel: "通话",
   chatCallIdle: "从这里发起语音通话、视频通话或屏幕共享。",
-  chatCamDenied: "没有摄像头权限。",
-  chatScreenDenied: "没有屏幕共享权限。",
+  chatCamDenied:
+    "没有摄像头权限。请到系统设置 → 隐私与安全性（System Settings → Privacy & Security）→ 摄像头，允许猫砂盆后再试一次。",
+  chatScreenDenied:
+    "没有屏幕共享权限。请到系统设置 → 隐私与安全性（System Settings → Privacy & Security）→ 屏幕与系统音频录制，允许猫砂盆，然后退出并重新打开应用。",
   chatScreenUnavailable: "这个系统不能共享屏幕。",
   chatLiveFailed: "实时媒体失败。受限网络没有通话中继，所以语音和视频可能失败，但聊天仍然可用。",
 } as const satisfies Record<MessageKey, string>;

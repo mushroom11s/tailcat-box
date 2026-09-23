@@ -132,6 +132,14 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 
 怎么打标签、怎么先试构建，见 [docs/releases/README.md](docs/releases/README.md)。
 
+## macOS 麦克风、摄像头和屏幕共享
+
+第一次发语音、打视频或共享屏幕时，macOS 会弹出系统授权。`build/darwin/Info.plist`（`wails dev` 用 `Info.dev.plist`）里有 `NSMicrophoneUsageDescription`、`NSCameraUsageDescription` 和 `NSScreenCaptureUsageDescription`。Wails 会把它写进 `tailcat-box.app/Contents/Info.plist`，发布用的压缩包保留整个 `.app`，所以装好的应用可以弹出系统对话框。没有这三行说明时，系统会直接拒绝，不会询问。
+
+未签名的包在打开前仍会碰到 Gatekeeper（系统设置 → 隐私与安全性 → 仍要打开，或右键 → 打开）。这和麦克风、摄像头、屏幕录制是两回事。应用能运行之后，第一次使用才会弹出后面那些权限。屏幕录制跟着代码签名走，所以新的未签名构建可能要再允许一次，而且经常要退出并重新打开才生效。如果之前选了不允许，就到「麦克风」「摄像头」和「屏幕与系统音频录制」里打开猫砂盆。应用里的提示中英文都会说明这一步。
+
+`wails dev` 有时会把权限算到启动它的终端上。给那个终端授权，或者用 `wails build` 确认系统对话框。
+
 ## 目录
 
 - `main.go` / `app.go` — Wails 入口，以及给前端调用的方法

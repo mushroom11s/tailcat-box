@@ -97,7 +97,7 @@ describe("phase 3 voice notes", () => {
       }),
     });
     fireEvent.pointerDown(screen.getByRole("button", { name: "Record voice note" }));
-    expect(await screen.findByText("Microphone access was denied.")).toBeTruthy();
+    expect(await screen.findByText(/System Settings → Privacy & Security → Microphone/)).toBeTruthy();
   });
 
   it("ignores a short Enter on an empty composer and records after a 100ms hold", async () => {
