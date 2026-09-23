@@ -16,8 +16,8 @@ import (
 const DefaultRoomCap = 8
 
 var (
-	// ErrRoomCap is the Phase A cap. Close does not exist yet, so the only way under the cap is to quit.
-	ErrRoomCap = errors.New("You can keep 8 rooms open. Quit the app to close rooms.")
+	// ErrRoomCap is the open-room cap. Close a room to free a slot.
+	ErrRoomCap = errors.New("You can keep 8 rooms open. Close one to start another.")
 	// ErrUnknownRoom means the room id is not an open chat room.
 	ErrUnknownRoom = errors.New("Unknown room.")
 	// ErrKeyInUse means another open room is already listening with that saved key.

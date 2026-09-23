@@ -1,15 +1,40 @@
 import type { KeyboardEvent } from "react";
 import { useI18n } from "../i18n";
 
+export type LobbyKey = {
+  name: string;
+  source: string;
+};
+
 type Props = {
   peer: string;
   error: string;
+  keys: LobbyKey[];
+  keyName: string;
+  keyDraft: string;
   onPeer: (value: string) => void;
+  onKey: (value: string) => void;
+  onKeyDraft: (value: string) => void;
   onCreate: () => void;
+  onCreatePermanent: () => void;
+  onSaveKey: () => void;
   onConnect: () => void;
 };
 
-export default function LobbyPage({ peer, error, onPeer, onCreate, onConnect }: Props) {
+export default function LobbyPage({
+  peer,
+  error,
+  keys,
+  keyName,
+  keyDraft,
+  onPeer,
+  onKey,
+  onKeyDraft,
+  onCreate,
+  onCreatePermanent,
+  onSaveKey,
+  onConnect,
+}: Props) {
   const { t } = useI18n();
 
   function onKeyDown(ev: KeyboardEvent<HTMLInputElement>): void {
@@ -20,33 +45,86 @@ export default function LobbyPage({ peer, error, onPeer, onCreate, onConnect }: 
     onConnect();
   }
 
+  function onKeyDraftKey(ev: KeyboardEvent<HTMLInputElement>): void {
+    if (ev.key !== "Enter") {
+      return;
+    }
+    ev.preventDefault();
+    onSaveKey();
+  }
+
   return (
     <section className="page chat-lobby">
-      <h2>{t("lobbyTitle")}</h2>
-      <p className="lede">{t("lobbyHelper")}</p>
-      <div className="row">
+      <header className="chat-lobby-head">
+        <h2>{t("lobbyTitle")}</h2>
+        <p className="lede">{t("lobbyHelper")}</p>
+      </header>
+
+      <div className="glass chat-lobby-panel">
+        <h3>{t("lobbyTempTitle")}</h3>
         <button className="btn" type="button" onClick={onCreate}>
           {t("lobbyCreate")}
         </button>
       </div>
-      <div className="field">
-        <label htmlFor="lobby-peer">{t("lobbyPeer")}</label>
-        <input
-          id="lobby-peer"
-          value={peer}
-          onChange={(ev) => onPeer(ev.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="tc…"
-          autoComplete="off"
-        />
+
+      <div className="glass chat-lobby-panel">
+        <h3>{t("lobbyPermanent")}</h3>
+        <div className="field">
+          <label htmlFor="lobby-key">{t("lobbyKey")}</label>
+          <select id="lobby-key" value={keyName} onChange={(ev) => onKey(ev.target.value)}>
+            <option value="">{t("lobbyKeyPlaceholder")}</option>
+            {keys.map((key) => (
+              <option key={`${key.source}:${key.name}`} value={key.name}>
+                {key.source && key.source !== "app" ? `${key.name} · ${key.source}` : key.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="row">
+          <button className="btn btn-ghost" type="button" onClick={onCreatePermanent}>
+            {t("lobbyCreatePermanent")}
+          </button>
+        </div>
+        <div className="chat-lobby-key-save">
+          <div className="field">
+            <label htmlFor="lobby-key-name">{t("lobbyNewKey")}</label>
+            <input
+              id="lobby-key-name"
+              value={keyDraft}
+              onChange={(ev) => onKeyDraft(ev.target.value)}
+              onKeyDown={onKeyDraftKey}
+              autoComplete="off"
+            />
+          </div>
+          <button className="btn btn-ghost" type="button" onClick={onSaveKey}>
+            {t("lobbySaveKey")}
+          </button>
+        </div>
       </div>
-      <p className="chat-quiet">{t("lobbyConnectHint")}</p>
-      <div className="row">
-        <button className="btn" type="button" onClick={onConnect}>
+
+      <div className="glass chat-lobby-panel">
+        <div className="field">
+          <label htmlFor="lobby-peer">{t("lobbyPeer")}</label>
+          <input
+            id="lobby-peer"
+            value={peer}
+            onChange={(ev) => onPeer(ev.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="tc…"
+            autoComplete="off"
+          />
+        </div>
+        <p className="chat-quiet">{t("lobbyConnectHint")}</p>
+        <button className="btn btn-ghost" type="button" onClick={onConnect}>
           {t("chatConnect")}
         </button>
       </div>
-      {error ? <p className="err">{error}</p> : null}
+
+      {error ? (
+        <p className="err" role="alert">
+          {error}
+        </p>
+      ) : null}
     </section>
   );
 }

@@ -81,6 +81,7 @@ describe("local nickname", () => {
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.type(screen.getByLabelText("Message"), "hi");
@@ -107,6 +108,7 @@ describe("local nickname", () => {
     await user.click(screen.getByRole("button", { name: "Chat" }));
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.type(screen.getByLabelText("Message"), "hi");

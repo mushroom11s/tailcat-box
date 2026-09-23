@@ -51,6 +51,89 @@ function renderChat(overrides: Partial<ComponentProps<typeof ChatPage>> = {}) {
   return { ...utils, onSend, onDiscard, onSave };
 }
 
+function identityRoom(props: Partial<ComponentProps<typeof ChatPage>> = {}) {
+  return (
+    <LocaleProvider>
+      <ChatPage
+        address="tc:fake-room-abcd"
+        peer=""
+        messages={thread}
+        roomError=""
+        onConnect={vi.fn()}
+        onSend={vi.fn()}
+        onRetry={vi.fn()}
+        {...props}
+      />
+    </LocaleProvider>
+  );
+}
+
+describe("room identity bar", () => {
+  it("collapses when the address is ready and keeps a manual toggle", async () => {
+    const user = userEvent.setup();
+    const view = renderChat({ address: "", peer: "" });
+    expect(screen.getByLabelText("Peer")).toBeTruthy();
+    expect(screen.getByLabelText("Remark")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Hide room details" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show room details" })).toBeNull();
+
+    view.rerender(identityRoom());
+    expect(screen.queryByLabelText("Peer")).toBeNull();
+    expect(screen.getByText("tc…abcd")).toBeTruthy();
+    expect(screen.getByText("Not connected")).toBeTruthy();
+    expect(document.querySelector(".chat-identity-peer")?.classList.contains("is-quiet")).toBe(true);
+    expect(screen.getByText("Listening")).toBeTruthy();
+    const copy = screen.getByRole("button", { name: "Copy" });
+    expect(document.querySelector(".chat-identity-compact")?.contains(copy)).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
+    expect(screen.getByLabelText("Peer")).toBeTruthy();
+    expect(screen.getByLabelText("Remark")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Connect" })).toBeTruthy();
+    expect(screen.getByText("tc:fake-room-abcd")).toBeTruthy();
+
+    view.rerender(identityRoom({ peer: "tc:fake-echo", remarks: { "tc:fake-echo": "Bob" } }));
+    expect(screen.getByLabelText("Peer")).toBeTruthy();
+    expect(screen.getByText("Peer connected")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Hide room details" }));
+    expect(screen.queryByLabelText("Peer")).toBeNull();
+    expect(document.querySelector(".chat-identity-peer")?.textContent).toBe("Bob");
+
+    view.rerender(identityRoom({ peer: "tc:fake-echo", remarks: { "tc:fake-echo": "Bob" } }));
+    expect(screen.queryByLabelText("Peer")).toBeNull();
+    expect(document.querySelector(".chat-identity-peer")?.textContent).toBe("Bob");
+
+    await user.click(screen.getByText("tc…abcd"));
+    expect(screen.getByLabelText("Peer")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Hide room details" })).toBeTruthy();
+  });
+
+  it("expands the identity bar when the room has an error", () => {
+    const view = renderChat({ address: "tc:fake-room-abcd", peer: "", roomError: "listen failed" });
+    expect(screen.getByText("listen failed")).toBeTruthy();
+    expect(screen.getByLabelText("Peer")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Hide room details" })).toBeNull();
+
+    view.rerender(identityRoom());
+    expect(screen.queryByLabelText("Peer")).toBeNull();
+    expect(screen.getByText("Not connected")).toBeTruthy();
+  });
+
+  it("stays open after a manual expand when an error clears", async () => {
+    const user = userEvent.setup();
+    const view = renderChat({ address: "tc:fake-room-abcd", peer: "" });
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
+    view.rerender(identityRoom({ roomError: "listen failed" }));
+    expect(screen.getByText("listen failed")).toBeTruthy();
+    expect(screen.getByLabelText("Peer")).toBeTruthy();
+    view.rerender(identityRoom());
+    expect(screen.getByLabelText("Peer")).toBeTruthy();
+    expect(screen.queryByText("listen failed")).toBeNull();
+  });
+});
+
 describe("multi-select alignment", () => {
   it("places a checkbox outside each bubble in one leading column", async () => {
     renderChat();
@@ -214,13 +297,27 @@ describe("burn preview and file download affordances", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Reveal" }));
     expect(screen.getByText("secret")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
     expect(document.querySelector(".chat-msg.dissolving")).toBeTruthy();
     expect(onDiscard).not.toHaveBeenCalled();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(500);
     });
     expect(onDiscard).toHaveBeenCalledWith("burn-1");
+  });
+
+  it("sends a burned message with a 3 second ttl", async () => {
+    const user = userEvent.setup();
+    const { onSend } = renderChat({ messages: [] });
+    await user.click(screen.getByRole("switch", { name: "Burn" }));
+    expect(screen.getByText("Shown for 3 seconds, then it disappears.")).toBeTruthy();
+    await user.type(screen.getByLabelText("Message"), "gone");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(onSend).toHaveBeenCalledWith("gone", true, 3);
   });
 
   it("puts download outside the file bubble", () => {
@@ -243,6 +340,33 @@ describe("burn preview and file download affordances", () => {
     expect(download.closest(".chat-outside-actions")).toBeTruthy();
     expect(download.querySelector("svg")).toBeTruthy();
     expect(screen.getByText("notes.txt · 4")).toBeTruthy();
+    expect(bubble.querySelector("img")).toBeNull();
+  });
+
+  it("puts an image preview outside the file bubble", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderChat({
+      messages: [
+        {
+          id: "pic-1",
+          direction: "in",
+          type: "file",
+          name: "pic.png",
+          mime: "image/png",
+          size: 4,
+          preview: "data:image/png;base64,xx",
+          at: "2026-09-22T00:00:00.000Z",
+        },
+      ],
+    });
+    const bubble = document.querySelector(".chat-bubble") as HTMLElement;
+    const img = screen.getByRole("img", { name: "pic.png" });
+    expect(bubble.contains(img)).toBe(false);
+    expect(img.closest(".chat-file-preview")).toBeTruthy();
+    expect(bubble.textContent).toContain("pic.png · 4");
+    expect(bubble.querySelector("button")).toBeNull();
+    await user.click(img);
+    expect(onSave).toHaveBeenCalledWith("pic-1");
   });
 
   it("translates the select toggle in zh-CN", () => {

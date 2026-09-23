@@ -30,6 +30,30 @@ function abbrev(address: string): string {
   return address.length <= 8 ? address : `tc…${address.slice(-4)}`;
 }
 
+function shownRoomAddress(): string {
+  return (
+    document.querySelector(".chat-address")?.textContent?.trim() ||
+    document.querySelector(".chat-identity-addr")?.getAttribute("title")?.trim() ||
+    ""
+  );
+}
+
+async function waitRoomAddress(): Promise<string> {
+  let address = "";
+  await waitFor(() => {
+    address = shownRoomAddress();
+    expect(address.startsWith("tc:fake-room-")).toBe(true);
+  });
+  return address;
+}
+
+async function openRoomDetails(user: { click: (el: Element) => Promise<void> }) {
+  const button = screen.queryByRole("button", { name: "Show room details" });
+  if (button) {
+    await user.click(button);
+  }
+}
+
 describe("phase A multi-room lobby", () => {
   it("cold launch shows the lobby and starts no chat listener", async () => {
     renderApp();
@@ -47,10 +71,13 @@ describe("phase A multi-room lobby", () => {
     renderApp();
     await user.type(screen.getByLabelText("Peer address (optional)"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
+    await openRoomDetails(user);
     const peer = await screen.findByLabelText("Peer");
     expect((peer as HTMLInputElement).value).toBe("tc:fake-echo");
     expect(screen.queryByText("Peer connected")).toBeNull();
     expect(document.querySelector(".chat-page")).toBeTruthy();
+    expect(document.querySelector(".nav-new")?.classList.contains("active")).toBe(false);
+    expect(document.querySelector(".nav-new")?.classList.contains("open")).toBe(false);
     expect(document.querySelectorAll(".nav-child:not(.nav-new)")).toHaveLength(1);
     const sessions = await listSessions();
     expect(sessions.filter((item) => item.Kind === "chat")).toHaveLength(1);
@@ -68,7 +95,8 @@ describe("phase A multi-room lobby", () => {
     await user.clear(screen.getByLabelText("Peer address (optional)"));
     await user.type(screen.getByLabelText("Peer address (optional)"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
-    expect(await screen.findByText("Peer connected")).toBeTruthy();
+    await user.click(await screen.findByRole("button", { name: "Show room details" }));
+    expect(screen.getByText("Peer connected")).toBeTruthy();
     expect((await listSessions()).filter((item) => item.Kind === "chat")).toHaveLength(1);
   });
 
@@ -76,12 +104,14 @@ describe("phase A multi-room lobby", () => {
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    const firstAddress = (await screen.findByText(/^tc:fake-room-/)).textContent ?? "";
+    const firstAddress = await waitRoomAddress();
     await user.click(screen.getByRole("button", { name: "+ New room" }));
+    expect(document.querySelector(".nav-new")?.classList.contains("active")).toBe(false);
+    expect(document.querySelector(".nav-new")?.classList.contains("open")).toBe(true);
     expect(document.querySelector(".chat-lobby")).toBeTruthy();
     expect(document.querySelectorAll(".nav-child:not(.nav-new)")).toHaveLength(1);
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    const secondAddress = (await screen.findByText(/^tc:fake-room-/)).textContent ?? "";
+    const secondAddress = await waitRoomAddress();
     expect(secondAddress).not.toBe(firstAddress);
 
     const chats = (await listSessions()).filter((item) => item.Kind === "chat");
@@ -95,7 +125,7 @@ describe("phase A multi-room lobby", () => {
     expect(screen.queryByText("only-first")).toBeNull();
     await user.click(screen.getByRole("button", { name: abbrev(firstAddress) }));
     expect(await screen.findByText("only-first")).toBeTruthy();
-    expect(screen.getByText(firstAddress)).toBeTruthy();
+    expect(shownRoomAddress()).toBe(firstAddress);
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
     await user.click(screen.getByRole("button", { name: "Chat" }));
@@ -104,7 +134,7 @@ describe("phase A multi-room lobby", () => {
 
     await user.click(screen.getByRole("button", { name: "Tunnel" }));
     await user.click(screen.getByRole("button", { name: "Chat" }));
-    expect(screen.getByText(firstAddress)).toBeTruthy();
+    expect(shownRoomAddress()).toBe(firstAddress);
   });
 
   it("labels rooms with the address abbreviation and outgoing bubbles with the self nickname", async () => {
@@ -112,10 +142,11 @@ describe("phase A multi-room lobby", () => {
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    const address = (await screen.findByText(/^tc:fake-room-/)).textContent ?? "";
+    const address = await waitRoomAddress();
     expect(screen.getByRole("button", { name: abbrev(address) })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Alice" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Alice ·/ })).toBeNull();
+    await openRoomDetails(user);
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.type(screen.getByLabelText("Message"), "ping");
@@ -139,7 +170,7 @@ describe("phase A multi-room lobby", () => {
     }
     await user.click(screen.getByRole("button", { name: "+ New room" }));
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    expect(await screen.findByText("You can keep 8 rooms open. Quit the app to close rooms.")).toBeTruthy();
+    expect(await screen.findByText("You can keep 8 rooms open. Close one to start another.")).toBeTruthy();
     expect(document.querySelector(".chat-lobby")).toBeTruthy();
     expect(document.querySelectorAll(".nav-child:not(.nav-new)")).toHaveLength(8);
     expect((await listSessions()).filter((item) => item.Kind === "chat")).toHaveLength(8);
@@ -157,5 +188,93 @@ describe("phase A multi-room lobby", () => {
     expect(screen.getByRole("button", { name: "新建临时房间" })).toBeTruthy();
     expect(screen.getByText("对方地址可以留空，先开房间，稍后再把地址发给对方。")).toBeTruthy();
     expect(screen.getByText("连接会新建一个临时房间。")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "固定密钥" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "保存密钥" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "新建" })).toBeTruthy();
+  });
+
+  it("creates a permanent room from a saved key and leaves the peer unsent", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: "Create" }));
+    expect(screen.getByText("Choose a saved key.")).toBeTruthy();
+    expect((await listSessions()).filter((item) => item.Kind === "chat")).toHaveLength(0);
+
+    await user.type(screen.getByLabelText("New key name"), "home");
+    await user.click(screen.getByRole("button", { name: "Save key" }));
+    expect(await screen.findByRole("option", { name: "home" })).toBeTruthy();
+    expect((screen.getByLabelText("Saved key") as HTMLSelectElement).value).toBe("home");
+    await user.type(screen.getByLabelText("Peer address (optional)"), "tc:fake-echo");
+    await user.click(screen.getByRole("button", { name: "Create" }));
+    await openRoomDetails(user);
+    const peer = await screen.findByLabelText("Peer");
+    expect((peer as HTMLInputElement).value).toBe("tc:fake-echo");
+    expect(screen.queryByText("Peer connected")).toBeNull();
+    expect(document.querySelector(".nav-room-key")?.textContent).toBe("home");
+
+    await user.click(screen.getByRole("button", { name: "+ New room" }));
+    await user.click(screen.getByRole("button", { name: "Create" }));
+    expect(await screen.findByText("That key is already listening in another room.")).toBeTruthy();
+    expect((await listSessions()).filter((item) => item.Kind === "chat")).toHaveLength(1);
+  });
+
+  it("closes an empty room immediately and confirms before discarding messages", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
+    const first = await waitRoomAddress();
+    await user.click(screen.getByRole("button", { name: "+ New room" }));
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
+    const second = await waitRoomAddress();
+    expect(second).not.toBe(first);
+
+    const closeSecond = screen.getByRole("button", { name: `Close ${abbrev(second)}` });
+    expect(closeSecond.closest(".nav-room-row")?.querySelector(".nav-btn")?.contains(closeSecond)).toBe(false);
+    expect(closeSecond.querySelector("svg")).toBeTruthy();
+    expect(closeSecond.textContent?.trim()).toBe("");
+    expect(document.querySelector(".chat-room-close")).toBeNull();
+    await user.click(closeSecond);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => {
+      expect(shownRoomAddress()).toBe(first);
+    });
+    expect(document.querySelectorAll(".nav-child:not(.nav-new)")).toHaveLength(1);
+
+    const chats = (await listSessions()).filter((item) => item.Kind === "chat");
+    emitBrowserEvent({
+      SessionID: chats[0]?.ID ?? "",
+      Kind: "message",
+      Data: JSON.stringify({
+        id: "sys-only",
+        direction: "system",
+        type: "system",
+        code: "hear-meow",
+        body: "they're hear meow",
+        at: "2026-09-23T00:00:00.000Z",
+      }),
+    });
+    expect(await screen.findByText("they're hear meow")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: `Close ${abbrev(first)}` }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(await screen.findByRole("heading", { name: "New room" })).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
+    await screen.findByRole("button", { name: "Copy" });
+    await openRoomDetails(user);
+    await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
+    await user.click(screen.getByRole("button", { name: "Connect" }));
+    await user.type(screen.getByLabelText("Message"), "stay");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("echo")).toBeTruthy();
+    const live = shownRoomAddress();
+    await user.click(screen.getByRole("button", { name: `Close ${abbrev(live)}` }));
+    expect(screen.getByText("Close this room? It stops listening and this device's transcript is discarded. Your peer is not notified.")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByText("echo")).toBeTruthy();
+    expect((await listSessions()).filter((item) => item.Kind === "chat")).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: `Close ${abbrev(live)}` }));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(await screen.findByRole("heading", { name: "New room" })).toBeTruthy();
+    expect((await listSessions()).filter((item) => item.Kind === "chat")).toHaveLength(0);
   });
 });

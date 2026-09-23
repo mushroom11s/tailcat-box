@@ -42,6 +42,7 @@ describe("phase 1 chat shell", () => {
     });
     await user.click(copy);
     const copied = writeText.mock.calls[0][0] as string;
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     expect(copied.startsWith("tc:fake-room-")).toBe(true);
     expect(copied.includes("#invite=")).toBe(false);
     expect(copied.includes("http")).toBe(false);
@@ -69,6 +70,7 @@ describe("phase 1 chat shell", () => {
     await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Chat" }));
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     expect(screen.getByText(copied)).toBeTruthy();
   });
 
@@ -77,6 +79,7 @@ describe("phase 1 chat shell", () => {
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     await user.type(screen.getByLabelText("Peer"), "tc:fake-room-missing");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     const composer = screen.getByLabelText("Message");
@@ -131,6 +134,7 @@ describe("phase 1 chat shell", () => {
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.click(screen.getByRole("button", { name: "Settings" }));
@@ -145,7 +149,10 @@ describe("phase 1 chat shell", () => {
     await user.click(screen.getByRole("button", { name: "Restart room" }));
     await user.click(screen.getByRole("button", { name: "Chat" }));
     await waitFor(() => {
-      const shown = document.querySelector(".chat-address")?.textContent ?? "";
+      const shown =
+        document.querySelector(".chat-address")?.textContent ||
+        document.querySelector(".chat-identity-addr")?.getAttribute("title") ||
+        "";
       expect(shown.startsWith("tc:fake-room-key-")).toBe(true);
     });
     expect(screen.queryByText("Peer connected")).toBeNull();

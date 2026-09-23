@@ -866,7 +866,7 @@ function listenRoom(entry: BrowserRoom): void {
 async function fakeStartChatRoom(keyName: string): Promise<Session> {
   const name = keyName.trim();
   if (browserRooms.size >= ROOM_CAP) {
-    throw new Error("You can keep 8 rooms open. Quit the app to close rooms.");
+    throw new Error("You can keep 8 rooms open. Close one to start another.");
   }
   if (name && [...browserRooms.values()].some((room) => room.keyName === name)) {
     throw new Error("That key is already listening in another room.");

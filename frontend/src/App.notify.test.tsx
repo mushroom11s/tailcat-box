@@ -60,7 +60,7 @@ afterEach(() => {
 async function connectEcho(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Peer address (optional)"), "tc:fake-echo");
   await user.click(screen.getByRole("button", { name: "Connect" }));
-  expect(await screen.findByText("Peer connected")).toBeTruthy();
+  expect(await screen.findByRole("button", { name: "Show room details" })).toBeTruthy();
 }
 
 async function chatRoomId(): Promise<string> {
@@ -160,10 +160,19 @@ describe("inbound OS notifications", () => {
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    const firstAddress = (await screen.findByText(/^tc:fake-room-/)).textContent ?? "";
+    let firstAddress = "";
+    await waitFor(() => {
+      firstAddress = document.querySelector(".chat-identity-addr")?.getAttribute("title") ?? "";
+      expect(firstAddress.startsWith("tc:fake-room-")).toBe(true);
+    });
     await user.click(screen.getByRole("button", { name: "+ New room" }));
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    const secondAddress = (await screen.findByText(/^tc:fake-room-/)).textContent ?? "";
+    let secondAddress = "";
+    await waitFor(() => {
+      secondAddress = document.querySelector(".chat-identity-addr")?.getAttribute("title") ?? "";
+      expect(secondAddress.startsWith("tc:fake-room-")).toBe(true);
+      expect(secondAddress).not.toBe(firstAddress);
+    });
     const chats = (await listSessions()).filter((item) => item.Kind === "chat");
     const hidden = chats.find((item) => item.Address === firstAddress);
     const open = chats.find((item) => item.Address === secondAddress);

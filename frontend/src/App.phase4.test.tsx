@@ -143,9 +143,9 @@ describe("phase 4 live media dock", () => {
   it("focuses the peer field when a call starts with no peer", async () => {
     const user = userEvent.setup();
     const { onSendSignal } = renderChat({ peer: "" });
-    const peer = screen.getByLabelText("Peer");
+    expect(screen.queryByLabelText("Peer")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Voice" }));
-    expect(document.activeElement).toBe(peer);
+    expect(document.activeElement).toBe(screen.getByLabelText("Peer"));
     expect(onSendSignal).not.toHaveBeenCalled();
   });
 

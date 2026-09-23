@@ -38,6 +38,7 @@ describe("phase 2 files and burn", () => {
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     await user.type(screen.getByLabelText("Peer"), "tc:fake-official");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.click(screen.getByRole("switch", { name: "Burn" }));
@@ -56,6 +57,7 @@ describe("phase 2 files and burn", () => {
     renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     await user.type(screen.getByLabelText("Peer"), "tc:fake-box");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.click(screen.getByRole("switch", { name: "Burn" }));
@@ -85,7 +87,9 @@ describe("phase 2 files and burn", () => {
     expect(screen.getByText("Burn after reading")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Reveal" }));
     expect(screen.getByText("secret")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+    fireEvent.keyDown(window, { key: "Escape" });
     expect(document.querySelector(".chat-msg.dissolving")).toBeTruthy();
     await waitFor(() => expect(onDiscard).toHaveBeenCalledWith("burn-1"));
   });
@@ -109,8 +113,10 @@ describe("phase 2 files and burn", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Reveal" }));
     expect(screen.getByText("secret")).toBeTruthy();
+    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2500);
+      await vi.advanceTimersByTimeAsync(3500);
     });
     expect(onDiscard).toHaveBeenCalledWith("burn-1");
   });
