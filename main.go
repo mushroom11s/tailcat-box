@@ -102,6 +102,11 @@ func (a *App) applicationMenu(title string) *menu.Menu {
 		a.quitApp()
 	})
 
+	// A custom menu replaces the macOS defaults. Without the standard Edit
+	// role, the webview never receives Cmd+C, Cmd+V, Cmd+X, Cmd+A, or Cmd+Z.
+	// https://wails.io/docs/reference/menus
+	m.Append(menu.EditMenu())
+
 	viewTitle, fullscreenLabel := viewMenuLabels(a.menuLocale(), a.windowFullscreen)
 	viewMenu := m.AddSubmenu(viewTitle)
 	// Control-Command-F is the macOS shortcut for Enter/Exit Full Screen.
