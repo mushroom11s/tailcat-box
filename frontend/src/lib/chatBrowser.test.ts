@@ -20,6 +20,15 @@ describe("browser hub", () => {
       expect.objectContaining({ direction: "out", body: "hi" }),
       expect.objectContaining({ direction: "in", body: "echo" }),
     ]);
+    await hub.sendText("secret", true, 0);
+    const burned = events
+      .filter((ev) => ev.Kind === "message")
+      .map((ev) => JSON.parse(ev.Data ?? "{}") as { body: string; direction: string; burn?: boolean })
+      .slice(2);
+    expect(burned).toEqual([
+      expect.objectContaining({ direction: "out", body: "secret", burn: true }),
+      expect.objectContaining({ direction: "in", body: "echo", burn: true }),
+    ]);
     const restarted = await hub.restart("sess-3", `{"fake":"k1"}`);
     expect(restarted.address.startsWith("tc:fake-room-key-")).toBe(true);
     expect(restarted.address).not.toBe(first.address);

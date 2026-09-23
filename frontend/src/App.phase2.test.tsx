@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, act } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -84,7 +84,8 @@ describe("phase 2 files and burn", () => {
     await user.click(screen.getByRole("button", { name: "Reveal" }));
     expect(screen.getByText("secret")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Close" }));
-    expect(onDiscard).toHaveBeenCalledWith("burn-1");
+    expect(document.querySelector(".chat-msg.dissolving")).toBeTruthy();
+    await waitFor(() => expect(onDiscard).toHaveBeenCalledWith("burn-1"));
   });
 
   it("discards a burned message when the countdown reaches zero", async () => {
@@ -177,6 +178,6 @@ describe("phase 2 files and burn", () => {
     expect(screen.queryByText("notes.txt · 4")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(onSave).toHaveBeenCalledWith("file-1");
-    expect(onDiscard).toHaveBeenCalledWith("file-1");
+    await waitFor(() => expect(onDiscard).toHaveBeenCalledWith("file-1"));
   });
 });

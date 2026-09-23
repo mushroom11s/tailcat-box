@@ -13,6 +13,7 @@ describe("chat text", () => {
 
 describe("multi-select delete strings", () => {
   it("resolves EN and ZH select chrome with {n} placeholders", () => {
+    expect(translate("en", "chatSelectToggle")).toBe("Select message");
     expect(translate("en", "chatSelectCount")).toBe("{n} selected");
     expect(translate("en", "chatSelectDelete")).toBe("Delete");
     expect(translate("en", "chatSelectClose")).toBe("Close");
@@ -21,6 +22,7 @@ describe("multi-select delete strings", () => {
     );
     expect(translate("en", "chatSelectDeleteError")).toBe("Could not delete some local messages.");
 
+    expect(translate("zh-CN", "chatSelectToggle")).toBe("选择消息");
     expect(translate("zh-CN", "chatSelectCount")).toBe("已选择 {n} 条");
     expect(translate("zh-CN", "chatSelectDelete")).toBe("删除");
     expect(translate("zh-CN", "chatSelectClose")).toBe("关闭");

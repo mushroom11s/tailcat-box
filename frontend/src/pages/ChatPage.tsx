@@ -89,6 +89,25 @@ function burnChoice(on: boolean): { burn: boolean; ttl: number } {
   return { burn: false, ttl: 0 };
 }
 
+const DISSOLVE_MS = 480;
+
+type PendingOut = {
+  baseline: string[];
+  msg: ChatMessage;
+};
+
+function pendingLanded(item: PendingOut, list: readonly ChatMessage[]): boolean {
+  const baseline = new Set(item.baseline);
+  return list.some(
+    (msg) =>
+      !baseline.has(msg.id) &&
+      msg.direction === "out" &&
+      msg.type === "text" &&
+      msg.body === item.msg.body &&
+      Boolean(msg.burn) === Boolean(item.msg.burn),
+  );
+}
+
 export default function ChatPage({
   address,
   peer,
@@ -127,6 +146,11 @@ export default function ChatPage({
   const [multiSelectActive, setMultiSelectActive] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [pending, setPending] = useState<PendingOut[]>([]);
+  const [dissolving, setDissolving] = useState<Set<string>>(() => new Set());
+  const sendingRef = useRef(false);
+  const dissolvingRef = useRef(new Set<string>());
   const captureRef = useRef<VoiceCapture | null>(null);
   const holdRef = useRef<number | null>(null);
   const pendingRef = useRef(false);
@@ -268,8 +292,9 @@ export default function ChatPage({
       return;
     }
     drag.active = true;
-    const left = Math.min(drag.startX, ev.clientX) - drag.originX;
-    const top = Math.min(drag.startY, ev.clientY) - drag.originY;
+    const log = logRef.current;
+    const left = Math.min(drag.startX, ev.clientX) - drag.originX + (log?.scrollLeft ?? 0);
+    const top = Math.min(drag.startY, ev.clientY) - drag.originY + (log?.scrollTop ?? 0);
     paintDragRect(left, top, Math.abs(dx), Math.abs(dy));
   }
 
@@ -289,7 +314,11 @@ export default function ChatPage({
     const height = Math.abs(ev.clientY - drag.startY);
     const local = { left, top, width, height };
     const hit = new Set<string>();
-    for (const msg of messages) {
+    const visible = [
+      ...messages,
+      ...pending.filter((item) => !pendingLanded(item, messages)).map((item) => item.msg),
+    ];
+    for (const msg of visible) {
       if (msg.direction === "system") {
         continue;
       }
@@ -408,6 +437,13 @@ export default function ChatPage({
     }
   }, [messages, viewer]);
 
+  useEffect(() => {
+    setPending((prev) => {
+      const next = prev.filter((item) => !pendingLanded(item, messages));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [messages]);
+
   const countdownID = viewer && viewer.left != null ? viewer.id : "";
   useEffect(() => {
     if (!countdownID || !viewer || viewer.left == null) {
@@ -419,8 +455,7 @@ export default function ChatPage({
       left -= 1;
       if (left <= 0) {
         window.clearInterval(timer);
-        void onDiscard?.(messageID);
-        setViewer(null);
+        void finishBurn(messageID);
         return;
       }
       setViewer({ id: messageID, left });
@@ -441,8 +476,7 @@ export default function ChatPage({
       if (confirmOpen || multiSelectActive) {
         return;
       }
-      void onDiscard?.(viewer.id);
-      setViewer(null);
+      void finishBurn(viewer.id);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -506,20 +540,42 @@ export default function ChatPage({
   }
 
   async function send(): Promise<void> {
-    if (!draft.trim()) {
+    if (sendingRef.current) {
+      return;
+    }
+    const body = draft;
+    if (!body.trim()) {
       return;
     }
     if (!peer) {
       peerRef.current?.focus();
       return;
     }
-    const body = draft;
+    sendingRef.current = true;
+    setSending(true);
     const choice = burnChoice(burnOn);
+    const item: PendingOut = {
+      baseline: messages.map((msg) => msg.id),
+      msg: {
+        id: `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        direction: "out",
+        type: "text",
+        body,
+        at: new Date().toISOString(),
+        burn: choice.burn,
+        ttlSec: choice.ttl,
+      },
+    };
+    setPending((prev) => [...prev, item]);
+    setDraft("");
     try {
       await onSend(body, choice.burn, choice.ttl);
-      setDraft("");
     } catch {
-      setDraft(body);
+      setPending((prev) => prev.filter((entry) => entry.msg.id !== item.msg.id));
+      setDraft((current) => (current.trim() ? current : body));
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
     }
   }
 
@@ -619,7 +675,7 @@ export default function ChatPage({
       return;
     }
     e.preventDefault();
-    if (e.repeat) {
+    if (e.repeat || sendingRef.current) {
       return;
     }
     if (draft.trim()) {
@@ -696,15 +752,99 @@ export default function ChatPage({
   }
 
   function openBurn(msg: ChatMessage): void {
+    if (dissolvingRef.current.has(msg.id)) {
+      return;
+    }
     setViewer({ id: msg.id, left: msg.ttlSec && msg.ttlSec > 0 ? msg.ttlSec : null });
   }
 
-  async function closeViewer(id: string): Promise<void> {
-    setViewer(null);
-    await onDiscard?.(id);
+  async function finishBurn(id: string): Promise<void> {
+    if (dissolvingRef.current.has(id)) {
+      return;
+    }
+    dissolvingRef.current.add(id);
+    setDissolving(new Set(dissolvingRef.current));
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, DISSOLVE_MS);
+    });
+    setViewer((current) => (current?.id === id ? null : current));
+    try {
+      await onDiscard?.(id);
+    } finally {
+      dissolvingRef.current.delete(id);
+      setDissolving(new Set(dissolvingRef.current));
+    }
+  }
+
+  function toggleSelected(id: string): void {
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    applySelection(next);
   }
 
   const openMessage = viewer ? messages.find((msg) => msg.id === viewer.id) : undefined;
+  const transcript = [
+    ...messages,
+    ...pending.filter((item) => !pendingLanded(item, messages)).map((item) => item.msg),
+  ];
+
+  function sideActions(msg: ChatMessage): ReactNode {
+    const inboundBurn = Boolean(msg.burn && msg.direction === "in");
+    const sealed = inboundBurn && openMessage?.id !== msg.id;
+    const actions: ReactNode[] = [];
+    if (sealed) {
+      const label = msg.type === "voice" ? t("chatPlay") : msg.type === "text" ? t("chatReveal") : t("chatPreview");
+      actions.push(
+        <button
+          key="view"
+          className="chat-outside-action"
+          type="button"
+          aria-label={label}
+          title={label}
+          onClick={() => openBurn(msg)}
+        >
+          <EyeIcon />
+        </button>,
+      );
+    }
+    if (msg.type === "file") {
+      const label = inboundBurn ? t("chatSave") : t("chatDownload");
+      actions.push(
+        <button
+          key="save"
+          className="chat-outside-action"
+          type="button"
+          aria-label={label}
+          title={inboundBurn ? t("chatSavingKeeps") : label}
+          onClick={() => {
+            void (async () => {
+              await onSave?.(msg.id);
+              if (inboundBurn) {
+                await finishBurn(msg.id);
+              }
+            })();
+          }}
+        >
+          <DownloadIcon />
+        </button>,
+      );
+      if (inboundBurn) {
+        actions.push(
+          <p key="keep" className="chat-side-note">
+            {t("chatSavingKeeps")}
+          </p>,
+        );
+      }
+    }
+    if (actions.length === 0) {
+      return null;
+    }
+    return <div className="chat-outside-actions">{actions}</div>;
+  }
 
   return (
     <section className="page chat-page">
@@ -777,15 +917,31 @@ export default function ChatPage({
         style={{ position: "relative" }}
       >
         <div ref={dragRectEl} className="chat-drag-rect" hidden />
-        {messages.length === 0 ? <p className="lede">{t("chatEmptyLede")}</p> : null}
-        {messages.map((msg) =>
+        {transcript.length === 0 ? <p className="lede">{t("chatEmptyLede")}</p> : null}
+        {transcript.map((msg) =>
           msg.direction === "system" ? (
             <p key={msg.id} className="chat-system">
               {systemText(msg.code, msg.body ?? "", t)}
             </p>
           ) : (
-            <div key={msg.id} className={`chat-msg ${msg.direction}`}>
+            <div
+              key={msg.id}
+              className={`chat-msg ${msg.direction}${multiSelectActive ? " selecting" : ""}${dissolving.has(msg.id) ? " dissolving" : ""}`}
+            >
+            {multiSelectActive ? (
+              <button
+                type="button"
+                className="chat-select-check"
+                role="checkbox"
+                aria-checked={selectedIds.has(msg.id)}
+                aria-label={t("chatSelectToggle")}
+                onClick={() => toggleSelected(msg.id)}
+              >
+                {selectedIds.has(msg.id) ? <CheckIcon /> : null}
+              </button>
+            ) : null}
             {msg.direction === "in" ? <img className="chat-avatar" src={iconUrl} alt="" /> : null}
+            <div className="chat-bubble-wrap">
             <article
               ref={(el) => {
                 if (el) {
@@ -795,7 +951,7 @@ export default function ChatPage({
                 }
               }}
               data-msgid={msg.id}
-              className={`glass chat-bubble ${msg.direction}${selectedIds.has(msg.id) ? " selected" : ""}`}
+              className={`glass chat-bubble ${msg.direction}${selectedIds.has(msg.id) ? " selected" : ""}${msg.burn && msg.direction === "in" && openMessage?.id !== msg.id ? " burn-sealed" : ""}`}
               onClick={(ev) => {
                 if (!multiSelectActive) {
                   return;
@@ -804,13 +960,7 @@ export default function ChatPage({
                   return;
                 }
                 ev.preventDefault();
-                const next = new Set(selectedIds);
-                if (next.has(msg.id)) {
-                  next.delete(msg.id);
-                } else {
-                  next.add(msg.id);
-                }
-                applySelection(next);
+                toggleSelected(msg.id);
               }}
             >
               <BubbleBody
@@ -818,14 +968,7 @@ export default function ChatPage({
                 caps={caps}
                 open={openMessage?.id === msg.id}
                 left={viewer?.id === msg.id ? viewer.left : null}
-                onOpen={() => openBurn(msg)}
-                onClose={() => closeViewer(msg.id)}
-                onSave={async () => {
-                  await onSave?.(msg.id);
-                  if (msg.burn && msg.direction === "in") {
-                    await onDiscard?.(msg.id);
-                  }
-                }}
+                onClose={() => finishBurn(msg.id)}
                 canPlayMime={canPlayMime}
                 decodeVoice={decodeVoice}
               />
@@ -833,7 +976,14 @@ export default function ChatPage({
                 <span>{msg.direction === "out" ? t("chatYou") : t("chatPeerName")}</span>
                 <time>{stamp(msg.at)}</time>
               </header>
+              {msg.burn && msg.direction === "in" && openMessage?.id !== msg.id ? (
+                <div className="chat-burn-mask" aria-hidden="true">
+                  <FlameIcon />
+                </div>
+              ) : null}
             </article>
+            {sideActions(msg)}
+            </div>
             </div>
           ),
         )}
@@ -891,7 +1041,7 @@ export default function ChatPage({
               onChange={(e) => setBurnOn(e.target.checked)}
             />
           </label>
-          <button className="btn composer-send" type="button" onClick={() => void send()}>
+          <button className="btn composer-send" type="button" disabled={sending} onClick={() => void send()}>
             {t("send")}
           </button>
         </div>
@@ -1048,9 +1198,7 @@ function BubbleBody({
   caps,
   open,
   left,
-  onOpen,
   onClose,
-  onSave,
   canPlayMime,
   decodeVoice,
 }: {
@@ -1058,25 +1206,19 @@ function BubbleBody({
   caps: string[];
   open: boolean;
   left: number | null;
-  onOpen: () => void;
   onClose: () => Promise<void>;
-  onSave: () => Promise<void>;
   canPlayMime?: (mime: string) => boolean;
   decodeVoice?: (mime: string, audio: string) => Promise<string | null>;
 }) {
   const { t } = useI18n();
   const inboundBurn = msg.burn && msg.direction === "in";
   const image = (msg.mime ?? "").startsWith("image/");
+  if (inboundBurn && !open && msg.type !== "voice") {
+    return <span className="chat-burn-label">{t("chatBurnCollapsed")}</span>;
+  }
   if (msg.type === "voice") {
     if (inboundBurn && !open) {
-      return (
-        <div className="chat-actions">
-          <span>{t("chatBurnCollapsed")}</span>
-          <button className="btn" type="button" onClick={onOpen}>
-            {t("chatPlay")}
-          </button>
-        </div>
-      );
+      return <span className="chat-burn-label">{t("chatBurnCollapsed")}</span>;
     }
     return (
       <>
@@ -1112,32 +1254,6 @@ function BubbleBody({
       </>
     );
   }
-  if (inboundBurn && !open) {
-    return (
-      <div className="chat-actions">
-        <span>{t("chatBurnCollapsed")}</span>
-        {msg.type === "text" ? (
-          <button className="btn" type="button" onClick={onOpen}>
-            {t("chatReveal")}
-          </button>
-        ) : (
-          <>
-            <button className="btn" type="button" onClick={onOpen}>
-              {t("chatPreview")}
-            </button>
-            {msg.type === "file" ? (
-              <>
-                <p>{t("chatSavingKeeps")}</p>
-                <button className="btn" type="button" onClick={() => void onSave()}>
-                  {t("chatSave")}
-                </button>
-              </>
-            ) : null}
-          </>
-        )}
-      </div>
-    );
-  }
   if (inboundBurn && open) {
     return (
       <div className="chat-viewer">
@@ -1148,14 +1264,8 @@ function BubbleBody({
             {msg.name} · {msg.size ?? 0}
           </p>
         ) : null}
-        {msg.type === "file" ? <p>{t("chatSavingKeeps")}</p> : null}
         {left != null ? <p>{left}</p> : null}
         <div className="chat-actions">
-          {msg.type === "file" ? (
-            <button className="btn" type="button" onClick={() => void onSave()}>
-              {t("chatSave")}
-            </button>
-          ) : null}
           <button className="btn" type="button" onClick={() => void onClose()}>
             {t("chatClose")}
           </button>
@@ -1170,11 +1280,6 @@ function BubbleBody({
         <p className="chat-file-meta">
           {msg.name} · {msg.size ?? 0}
         </p>
-        {!image ? (
-          <button className="btn" type="button" onClick={() => void onSave()}>
-            {t("chatDownload")}
-          </button>
-        ) : null}
         {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} /> : null}
       </div>
     );
@@ -1236,6 +1341,23 @@ function LockIcon() {
 
 function FlameIcon() {
   return <StrokeIcon d="M12 3s5 4.2 5 8.2A5 5 0 0 1 7 11.2C7 8.4 9.2 7 9.2 7S9.6 9 12 9c0-2.6 0-6 0-6z" />;
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return <StrokeIcon d="M12 4v11M8 11l4 4 4-4M5 20h14" />;
+}
+
+function CheckIcon() {
+  return <StrokeIcon d="M5 12.5 9.2 17 19 7" />;
 }
 
 function ClipIcon() {

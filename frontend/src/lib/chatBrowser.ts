@@ -228,6 +228,10 @@ export function createBrowserHub() {
       emit({ Kind: "message", SessionID: sessionID, Data: JSON.stringify(out) });
       if (peer === "tc:fake-echo") {
         const inbound = message("in", "text", "echo");
+        if (burn) {
+          inbound.burn = true;
+          inbound.ttlSec = ttlSec;
+        }
         emit({ Kind: "message", SessionID: sessionID, Data: JSON.stringify(inbound) });
       }
     },

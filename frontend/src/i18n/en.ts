@@ -278,6 +278,7 @@ export const en = {
   chatDownload: "Download",
   chatClose: "Close",
   chatDelete: "Delete",
+  chatSelectToggle: "Select message",
   chatSelectCount: "{n} selected",
   chatSelectDelete: "Delete",
   chatSelectClose: "Close",
