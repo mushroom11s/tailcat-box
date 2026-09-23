@@ -59,10 +59,12 @@ describe("shell scroll", () => {
       const metrics = getComputedStyle(rooms);
       const marginLeft = parseFloat(metrics.marginLeft);
       const marginRight = parseFloat(metrics.marginRight);
+      const marginTop = parseFloat(metrics.marginTop);
       expect(marginLeft).toBeGreaterThanOrEqual(16);
       expect(marginLeft).toBeLessThanOrEqual(20);
       expect(marginRight).toBeGreaterThanOrEqual(8);
       expect(marginRight).toBeLessThanOrEqual(12);
+      expect(marginTop).toBe(12);
       expect(rooms.contains(chat)).toBe(false);
 
       await user.click(screen.getByRole("button", { name: "Create temporary room" }));
@@ -76,6 +78,45 @@ describe("shell scroll", () => {
         expect(childStyle.paddingTop).toBe("8px");
         expect(childStyle.paddingRight).toBe("10px");
       }
+    } finally {
+      style.remove();
+    }
+  });
+
+  it("centers the brand stack in the sidebar", () => {
+    const style = document.createElement("style");
+    style.textContent = [
+      cssBlock(css, ".brand"),
+      cssBlock(css, ".brand-logo-row"),
+      cssBlock(css, ".brand h1"),
+      cssBlock(css, ".brand p"),
+    ].join("\n");
+    document.head.appendChild(style);
+
+    try {
+      localStorage.setItem("tailcat-locale", "en");
+      render(
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>,
+      );
+
+      const brand = document.querySelector(".brand") as HTMLElement;
+      const brandStyle = getComputedStyle(brand);
+      expect(brandStyle.alignItems).toBe("center");
+      expect(brandStyle.textAlign).toBe("center");
+      expect(brandStyle.flexDirection).toBe("column");
+
+      const row = document.querySelector(".brand-logo-row") as HTMLElement;
+      expect(brand.contains(row)).toBe(true);
+      expect(row.querySelector(".brand-mark")?.tagName).toBe("IMG");
+      const rowStyle = getComputedStyle(row);
+      expect(rowStyle.display).toBe("flex");
+      expect(rowStyle.justifyContent).toBe("center");
+      expect(rowStyle.alignItems).toBe("flex-end");
+
+      expect(getComputedStyle(brand.querySelector("h1") as HTMLElement).textAlign).toBe("center");
+      expect(getComputedStyle(brand.querySelector("p") as HTMLElement).textAlign).toBe("center");
     } finally {
       style.remove();
     }
