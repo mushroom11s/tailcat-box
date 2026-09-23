@@ -1246,12 +1246,30 @@ export function openReleasePage(url: string): void {
   if (!url.startsWith("https://github.com/mushroom11s/tailcat-box/")) {
     return;
   }
+  openHttpURL(url);
+}
+
+export function openHttpURL(url: string): void {
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return;
+  }
+  const safe = parsed.href;
   if (hasWailsBindings() && goWindow().runtime) {
-    BrowserOpenURL(url);
+    BrowserOpenURL(safe);
     return;
   }
   if (typeof window !== "undefined") {
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(safe, "_blank", "noopener,noreferrer");
   }
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import DiagnosticsSection from "../components/DiagnosticsSection";
 import KeysDERPSection from "../components/KeysDERPSection";
+import ReleaseNotes from "../components/ReleaseNotes";
 import iconUrl from "../assets/icon.png";
 import { useI18n, type Locale, type MessageKey } from "../i18n";
 import { displayNickname, sanitizeNickname } from "../lib/nickname";
@@ -428,10 +429,9 @@ export default function SettingsPage({
           {update?.Notes ? (
             <div className="update-notes">
               <span className="info-card-label">{t("releaseNotes")}</span>
-              <p>{update.Notes}</p>
+              <ReleaseNotes markdown={update.Notes} />
             </div>
           ) : null}
-          <p className="info-card-note">{t("updateCheckHint")}</p>
           {downloading ? (
             <div
               className="update-progress"
