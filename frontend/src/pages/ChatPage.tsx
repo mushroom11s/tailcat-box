@@ -60,7 +60,6 @@ type Props = {
   onResend?: (id: string) => Promise<void>;
   onSave?: (id: string) => Promise<void>;
   onRetry: () => Promise<void>;
-  onCloseRoom?: () => void;
   initialPeerDraft?: string;
   initialComposer?: string;
   initialBurn?: boolean;
@@ -148,7 +147,6 @@ export default function ChatPage({
   onResend,
   onSave,
   onRetry,
-  onCloseRoom,
   initialPeerDraft,
   initialComposer,
   initialBurn,
@@ -1031,16 +1029,6 @@ export default function ChatPage({
           {roomError ? (
             <button className="btn" type="button" onClick={() => onRetry()}>
               {t("chatRetry")}
-            </button>
-          ) : null}
-          {onCloseRoom ? (
-            <button
-              className="btn btn-ghost chat-room-close"
-              type="button"
-              aria-label={`${t("roomClose")} ${address || t("roomCloseTitle")}`}
-              onClick={onCloseRoom}
-            >
-              {t("roomClose")}
             </button>
           ) : null}
           {address.trim() && !roomError ? (

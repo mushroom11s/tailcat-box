@@ -308,34 +308,59 @@ textarea {
 }
 
 .nav-room-row {
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
+  position: relative;
   min-width: 0;
 }
 
 .nav-room-row .nav-btn.nav-child {
-  flex: 1;
+  width: 100%;
   min-width: 0;
+  padding-right: 28px;
 }
 
 .nav-room-close {
-  flex: none;
-  align-self: center;
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
   border: 0;
+  border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 650;
-  line-height: 1;
-  border-radius: 10px;
-  padding: 6px 7px;
   cursor: pointer;
+  opacity: 0;
 }
 
-.nav-room-close:hover {
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
-  color: var(--danger);
+.nav-room-close-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.nav-room-row:hover .nav-room-close,
+.nav-room-row:focus-within .nav-room-close {
+  opacity: 1;
+}
+
+.nav-room-row:has(.nav-btn.active) .nav-room-close {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.nav-room-close:hover,
+.nav-room-close:focus-visible {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.nav-room-close:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, white);
+  outline-offset: 1px;
 }
 
 .nav-room-label {
@@ -555,10 +580,6 @@ textarea {
 .chat-lobby-key-save .field {
   flex: 1;
   min-width: 180px;
-}
-
-.chat-room-close {
-  margin-left: auto;
 }
 
 .lede {

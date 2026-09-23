@@ -637,7 +637,7 @@ export default function App() {
                           aria-label={`${t("roomClose")} ${label}`}
                           onClick={() => requestCloseRoom(id)}
                         >
-                          {t("roomClose")}
+                          <RoomCloseIcon />
                         </button>
                       </div>
                     );
@@ -707,7 +707,6 @@ export default function App() {
               onResend={(messageID) => resendChatFile(chatRoom.id, messageID)}
               onSave={(messageID) => saveChatFile(chatRoom.id, messageID)}
               onRetry={() => onRestart(chatRoom.keyName)}
-              onCloseRoom={() => requestCloseRoom(chatRoom.id)}
               notifyNote={notifyDenied ? t("chatNotifyDenied") : ""}
             />
           )
@@ -778,6 +777,14 @@ export default function App() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function RoomCloseIcon() {
+  return (
+    <svg className="nav-room-close-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" d="M6 6l12 12M18 6 6 18" />
+    </svg>
   );
 }
 

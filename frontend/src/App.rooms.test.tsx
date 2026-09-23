@@ -228,7 +228,12 @@ describe("phase A multi-room lobby", () => {
     const second = await waitRoomAddress();
     expect(second).not.toBe(first);
 
-    await user.click(screen.getByRole("button", { name: `Close ${abbrev(second)}` }));
+    const closeSecond = screen.getByRole("button", { name: `Close ${abbrev(second)}` });
+    expect(closeSecond.closest(".nav-room-row")?.querySelector(".nav-btn")?.contains(closeSecond)).toBe(false);
+    expect(closeSecond.querySelector("svg")).toBeTruthy();
+    expect(closeSecond.textContent?.trim()).toBe("");
+    expect(document.querySelector(".chat-room-close")).toBeNull();
+    await user.click(closeSecond);
     expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() => {
       expect(shownRoomAddress()).toBe(first);
