@@ -256,6 +256,8 @@ export const zhCN = {
   chatCopyHelper: "房间开着时，拿到这个地址的人都能往这里发消息。",
   chatPeerLabel: "对方",
   chatPeerHelper: "把对方的 Tailcat 地址粘贴到这里。",
+  chatRemark: "备注",
+  chatRemarkHelp: "只存在这台设备上，对应这个地址。对方看不到。这不是你的昵称。",
   chatConnect: "连接",
   chatEmptyLede: "消息只留在这台设备上，退出后就没了。",
   chatYou: "我",
