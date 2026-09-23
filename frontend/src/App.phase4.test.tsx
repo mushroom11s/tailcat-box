@@ -107,15 +107,22 @@ describe("phase 4 live media dock", () => {
   it("keeps the composer usable and can expand and hang up", async () => {
     const user = userEvent.setup();
     const { onSend, onSendSignal } = renderChat();
-    expect(screen.getByRole("button", { name: "Voice" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Video" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Screen share" })).toBeTruthy();
+    const panel = screen.getByRole("complementary", { name: "Calls" });
+    expect(panel.querySelector(".call-panel-idle")?.textContent).toBe(en.chatCallIdle);
+    expect(panel.contains(screen.getByRole("button", { name: "Voice" }))).toBe(true);
+    expect(panel.contains(screen.getByRole("button", { name: "Video" }))).toBe(true);
+    expect(panel.contains(screen.getByRole("button", { name: "Screen share" }))).toBe(true);
+    const composerActions = document.querySelector(".composer-actions");
+    expect(composerActions?.textContent).not.toContain("Voice");
+    expect(composerActions?.contains(screen.getByRole("button", { name: "Record voice note" }))).toBe(true);
     await user.click(screen.getByRole("button", { name: "Voice" }));
-    expect(await screen.findByRole("complementary", { name: "Live media" })).toBeTruthy();
+    expect(await screen.findByRole("complementary", { name: "Calls" })).toBe(panel);
     expect(screen.getByText("Local preview")).toBeTruthy();
     expect(screen.getByText("Remote media")).toBeTruthy();
-    expect(document.querySelector(".chat-stage .chat-log")).toBeTruthy();
-    expect(document.querySelector(".chat-stage .media-dock")).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Live media" })).toBeTruthy();
+    expect(screen.queryByText(en.chatCallIdle)).toBeNull();
+    expect(document.querySelector(".chat-main .chat-log")).toBeTruthy();
+    expect(document.querySelector(".chat-layout > .call-panel.media-dock")).toBe(panel);
     const composer = screen.getByLabelText("Message") as HTMLTextAreaElement;
     expect(composer.disabled).toBe(false);
     await user.type(composer, "during");
@@ -125,7 +132,9 @@ describe("phase 4 live media dock", () => {
     expect(screen.getByRole("button", { name: "Collapse" }).getAttribute("aria-expanded")).toBe("true");
     expect(document.querySelector(".media-dock.expanded")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Hang up" }));
-    expect(screen.queryByRole("complementary", { name: "Live media" })).toBeNull();
+    expect(screen.getByRole("complementary", { name: "Calls" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Hang up" })).toBeNull();
+    expect(screen.getByText(en.chatCallIdle)).toBeTruthy();
     const sent = onSendSignal.mock.calls.map((call) => JSON.parse(call[0] as string) as SignalMeta);
     expect(sent.map((meta) => meta.type)).toEqual(["rtc-offer", "rtc-hangup"]);
     expect(composer.value).toBe("");
@@ -144,10 +153,11 @@ describe("phase 4 live media dock", () => {
     const user = userEvent.setup();
     const { onSend } = renderChat();
     await user.click(screen.getByRole("button", { name: "Voice" }));
-    await screen.findByRole("complementary", { name: "Live media" });
+    await screen.findByRole("button", { name: "Hang up" });
     FakePC.instances.at(-1)?.fail();
     expect(await screen.findByText(liveMediaError)).toBeTruthy();
-    expect(screen.queryByRole("complementary", { name: "Live media" })).toBeNull();
+    expect(screen.getByRole("complementary", { name: "Calls" })).toBeTruthy();
+    expect(screen.getByText(en.chatCallIdle)).toBeTruthy();
     const composer = screen.getByLabelText("Message");
     await user.type(composer, "still");
     await user.click(screen.getByRole("button", { name: "Send" }));
@@ -166,9 +176,11 @@ describe("phase 4 live media dock", () => {
         },
       },
     });
-    expect(screen.getByRole("button", { name: "语音" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "视频" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "共享屏幕" })).toBeTruthy();
+    const panel = screen.getByRole("complementary", { name: "通话" });
+    expect(panel.textContent).toContain("从这里发起语音通话、视频通话或屏幕共享。");
+    expect(panel.contains(screen.getByRole("button", { name: "语音" }))).toBe(true);
+    expect(panel.contains(screen.getByRole("button", { name: "视频" }))).toBe(true);
+    expect(panel.contains(screen.getByRole("button", { name: "共享屏幕" }))).toBe(true);
     await user.click(screen.getByRole("button", { name: "语音" }));
     expect(await screen.findByText("没有麦克风权限。")).toBeTruthy();
     expect(screen.getByLabelText("消息")).toBeTruthy();

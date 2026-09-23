@@ -305,6 +305,8 @@ export const zhCN = {
   chatLocalPreview: "本地预览",
   chatRemoteMedia: "对方媒体",
   chatMediaDock: "实时媒体",
+  chatCallPanel: "通话",
+  chatCallIdle: "从这里发起语音通话、视频通话或屏幕共享。",
   chatCamDenied: "没有摄像头权限。",
   chatScreenDenied: "没有屏幕共享权限。",
   chatScreenUnavailable: "这个系统不能共享屏幕。",

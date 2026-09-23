@@ -708,6 +708,8 @@ export default function ChatPage({
 
   return (
     <section className="page chat-page">
+      <div className="chat-layout">
+      <div className="chat-main">
       <div className="glass chat-identity">
         <div className="chat-room-bar">
           <span className={`status-dot${roomError ? " bad" : ""}`} aria-hidden="true" />
@@ -850,28 +852,8 @@ export default function ChatPage({
         ))}
       </div>
       </div>
-      {callView.phase !== "idle" ? (
-        <aside className={`glass media-dock${callView.expanded ? " expanded" : ""}`} role="complementary" aria-label={t("chatMediaDock")}>
-          <MediaPreview label={t("chatLocalPreview")} stream={callView.localStream} muted />
-          <MediaPreview label={t("chatRemoteMedia")} stream={callView.remoteStream} />
-          <div className="row">
-            <button className="btn" type="button" onClick={() => void callRef.current?.hangup()}>
-              {t("chatHangUp")}
-            </button>
-            <button
-              className="btn"
-              type="button"
-              aria-expanded={callView.expanded}
-              onClick={() => callRef.current?.toggleExpanded()}
-            >
-              {callView.expanded ? t("chatCollapse") : t("chatExpand")}
-            </button>
-          </div>
-        </aside>
-      ) : null}
       </div>
       {notice ? <p className="chat-quiet">{notice}</p> : null}
-      {callView.error ? <p className="err">{localizeChatError(callView.error, t) || callView.error}</p> : null}
       <div className="glass composer-bar">
         <label className="sr-only" htmlFor="chat-composer">{t("chatMessageLabel")}</label>
         <textarea
@@ -895,15 +877,6 @@ export default function ChatPage({
             onPointerCancel={() => requestStop()}
           >
             <MicIcon />
-          </IconButton>
-          <IconButton label={t("chatCallVoice")} onClick={() => void placeCall("voice")}>
-            <PhoneIcon />
-          </IconButton>
-          <IconButton label={t("chatCallVideo")} onClick={() => void placeCall("video")}>
-            <VideoIcon />
-          </IconButton>
-          <IconButton label={t("chatCallScreen")} onClick={() => void placeCall("screen")}>
-            <ScreenIcon />
           </IconButton>
           <label className="burn-switch" htmlFor="chat-burn">
             <FlameIcon />
@@ -930,6 +903,20 @@ export default function ChatPage({
         style={{ display: "none" }}
         onChange={(e) => void onPicked(e)}
       />
+      </div>
+      <CallPanel
+        phase={callView.phase}
+        expanded={callView.expanded}
+        error={callView.error ? localizeChatError(callView.error, t) || callView.error : ""}
+        localStream={callView.localStream}
+        remoteStream={callView.remoteStream}
+        onVoice={() => void placeCall("voice")}
+        onVideo={() => void placeCall("video")}
+        onScreen={() => void placeCall("screen")}
+        onHangup={() => void callRef.current?.hangup()}
+        onToggleExpanded={() => callRef.current?.toggleExpanded()}
+      />
+      </div>
       {confirmOpen ? (
         <div className="modal-backdrop" role="presentation" onClick={() => setConfirmOpen(false)}>
           <div
@@ -953,6 +940,79 @@ export default function ChatPage({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function CallPanel({
+  phase,
+  expanded,
+  error,
+  localStream,
+  remoteStream,
+  onVoice,
+  onVideo,
+  onScreen,
+  onHangup,
+  onToggleExpanded,
+}: {
+  phase: CallView["phase"];
+  expanded: boolean;
+  error: string;
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+  onVoice: () => void;
+  onVideo: () => void;
+  onScreen: () => void;
+  onHangup: () => void;
+  onToggleExpanded: () => void;
+}) {
+  const { t } = useI18n();
+  const live = phase !== "idle";
+  return (
+    <aside
+      className={`glass call-panel media-dock${expanded ? " expanded" : ""}`}
+      role="complementary"
+      aria-label={t("chatCallPanel")}
+    >
+      <h2 className="call-panel-title">{t("chatCallPanel")}</h2>
+      <div className="call-panel-actions">
+        <CallStartButton label={t("chatCallVoice")} onClick={onVoice}>
+          <PhoneIcon />
+        </CallStartButton>
+        <CallStartButton label={t("chatCallVideo")} onClick={onVideo}>
+          <VideoIcon />
+        </CallStartButton>
+        <CallStartButton label={t("chatCallScreen")} onClick={onScreen}>
+          <ScreenIcon />
+        </CallStartButton>
+      </div>
+      {live ? (
+        <div className="call-panel-live" role="group" aria-label={t("chatMediaDock")}>
+          <MediaPreview label={t("chatLocalPreview")} stream={localStream} muted />
+          <MediaPreview label={t("chatRemoteMedia")} stream={remoteStream} />
+          <div className="row">
+            <button className="btn" type="button" onClick={onHangup}>
+              {t("chatHangUp")}
+            </button>
+            <button className="btn" type="button" aria-expanded={expanded} onClick={onToggleExpanded}>
+              {expanded ? t("chatCollapse") : t("chatExpand")}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="chat-quiet call-panel-idle">{t("chatCallIdle")}</p>
+      )}
+      {error ? <p className="err">{error}</p> : null}
+    </aside>
+  );
+}
+
+function CallStartButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button className="btn btn-ghost call-start" type="button" onClick={onClick}>
+      {children}
+      <span>{label}</span>
+    </button>
   );
 }
 
