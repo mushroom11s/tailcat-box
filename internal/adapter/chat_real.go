@@ -74,14 +74,18 @@ func (r *Real) StartRoom(ctx context.Context, opts RoomOpts) (Room, error) {
 	room.srv = srv
 	room.addr = string(srv.TailcatAddr())
 	r.mu.Lock()
-	if r.chat != nil {
-		old := r.chat
-		r.chat = nil
+	if r.chatRooms == nil {
+		r.chatRooms = map[string]*realRoom{}
+	}
+	// A second start for the same session replaces only that listener.
+	// Other chat rooms stay up.
+	if old := r.chatRooms[room.id]; old != nil && old != room {
+		delete(r.chatRooms, room.id)
 		r.mu.Unlock()
 		_ = old.Close()
 		r.mu.Lock()
 	}
-	r.chat = room
+	r.chatRooms[room.id] = room
 	r.mu.Unlock()
 	room.emit(ChatEvent{SessionID: room.id, Kind: ChatEventReady, Address: room.addr})
 	go func() {
@@ -167,8 +171,8 @@ func (r *realRoom) Close() error {
 			_ = srv.Close()
 		}
 		r.real.mu.Lock()
-		if r.real.chat == r {
-			r.real.chat = nil
+		if r.real.chatRooms[r.id] == r {
+			delete(r.real.chatRooms, r.id)
 		}
 		r.real.mu.Unlock()
 		close(r.events)

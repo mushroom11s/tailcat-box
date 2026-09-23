@@ -613,15 +613,24 @@ func TestMaybeRecordDailyUpdateCheck(t *testing.T) {
 func TestChatRoomEchoAndRestartKey(t *testing.T) {
 	t.Setenv("TAILCAT_ADAPTER", "fake")
 	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	t.Setenv("TAILCAT_CHAT_DIR", t.TempDir())
 	a := NewApp()
-	if _, err := a.StartChatRoom(); err != nil {
+	first, err := a.StartChatRoom("")
+	if err != nil {
 		t.Fatal(err)
+	}
+	second, err := a.StartChatRoom("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID == second.ID {
+		t.Fatal("second start must open another room")
 	}
 	var addr string
 	deadline := time.After(2 * time.Second)
 	for addr == "" {
 		for _, item := range a.ListSessions() {
-			if item.Kind == session.KindChat && item.Status == session.StatusRunning {
+			if item.ID == first.ID && item.Status == session.StatusRunning {
 				addr = item.Address
 			}
 		}
@@ -631,28 +640,40 @@ func TestChatRoomEchoAndRestartKey(t *testing.T) {
 		case <-time.After(10 * time.Millisecond):
 		}
 	}
-	again, err := a.StartChatRoom()
-	if err != nil || again.Address != addr {
-		t.Fatalf("again=%+v err=%v", again, err)
+	chats := 0
+	for _, item := range a.ListSessions() {
+		if item.Kind == session.KindChat && item.Status != session.StatusStopped {
+			chats++
+		}
 	}
-	if err := a.ConnectChatPeer("tc:fake-echo"); err != nil {
+	if chats != 2 {
+		t.Fatalf("chat sessions=%d %+v", chats, a.ListSessions())
+	}
+	if a.activeSessionCount() < 2 {
+		t.Fatalf("tray count=%d", a.activeSessionCount())
+	}
+	if err := a.ConnectChatPeer(first.ID, "tc:fake-echo"); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.SendChatText("hi", false, 0); err != nil {
+	if err := a.SendChatText(first.ID, "hi", false, 0); err != nil {
 		t.Fatal(err)
 	}
 	deadline = time.After(2 * time.Second)
-	for !chatHas(a, "in", "echo") {
+	for !chatHas(a, first.ID, "in", "echo") {
 		select {
 		case <-deadline:
-			t.Fatalf("%+v", a.chat.Messages())
+			msgs, _ := a.rooms.Messages(first.ID)
+			t.Fatalf("%+v", msgs)
 		case <-time.After(10 * time.Millisecond):
 		}
+	}
+	if other, err := a.rooms.Messages(second.ID); err != nil || len(other) != 0 {
+		t.Fatalf("other=%+v err=%v", other, err)
 	}
 	if _, err := a.CreateKey("home", false, ""); err != nil {
 		t.Fatal(err)
 	}
-	restarted, err := a.RestartChatRoom("home")
+	restarted, err := a.RestartChatRoom(first.ID, "home")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -673,8 +694,13 @@ func TestChatRoomEchoAndRestartKey(t *testing.T) {
 	if next == addr || !strings.HasPrefix(next, "tc:fake-room-key-") {
 		t.Fatalf("next=%s old=%s", next, addr)
 	}
-	if a.chat.Peer() != "" {
-		t.Fatalf("peer=%s", a.chat.Peer())
+	peer, err := a.rooms.Peer(restarted.ID)
+	if err != nil || peer != "" {
+		t.Fatalf("peer=%s err=%v", peer, err)
+	}
+	still, err := a.rooms.Peer(second.ID)
+	if err != nil || still != "" {
+		t.Fatalf("second peer=%s err=%v", still, err)
 	}
 }
 
@@ -693,13 +719,24 @@ func TestChatVoiceWireFormatIsBase64(t *testing.T) {
 	if _, err := a.DecodeChatVoice("audio/wav", "@@@"); err == nil {
 		t.Fatal("expected invalid base64 to fail")
 	}
-	if err := a.SendChatVoice("audio/webm;codecs=opus", 1, encoded, false, 0); err == nil || !strings.Contains(err.Error(), "no peer") {
+	room, err := a.StartChatRoom("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SendChatVoice(room.ID, "audio/webm;codecs=opus", 1, encoded, false, 0); err == nil || !strings.Contains(err.Error(), "no peer") {
 		t.Fatalf("send without a peer: %v", err)
+	}
+	if err := a.SendChatVoice("missing", "audio/webm;codecs=opus", 1, encoded, false, 0); err == nil || !strings.Contains(err.Error(), "Unknown room") {
+		t.Fatalf("unknown room: %v", err)
 	}
 }
 
-func chatHas(a *App, direction, body string) bool {
-	for _, msg := range a.chat.Messages() {
+func chatHas(a *App, roomID, direction, body string) bool {
+	msgs, err := a.rooms.Messages(roomID)
+	if err != nil {
+		return false
+	}
+	for _, msg := range msgs {
 		if msg.Direction == direction && msg.Body == body {
 			return true
 		}

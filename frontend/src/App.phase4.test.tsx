@@ -213,12 +213,14 @@ describe("phase 4 live media dock", () => {
         <App />
       </LocaleProvider>,
     );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     expect(await screen.findByRole("button", { name: "Voice" })).toBeTruthy();
-    expect(Array.from(document.querySelectorAll(".nav-btn")).map((node) => node.textContent)).toEqual([
-      "Chat",
-      "Tunnel",
-      "Settings",
-    ]);
+    const names = Array.from(document.querySelectorAll(".nav-btn")).map((node) => node.textContent ?? "");
+    expect(names[0]).toBe("Chat");
+    expect(names[1]).toBe("+ New room");
+    expect(names.at(-2)).toBe("Tunnel");
+    expect(names.at(-1)).toBe("Settings");
     expect(screen.queryByRole("heading", { name: "Services" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Start SSH serve" })).toBeNull();
   });

@@ -36,6 +36,7 @@ describe("phase 2 files and burn", () => {
   it("sends a dropped image to an official peer as a full transfer", async () => {
     const user = userEvent.setup();
     renderApp();
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.type(screen.getByLabelText("Peer"), "tc:fake-official");
     await user.click(screen.getByRole("button", { name: "Connect" }));
@@ -53,6 +54,7 @@ describe("phase 2 files and burn", () => {
   it("uses the burn badge when the peer advertises burn", async () => {
     const user = userEvent.setup();
     renderApp();
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.type(screen.getByLabelText("Peer"), "tc:fake-box");
     await user.click(screen.getByRole("button", { name: "Connect" }));

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -70,6 +71,7 @@ type Service struct {
 	messages       []Message
 	ui             chan adapter.Event
 	opening        bool
+	dataRoot       string
 	dataDir        string
 	sending        bool
 	queued         *fileJob
@@ -84,6 +86,14 @@ type Service struct {
 
 func New(ad adapter.ChatAdapter) *Service {
 	return &Service{ad: ad, ui: make(chan adapter.Event, 64)}
+}
+
+// SetDataRoot gives each room a subdirectory of root named by its first session id.
+// Restart keeps that directory so this service's files stay put.
+func (s *Service) SetDataRoot(root string) {
+	s.mu.Lock()
+	s.dataRoot = root
+	s.mu.Unlock()
 }
 
 func (s *Service) Events() <-chan adapter.Event { return s.ui }
@@ -181,6 +191,9 @@ func (s *Service) open(opts StartOpts, restarted bool) (session.Session, error) 
 	sess := session.New(session.KindChat)
 	s.sess = sess
 	s.peer = ""
+	if s.dataRoot != "" && s.dataDir == "" {
+		s.dataDir = filepath.Join(s.dataRoot, sess.ID)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	s.roomCtx = ctx

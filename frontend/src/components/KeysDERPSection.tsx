@@ -34,6 +34,7 @@ type Props = {
   onDelete: (name: string) => void | Promise<void>;
   onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
   onRestart: (keyName: string) => void | Promise<void>;
+  canRestart: boolean;
 };
 
 export default function KeysDERPSection({
@@ -51,6 +52,7 @@ export default function KeysDERPSection({
   onDelete,
   onSaveNetwork,
   onRestart,
+  canRestart,
 }: Props) {
   const { t } = useI18n();
   const [name, setName] = useState("");
@@ -173,9 +175,10 @@ export default function KeysDERPSection({
           ))}
         </select>
       </div>
-      {dirty ? <p>{t("chatRestartHint")}</p> : null}
+      {canRestart && dirty ? <p>{t("chatRestartHint")}</p> : null}
+      {!canRestart ? <p>{t("chatNoRoomRestart")}</p> : null}
       <div className="row">
-        <button className="btn" type="button" disabled={busy} onClick={() => onRestart(roomKey)}>
+        <button className="btn" type="button" disabled={busy || !canRestart} onClick={() => onRestart(roomKey)}>
           {t("chatRestartRoom")}
         </button>
       </div>

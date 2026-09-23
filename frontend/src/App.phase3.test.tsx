@@ -259,6 +259,7 @@ describe("phase 3 browser fake", () => {
         <App />
       </LocaleProvider>,
     );
+    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));

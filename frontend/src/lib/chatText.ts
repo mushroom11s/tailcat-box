@@ -28,6 +28,14 @@ export function localizeChatError(message: string, t: (key: MessageKey) => strin
   switch (message) {
     case "Paste a Tailcat address that starts with tc.":
       return t("chatAddrError");
+    case "You can keep 8 rooms open. Quit the app to close rooms.":
+      return t("roomCap");
+    case "Unknown room.":
+      return t("chatUnknownRoom");
+    case "That key is already listening in another room.":
+      return t("chatKeyInUse");
+    case "There is no room to restart.":
+      return t("chatNoRoomRestart");
     case "Could not reach peer. Check the address and that they are online.":
       return t("chatUnreachable");
     case micDeniedError:
