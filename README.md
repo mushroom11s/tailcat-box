@@ -10,7 +10,7 @@ Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on mac
   <img src="docs/assets/icon.png" alt="Tailcat Box" width="256" />
 </p>
 
-The app is **Tailcat Box**. In 简体中文 the product name is **猫砂盆**. The GitHub repository is `tailcat-box`: [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box).
+**Tailcat Box** (Simplified Chinese: **猫砂盆**). GitHub: [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box).
 
 ## Features
 
