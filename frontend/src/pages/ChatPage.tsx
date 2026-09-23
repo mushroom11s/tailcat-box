@@ -66,6 +66,7 @@ type Props = {
   liveMedia?: LiveDevices;
   peerConnection?: new (config?: RTCConfiguration) => RTCPeerConnection;
   nickname?: string;
+  notifyNote?: string;
 };
 
 async function copyText(text: string): Promise<void> {
@@ -142,6 +143,7 @@ export default function ChatPage({
   liveMedia,
   peerConnection,
   nickname = "",
+  notifyNote = "",
 }: Props) {
   const { t } = useI18n();
   const ownLabel = displayNickname(nickname) || t("chatYou");
@@ -163,6 +165,7 @@ export default function ChatPage({
   const [multiSelectActive, setMultiSelectActive] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmDialogRef = useRef<HTMLDivElement>(null);
   const [sending, setSending] = useState(false);
   const [pending, setPending] = useState<PendingOut[]>([]);
   const [dissolving, setDissolving] = useState<Set<string>>(() => new Set());
@@ -538,6 +541,19 @@ export default function ChatPage({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [multiSelectActive, confirmOpen]);
+
+  useEffect(() => {
+    if (!confirmOpen) {
+      return;
+    }
+    const prev = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    confirmDialogRef.current?.focus();
+    return () => {
+      if (prev && document.contains(prev)) {
+        prev.focus();
+      }
+    };
+  }, [confirmOpen]);
 
   async function connect(): Promise<void> {
     const addr = draftPeer.trim();
@@ -1021,6 +1037,11 @@ export default function ChatPage({
       </div>
       </div>
       {notice ? <p className="chat-quiet">{notice}</p> : null}
+      {notifyNote ? (
+        <p className="chat-quiet" role="status">
+          {notifyNote}
+        </p>
+      ) : null}
       <div className="glass composer-bar">
         <label className="sr-only" htmlFor="chat-composer">{t("chatMessageLabel")}</label>
         <textarea
@@ -1087,14 +1108,17 @@ export default function ChatPage({
       {confirmOpen ? (
         <div className="modal-backdrop" role="presentation" onClick={() => setConfirmOpen(false)}>
           <div
-            className="glass modal"
+            ref={confirmDialogRef}
+            className="glass modal modal-compact"
             role="dialog"
             aria-modal="true"
             aria-labelledby="chat-select-delete-title"
+            aria-describedby="chat-select-delete-body"
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
           >
             <h3 id="chat-select-delete-title">{t("chatSelectDelete")}</h3>
-            <p>{fillN(t("chatSelectDeleteConfirm"), selectedIds.size)}</p>
+            <p id="chat-select-delete-body">{fillN(t("chatSelectDeleteConfirm"), selectedIds.size)}</p>
             <div className="row">
               <button className="btn btn-ghost" type="button" onClick={() => setConfirmOpen(false)}>
                 {t("cancel")}

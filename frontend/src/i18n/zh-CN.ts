@@ -329,4 +329,8 @@ export const zhCN = {
     "没有屏幕共享权限。请到系统设置 → 隐私与安全性（System Settings → Privacy & Security）→ 屏幕与系统音频录制，允许猫砂盆，然后退出并重新打开应用。",
   chatScreenUnavailable: "这个系统不能共享屏幕。",
   chatLiveFailed: "实时媒体失败。受限网络没有通话中继，所以语音和视频可能失败，但聊天仍然可用。",
+  chatNotifyFile: "发来一个文件",
+  chatNotifyVoice: "发来一条语音",
+  chatNotifyMessage: "新消息",
+  chatNotifyDenied: "系统通知没开，新消息只留在聊天里。",
 } as const satisfies Record<MessageKey, string>;

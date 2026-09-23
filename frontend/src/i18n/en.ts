@@ -328,6 +328,10 @@ export const en = {
   chatScreenUnavailable: "Screen sharing is unavailable on this system.",
   chatLiveFailed:
     "Live media failed. Restrictive networks have no relay for calls, so voice and video can fail while chat still works.",
+  chatNotifyFile: "Sent a file",
+  chatNotifyVoice: "Sent a voice note",
+  chatNotifyMessage: "New message",
+  chatNotifyDenied: "System notifications are off, so new messages stay in the chat.",
 } as const;
 
 export type MessageKey = keyof typeof en;
