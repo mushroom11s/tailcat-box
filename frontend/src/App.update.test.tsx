@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { LocaleProvider } from "./i18n";
 import { emitTrayNavigate, emitUpdateStatus, resetFakeUpdateState, updateCheckCount, type UpdateStatus } from "./lib/wails";
@@ -58,6 +58,61 @@ describe("in-app update", () => {
     expect(card?.classList.contains("update-focus")).toBe(true);
     expect(await screen.findByRole("button", { name: "Download" })).toBeTruthy();
     expect(screen.getByText("Ships the cat.")).toBeTruthy();
+    expect(card?.textContent ?? "").not.toMatch(/GitHub Releases|does not replace the running app/);
+  });
+
+  it("does not show the phase-1 update explainer in zh-CN", async () => {
+    localStorage.setItem("tailcat-locale", "zh-CN");
+    renderApp();
+    emitTrayNavigate("settings");
+    const card = await waitFor(() => {
+      const el = document.getElementById("settings-update");
+      expect(el).toBeTruthy();
+      return el;
+    });
+    const text = card?.textContent ?? "";
+    expect(text).not.toContain("猫砂盆会到 GitHub Releases");
+    expect(text).not.toContain("还不能一键替换正在运行的程序");
+    expect(text).not.toContain("也不会自动重启");
+  });
+
+  it("renders release notes as sanitized markdown and opens https links", async () => {
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const notes = [
+      "## What's new",
+      "",
+      "- **Pixel** cats",
+      "- See [the release](https://github.com/mushroom11s/tailcat-box/releases/tag/v0.2.0)",
+      "",
+      "Use `meow`.",
+      "",
+      "<script>alert(1)</script>",
+      "[bad](javascript:alert(1))",
+    ].join("\n");
+    emitUpdateStatus(status({ UpdateAvailable: true, Notes: notes }));
+    renderApp();
+    emitTrayNavigate("settings");
+
+    const heading = await screen.findByRole("heading", { name: "What's new" });
+    expect(heading.tagName).toBe("H2");
+    expect(screen.getByText("Pixel").tagName).toBe("STRONG");
+    const link = screen.getByRole("link", { name: "the release" });
+    expect(link.getAttribute("href")).toContain("https://github.com/mushroom11s/tailcat-box/releases/tag/v0.2.0");
+    expect(screen.getByText("meow").tagName).toBe("CODE");
+
+    const card = document.getElementById("settings-update");
+    const html = card?.innerHTML ?? "";
+    expect(html.toLowerCase()).not.toContain("<script");
+    expect(html.toLowerCase()).not.toContain("javascript:");
+
+    await user.click(link);
+    expect(open).toHaveBeenCalledWith(
+      "https://github.com/mushroom11s/tailcat-box/releases/tag/v0.2.0",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    open.mockRestore();
   });
 
   it("hides NEW! until a successful check says an update is available", async () => {

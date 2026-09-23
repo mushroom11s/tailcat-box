@@ -67,8 +67,6 @@ export const en = {
   checkNow: "Check now",
   updateNew: "NEW!",
   updateNewBadge: "NEW! A newer version is available",
-  updateCheckHint:
-    "Tailcat Box checks GitHub Releases, downloads the matching zip into Downloads, and shows where it went. It does not replace the running app or restart yet.",
   latestVersion: "Latest version",
   updateStatus: "Update",
   releaseNotes: "Release notes",

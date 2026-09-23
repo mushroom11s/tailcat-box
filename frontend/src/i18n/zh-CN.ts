@@ -72,8 +72,6 @@ export const zhCN = {
   checkNow: "现在检查",
   updateNew: "NEW!",
   updateNewBadge: "NEW! 有新版本",
-  updateCheckHint:
-    "猫砂盆会到 GitHub Releases 检查新版本，把适合这台电脑的压缩包下载到「下载」文件夹，并告诉你怎么换上。还不能一键替换正在运行的程序，也不会自动重启。",
   latestVersion: "最新版本",
   updateStatus: "更新",
   releaseNotes: "更新说明",
