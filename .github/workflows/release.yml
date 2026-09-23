@@ -189,6 +189,23 @@ jobs:
           command -v python3 >/dev/null 2>&1 || PY=python
           "$PY" scripts/package-wails-artifact.py --version "${VERSION}" --os-slug "${OS_SLUG}" --arch "${ARCH}"
 
+      - name: Verify macOS privacy usage descriptions
+        if: matrix.slug == 'macos'
+        run: |
+          set -euo pipefail
+          app_plist="build/bin/tailcat-box.app/Contents/Info.plist"
+          if [ ! -f "${app_plist}" ]; then
+            echo "missing ${app_plist}" >&2
+            find build/bin -name Info.plist -print >&2 || true
+            exit 1
+          fi
+          zip=$(echo dist-upload/*.zip)
+          unzip -p "${zip}" "tailcat-box.app/Contents/Info.plist" > "${RUNNER_TEMP}/shipped-Info.plist"
+          for key in NSMicrophoneUsageDescription NSCameraUsageDescription NSScreenCaptureUsageDescription; do
+            /usr/libexec/PlistBuddy -c "Print :${key}" "${app_plist}" >/dev/null
+            /usr/libexec/PlistBuddy -c "Print :${key}" "${RUNNER_TEMP}/shipped-Info.plist" >/dev/null
+          done
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

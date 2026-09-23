@@ -23,6 +23,13 @@
         <string>true</string>
         <key>NSHumanReadableCopyright</key>
         <string>{{.Info.Copyright}}</string>
+        <!-- macOS TCC will not prompt without these. Keep the same keys in Info.plist. -->
+        <key>NSMicrophoneUsageDescription</key>
+        <string>Tailcat Box uses the microphone for voice notes and live calls.</string>
+        <key>NSCameraUsageDescription</key>
+        <string>Tailcat Box uses the camera for live video calls.</string>
+        <key>NSScreenCaptureUsageDescription</key>
+        <string>Tailcat Box records the screen when you share it in a call.</string>
         {{if .Info.FileAssociations}}
         <key>CFBundleDocumentTypes</key>
         <array>

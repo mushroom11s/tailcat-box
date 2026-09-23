@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { LocaleProvider } from "./i18n";
 import { en } from "./i18n/en";
-import { liveMediaError, micDeniedError, type SignalMeta } from "./lib/liveCall";
+import { liveMediaError, type SignalMeta } from "./lib/liveCall";
 import ChatPage from "./pages/ChatPage";
 
 class FakePC {
@@ -163,7 +163,9 @@ describe("phase 4 live media dock", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(onSend).toHaveBeenCalledWith("still", false, 0);
     expect(en.chatLiveFailed).toBe(liveMediaError);
-    expect(en.chatMicDenied).toBe(micDeniedError);
+    expect(en.chatMicDenied).toContain("System Settings → Privacy & Security → Microphone");
+    expect(en.chatCamDenied).toContain("System Settings → Privacy & Security → Camera");
+    expect(en.chatScreenDenied).toContain("System Settings → Privacy & Security → Screen & System Audio Recording");
   });
 
   it("uses the Chinese call strings", async () => {
@@ -182,8 +184,27 @@ describe("phase 4 live media dock", () => {
     expect(panel.contains(screen.getByRole("button", { name: "视频" }))).toBe(true);
     expect(panel.contains(screen.getByRole("button", { name: "共享屏幕" }))).toBe(true);
     await user.click(screen.getByRole("button", { name: "语音" }));
-    expect(await screen.findByText("没有麦克风权限。")).toBeTruthy();
+    expect(await screen.findByText(/系统设置 → 隐私与安全性（System Settings → Privacy & Security）→ 麦克风/)).toBeTruthy();
     expect(screen.getByLabelText("消息")).toBeTruthy();
+  });
+
+  it("shows settings guidance when camera or screen capture is denied", async () => {
+    const user = userEvent.setup();
+    const denied = async () => {
+      throw new DOMException("denied", "NotAllowedError");
+    };
+    const first = renderChat({
+      liveMedia: { getUserMedia: denied, getDisplayMedia: denied },
+    });
+    await user.click(screen.getByRole("button", { name: "Video" }));
+    expect(await screen.findByText(en.chatCamDenied)).toBeTruthy();
+    first.unmount();
+
+    renderChat({
+      liveMedia: { getUserMedia: denied, getDisplayMedia: denied },
+    });
+    await user.click(screen.getByRole("button", { name: "Screen share" }));
+    expect(await screen.findByText(en.chatScreenDenied)).toBeTruthy();
   });
 
   it("does not restore toolbox navigation", async () => {

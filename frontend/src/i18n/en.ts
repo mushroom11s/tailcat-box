@@ -293,7 +293,8 @@ export const en = {
   chatRecording: "Recording",
   chatVoiceReceived: "Voice received — tap play",
   chatVoiceUnplayable: "Cannot play this voice message.",
-  chatMicDenied: "Microphone access was denied.",
+  chatMicDenied:
+    "Microphone access was denied. Allow Tailcat Box in System Settings → Privacy & Security → Microphone, then try again.",
   chatPlay: "Play",
   chatCallVoice: "Voice",
   chatCallVideo: "Video",
@@ -306,8 +307,10 @@ export const en = {
   chatMediaDock: "Live media",
   chatCallPanel: "Calls",
   chatCallIdle: "Start a voice call, video call, or screen share.",
-  chatCamDenied: "Camera access was denied.",
-  chatScreenDenied: "Screen sharing was denied.",
+  chatCamDenied:
+    "Camera access was denied. Allow Tailcat Box in System Settings → Privacy & Security → Camera, then try again.",
+  chatScreenDenied:
+    "Screen sharing was denied. Allow Tailcat Box in System Settings → Privacy & Security → Screen & System Audio Recording, then quit and reopen the app.",
   chatScreenUnavailable: "Screen sharing is unavailable on this system.",
   chatLiveFailed:
     "Live media failed. Restrictive networks have no relay for calls, so voice and video can fail while chat still works.",

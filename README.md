@@ -132,6 +132,14 @@ Pushing a `v*` tag builds unsigned macOS (Apple Silicon and Intel) and Windows (
 
 Tagging, dry-run builds, and which runners are used are described in [docs/releases/README.md](docs/releases/README.md).
 
+## macOS microphone, camera, and screen sharing
+
+The first voice note, video call, or screen share asks macOS for permission. `build/darwin/Info.plist` (and `Info.dev.plist` for `wails dev`) includes `NSMicrophoneUsageDescription`, `NSCameraUsageDescription`, and `NSScreenCaptureUsageDescription`. Wails writes that file to `tailcat-box.app/Contents/Info.plist`, and the release zip keeps the whole `.app`, so the shipped build can show the system dialogs. Without those strings, macOS denies the capture and does not prompt.
+
+Unsigned builds still hit Gatekeeper before the app opens (System Settings → Privacy & Security → Open Anyway, or right-click → Open). That check is separate from microphone, camera, and screen recording. After the app is allowed to run, those prompts appear on first use. Screen recording follows the app’s code signature, so a new unsigned build may need to be allowed again, and macOS often applies it only after you quit and reopen the app. If you previously chose Don’t Allow, turn Tailcat Box on under Microphone, Camera, and Screen & System Audio Recording. The in-app message says the same thing in English and 简体中文.
+
+`wails dev` can attribute the request to the terminal that launched it. Allow that terminal, or confirm the prompts with `wails build`.
+
 ## Layout
 
 - `main.go` / `app.go` — Wails entry and JS bindings
