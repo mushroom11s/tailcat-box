@@ -22,11 +22,15 @@ func main() {
 	// Create an instance of the app structure
 	app := NewApp()
 
-	// Create application with options
+	// Create application with options.
+	// Height 860 fits one in-progress Mew Share card (chrome, file name,
+	// code, expiry, packing cat, and actions) under the share controls.
+	// 760 clips that card. Windows includes the title bar in this height;
+	// macOS and Linux use it as the content height.
 	err := wails.Run(&options.App{
 		Title:             windowTitle,
 		Width:             1100,
-		Height:            760,
+		Height:            860,
 		HideWindowOnClose: true,
 		// macOS draws this in the system menu bar. Windows and Linux would
 		// draw it as a second bar under the native title, so it stays unset.
