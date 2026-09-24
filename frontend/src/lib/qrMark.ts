@@ -3,8 +3,14 @@ import type { QrErrorCorrection } from "./qr";
 
 /** Longer side of the trimmed mark, as a fraction of the QR bitmap width. */
 const MARK_FRACTION = 0.2;
-/** White modules kept around the opaque silhouette. One module stays tight. */
-const QUIET_MODULES = 1;
+/**
+ * White pixels kept around the opaque silhouette (Euclidean).
+ * Half a module hugs the contour the way Word tight wrap does, so transparent
+ * nooks still hold QR modules. A full module of quiet fills those gaps.
+ */
+const QUIET_PX = 4;
+/** Finder patterns stay this many modules clear of the scaled mark. */
+const FINDER_GUARD_MODULES = 1;
 const MODULE_PX = 8;
 const MARGIN = 2;
 const ALPHA_ON = 128;
@@ -269,8 +275,9 @@ function trimContent(image: RgbaImage): { minX: number; minY: number; width: num
 }
 
 /**
- * Draw a level-H (or caller-selected) QR and punch modules only where the
- * mark's opaque silhouette, expanded by one module, covers them. Finders stay.
+ * Draw a QR and punch only the opaque silhouette plus a thin contour offset.
+ * Transparent indentations inside the mark's bounding box keep their modules.
+ * Finders stay. Callers that pass a mark use ECC H.
  */
 export async function composeMarkedQrPng(
   text: string,
@@ -283,7 +290,7 @@ export async function composeMarkedQrPng(
   const modules = qr.modules.size;
   const count = modules + MARGIN * 2;
   const size = count * MODULE_PX;
-  const guard = (7 + QUIET_MODULES) * MODULE_PX;
+  const guard = (7 + FINDER_GUARD_MODULES) * MODULE_PX;
   const maxEdge = Math.max(MODULE_PX, size - guard * 2);
   let destW = Math.max(1, Math.round(size * MARK_FRACTION));
   let destH = Math.max(1, Math.round((destW * trimmed.height) / trimmed.width));
@@ -296,7 +303,8 @@ export async function composeMarkedQrPng(
   const originX = Math.round((size - destW) / 2);
   const originY = Math.round((size - destH) / 2);
 
-  const hit = new Uint8Array(count * count);
+  const punch = new Uint8Array(size * size);
+  const quiet2 = QUIET_PX * QUIET_PX;
   for (let dy = 0; dy < destH; dy++) {
     const sy = trimmed.minY + Math.min(trimmed.height - 1, Math.floor((dy * trimmed.height) / destH));
     for (let dx = 0; dx < destW; dx++) {
@@ -304,37 +312,28 @@ export async function composeMarkedQrPng(
       if (source.rgba[(sy * source.width + sx) * 4 + 3] < ALPHA_ON) {
         continue;
       }
-      const mx = Math.floor((originX + dx) / MODULE_PX);
-      const my = Math.floor((originY + dy) / MODULE_PX);
-      if (mx >= 0 && my >= 0 && mx < count && my < count) {
-        hit[my * count + mx] = 1;
-      }
-    }
-  }
-
-  const clear = new Uint8Array(count * count);
-  for (let my = 0; my < count; my++) {
-    for (let mx = 0; mx < count; mx++) {
-      let covered = false;
-      for (let oy = -QUIET_MODULES; oy <= QUIET_MODULES && !covered; oy++) {
-        for (let ox = -QUIET_MODULES; ox <= QUIET_MODULES; ox++) {
-          const x = mx + ox;
-          const y = my + oy;
-          if (x >= 0 && y >= 0 && x < count && y < count && hit[y * count + x]) {
-            covered = true;
-            break;
+      const px = originX + dx;
+      const py = originY + dy;
+      const y0 = Math.max(0, py - QUIET_PX);
+      const y1 = Math.min(size - 1, py + QUIET_PX);
+      const x0 = Math.max(0, px - QUIET_PX);
+      const x1 = Math.min(size - 1, px + QUIET_PX);
+      for (let y = y0; y <= y1; y++) {
+        const dyq = y - py;
+        const rowBase = y * size;
+        for (let x = x0; x <= x1; x++) {
+          const dxq = x - px;
+          if (dxq * dxq + dyq * dyq > quiet2) {
+            continue;
           }
+          const col = Math.floor(x / MODULE_PX) - MARGIN;
+          const row = Math.floor(y / MODULE_PX) - MARGIN;
+          if (row >= 0 && col >= 0 && row < modules && col < modules && isFinder(row, col, modules)) {
+            continue;
+          }
+          punch[rowBase + x] = 1;
         }
       }
-      if (!covered) {
-        continue;
-      }
-      const col = mx - MARGIN;
-      const row = my - MARGIN;
-      if (col < 0 || row < 0 || col >= modules || row >= modules || isFinder(row, col, modules)) {
-        continue;
-      }
-      clear[my * count + mx] = 1;
     }
   }
 
@@ -347,16 +346,18 @@ export async function composeMarkedQrPng(
   }
   for (let row = 0; row < modules; row++) {
     for (let col = 0; col < modules; col++) {
-      const mx = col + MARGIN;
-      const my = row + MARGIN;
-      if (clear[my * count + mx] || qr.modules.get(row, col) !== 1) {
+      if (qr.modules.get(row, col) !== 1) {
         continue;
       }
-      const x0 = mx * MODULE_PX;
-      const y0 = my * MODULE_PX;
+      const x0 = (col + MARGIN) * MODULE_PX;
+      const y0 = (row + MARGIN) * MODULE_PX;
       for (let y = 0; y < MODULE_PX; y++) {
+        const rowBase = (y0 + y) * size;
         for (let x = 0; x < MODULE_PX; x++) {
-          const i = ((y0 + y) * size + (x0 + x)) * 4;
+          if (punch[rowBase + x0 + x]) {
+            continue;
+          }
+          const i = (rowBase + x0 + x) * 4;
           pixels[i] = 0;
           pixels[i + 1] = 0;
           pixels[i + 2] = 0;
