@@ -638,6 +638,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
   max-width: 640px;
 }
 
@@ -649,6 +650,8 @@ textarea {
   margin: 0;
   padding: 8px;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tunnel-list .empty {
@@ -680,6 +683,8 @@ textarea {
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
   padding: 18px;
   border-radius: 22px;
 }
@@ -699,6 +704,80 @@ textarea {
 
 .tunnel-detail .address {
   margin: 0;
+}
+
+.tunnel-codeblock {
+  position: relative;
+  align-self: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 8px;
+  background: var(--icon-bg);
+  border: 1px solid var(--hairline);
+}
+
+.tunnel-codeblock pre {
+  margin: 0;
+  padding: 10px 40px 10px 12px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.tunnel-codeblock code {
+  display: block;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.tunnel-code-copy {
+  position: absolute;
+  z-index: 1;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg-strong);
+  color: var(--muted);
+  box-shadow: var(--glass-highlight);
+  cursor: pointer;
+}
+
+.tunnel-code-copy svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.tunnel-code-copy:hover,
+.tunnel-code-copy:focus-visible {
+  color: var(--text);
+  background: var(--icon-bg-hover);
+}
+
+.tunnel-code-copy:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, white);
+  outline-offset: 1px;
 }
 
 .tunnel-mode {
