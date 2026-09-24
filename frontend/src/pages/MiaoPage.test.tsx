@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { LocaleProvider } from "../i18n";
 import { resetBrowserMiao } from "../lib/miaoBrowser";
-import { MAX_SHARE_BYTES } from "../lib/miao";
+import { MAX_SHARE_BYTES, parseJoin } from "../lib/miao";
 import css from "../styles/glass.css?inline";
 import MiaoPage from "./MiaoPage";
 
@@ -35,8 +35,11 @@ describe("Mew Share page", () => {
     expect(screen.getByText("notes.txt")).toBeTruthy();
     expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
     const token = (await screen.findByLabelText("Share code")) as HTMLTextAreaElement;
-    expect(token.value).toContain("tc:fake-miao-");
-    expect(token.value).toContain('"kind":"miao"');
+    expect(token.value.startsWith("mw1.")).toBe(true);
+    const parsed = parseJoin(token.value);
+    expect(parsed?.kind).toBe("miao");
+    expect(parsed?.addr.startsWith("tc:fake-miao-")).toBe(true);
+    expect(parsed?.token).toBeTruthy();
     await waitFor(() => {
       expect(document.querySelector(".miao-qr img")).toBeTruthy();
     });

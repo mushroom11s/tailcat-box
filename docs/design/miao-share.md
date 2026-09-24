@@ -38,7 +38,7 @@ Sidebar entry **above Chat**: drop files → host copies into app temp → QR + 
 
 ### Transport
 
-Host listens with an ephemeral Tailcat room (the same `StartRoom` path as chat). The join payload is JSON:
+Host listens with an ephemeral Tailcat room (the same `StartRoom` path as chat). The outward share code, used by the QR and Copy, is `mw1.` plus unpadded base64url of the Tailcat address and share token. The prefix implies `v=1` and `kind=miao`. A canonical `tc` + base64url address is stored as its raw bytes; any other `tc…` address is stored as UTF-8. Peers also still accept the legacy JSON:
 
 ```json
 {"v":1,"kind":"miao","addr":"tc…","token":"…"}
