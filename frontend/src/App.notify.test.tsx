@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -29,12 +29,14 @@ function installRuntime(authorized = true): RuntimeMocks {
   return { send, initialize, request };
 }
 
-function renderApp() {
-  return render(
+async function renderApp() {
+  const view = render(
     <LocaleProvider>
       <App />
     </LocaleProvider>,
   );
+  fireEvent.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
+  return view;
 }
 
 beforeEach(() => {
@@ -73,7 +75,7 @@ describe("inbound OS notifications", () => {
     const { send } = installRuntime();
     focused = false;
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await connectEcho(user);
     await user.type(screen.getByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: "Send" }));
@@ -91,7 +93,7 @@ describe("inbound OS notifications", () => {
   it("stays quiet while the focused window is already on the chat transcript", async () => {
     const { send } = installRuntime();
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await connectEcho(user);
     await user.type(screen.getByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: "Send" }));
@@ -102,7 +104,7 @@ describe("inbound OS notifications", () => {
   it("notifies when the window is focused on another page", async () => {
     const { send } = installRuntime();
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await connectEcho(user);
     await user.click(screen.getByRole("button", { name: "Settings" }));
     await sendChatText(await chatRoomId(), "later", false, 0);
@@ -117,7 +119,7 @@ describe("inbound OS notifications", () => {
     const { send } = installRuntime();
     hidden = true;
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await connectEcho(user);
     await user.type(screen.getByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: "Send" }));
@@ -130,7 +132,7 @@ describe("inbound OS notifications", () => {
     const { send, request } = installRuntime(false);
     focused = false;
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await connectEcho(user);
     await user.type(screen.getByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: "Send" }));
@@ -150,7 +152,7 @@ describe("inbound OS notifications", () => {
     const { send } = installRuntime();
     focused = false;
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await connectEcho(user);
     expect(send).not.toHaveBeenCalled();
   });
@@ -158,7 +160,7 @@ describe("inbound OS notifications", () => {
   it("notifies for a room that is not the open transcript", async () => {
     const { send } = installRuntime();
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     let firstAddress = "";
     await waitFor(() => {

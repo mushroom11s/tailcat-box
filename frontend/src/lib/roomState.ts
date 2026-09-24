@@ -13,9 +13,6 @@ export type RoomSlice = {
   peerDraft: string;
   composer: string;
   burn: boolean;
-  appliedKey: string;
-  appliedRegion: string;
-  appliedDERP: string;
 };
 
 export function emptyRoom(id: string, peerDraft = ""): RoomSlice {
@@ -31,9 +28,6 @@ export function emptyRoom(id: string, peerDraft = ""): RoomSlice {
     peerDraft,
     composer: "",
     burn: false,
-    appliedKey: "",
-    appliedRegion: "",
-    appliedDERP: "",
   };
 }
 

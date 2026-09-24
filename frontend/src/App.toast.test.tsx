@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -29,12 +29,14 @@ const started: Session = {
   Dangerous: false,
 };
 
-function renderApp() {
-  return render(
+async function renderApp() {
+  const view = render(
     <LocaleProvider>
       <App />
     </LocaleProvider>,
   );
+  fireEvent.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
+  return view;
 }
 
 beforeEach(() => {
@@ -54,7 +56,7 @@ describe("operational error toasts", () => {
   it("toasts a room DERPMap error and keeps the identity bar compact", async () => {
     vi.mocked(startChatRoom).mockResolvedValue(started);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
 
     const alert = await screen.findByRole("alert");
@@ -71,7 +73,7 @@ describe("operational error toasts", () => {
   it("toasts a keys network save failure away from the settings form", async () => {
     vi.mocked(setNetworkSettings).mockRejectedValue(new Error(derp));
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Settings" }));
     await user.click(screen.getByRole("button", { name: "Save network settings" }));
 
@@ -85,7 +87,7 @@ describe("operational error toasts", () => {
   it("toasts a tunnel start failure and a forward session error", async () => {
     vi.mocked(startPortServe).mockRejectedValue(new Error("connection reset"));
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Tunnel" }));
     await user.click(screen.getByRole("button", { name: "+ New mapping" }));
     await user.click(screen.getByRole("button", { name: "Save mapping" }));

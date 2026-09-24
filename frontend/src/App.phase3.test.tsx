@@ -261,6 +261,7 @@ describe("phase 3 browser fake", () => {
         <App />
       </LocaleProvider>,
     );
+    await user.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.click(screen.getByRole("button", { name: "Show room details" }));

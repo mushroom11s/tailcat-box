@@ -214,6 +214,7 @@ describe("phase 4 live media dock", () => {
       </LocaleProvider>,
     );
     const user = userEvent.setup();
+    await user.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     expect(await screen.findByRole("button", { name: "Voice" })).toBeTruthy();
     const names = Array.from(document.querySelectorAll(".nav-btn")).map((node) => node.textContent ?? "");

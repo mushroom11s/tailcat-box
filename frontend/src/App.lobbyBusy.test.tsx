@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -40,12 +40,14 @@ const started: Session = {
   Dangerous: false,
 };
 
-function renderApp() {
-  return render(
+async function renderApp() {
+  const view = render(
     <LocaleProvider>
       <App />
     </LocaleProvider>,
   );
+  fireEvent.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
+  return view;
 }
 
 function button(name: string): HTMLButtonElement {
@@ -90,7 +92,7 @@ describe("lobby room start loading", () => {
     const pending = deferred<Session>();
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
 
     await user.click(button("Create temporary room"));
 
@@ -100,7 +102,7 @@ describe("lobby room start loading", () => {
     expect(tempCat.querySelector("img")?.getAttribute("src")).toContain("loading-cat");
     expect(panelByHeading("Permanent key").querySelector(".chat-lobby-busy")).toBeNull();
     expect(connectPanel("Peer address (optional)").querySelector(".chat-lobby-busy")).toBeNull();
-    expect(button("Create").disabled).toBe(true);
+    expect(button("Restart room").disabled).toBe(true);
     expect(button("Save key").disabled).toBe(true);
     expect(button("Connect").disabled).toBe(true);
     expect(startChatRoom).toHaveBeenCalledTimes(1);
@@ -116,12 +118,12 @@ describe("lobby room start loading", () => {
     const pending = deferred<Session>();
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.type(screen.getByLabelText("New key name"), "home-busy");
     await user.click(button("Save key"));
     expect(await screen.findByRole("option", { name: "home-busy" })).toBeTruthy();
 
-    await user.click(button("Create"));
+    await user.click(button("Restart room"));
 
     expect(button("Creating…").disabled).toBe(true);
     expect(button("Creating…").querySelector("img")?.getAttribute("src")).toContain("loading-cat");
@@ -144,7 +146,7 @@ describe("lobby room start loading", () => {
     const pending = deferred<Session>();
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.type(screen.getByLabelText("Peer address (optional)"), "tc:fake-echo");
     await user.click(button("Connect"));
 
@@ -155,7 +157,7 @@ describe("lobby room start loading", () => {
     expect(panelByHeading("Temporary room").querySelector(".chat-lobby-busy")).toBeNull();
     expect(panelByHeading("Permanent key").querySelector(".chat-lobby-busy")).toBeNull();
     expect(button("Create temporary room").disabled).toBe(true);
-    expect(button("Create").disabled).toBe(true);
+    expect(button("Restart room").disabled).toBe(true);
     expect(button("Save key").disabled).toBe(true);
     expect(startChatRoom).toHaveBeenCalledTimes(1);
 
@@ -169,7 +171,7 @@ describe("lobby room start loading", () => {
     const pending = deferred<Session>();
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(button("Create temporary room"));
     expect(button("Creating…").disabled).toBe(true);
     expect(button("Creating…").querySelector("img")?.getAttribute("src")).toContain("loading-cat");
@@ -182,7 +184,7 @@ describe("lobby room start loading", () => {
     expect(document.querySelector(".chat-lobby .err")).toBeNull();
     expect(panelByHeading("Temporary room").querySelector(".chat-lobby-busy")).toBeNull();
     expect(button("Create temporary room").disabled).toBe(false);
-    expect(button("Create").disabled).toBe(false);
+    expect(button("Restart room").disabled).toBe(false);
     expect(button("Save key").disabled).toBe(false);
     expect(button("Connect").disabled).toBe(false);
     expect(document.querySelector(".chat-lobby")).toBeTruthy();
@@ -191,13 +193,13 @@ describe("lobby room start loading", () => {
   it("does not enter a loading state for validation errors", async () => {
     vi.mocked(startChatRoom).mockReturnValue(deferred<Session>().promise);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
 
-    await user.click(button("Create"));
+    await user.click(button("Restart room"));
     const keyAlert = screen.getByText("Choose a saved key.");
     expect(keyAlert.closest(".chat-lobby")).toBeTruthy();
     expect(keyAlert.closest(".toast-stack")).toBeNull();
-    expect(button("Create").disabled).toBe(false);
+    expect(button("Restart room").disabled).toBe(false);
     expect(screen.queryByRole("button", { name: "Creating…" })).toBeNull();
     expect(document.querySelector(".chat-lobby-busy")).toBeNull();
 
@@ -217,13 +219,13 @@ describe("lobby room start loading", () => {
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     localStorage.setItem("tailcat-locale", "zh-CN");
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
 
     await user.click(button("新建临时房间"));
     expect(button("正在创建…").disabled).toBe(true);
     const tempCat = panelCat(panelByHeading("临时房间"), "正在创建…");
     expect(tempCat.querySelector("img")?.getAttribute("src")).toContain("loading-cat");
-    expect(button("新建").disabled).toBe(true);
+    expect(button("重启房间").disabled).toBe(true);
     expect(button("保存密钥").disabled).toBe(true);
     expect(button("连接").disabled).toBe(true);
 

@@ -150,21 +150,67 @@ jobs:
           $env:PATH = "$($gcc.DirectoryName);$env:PATH"
           gcc --version
 
+      - name: Install NSIS (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          choco install nsis -y --no-progress
+          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
+            throw "choco install nsis exited $LASTEXITCODE"
+          }
+          $ErrorActionPreference = "Stop"
+
+          function Find-Makensis {
+            $cmd = Get-Command makensis -ErrorAction SilentlyContinue
+            if ($cmd) { return $cmd.Source }
+            $roots = @(
+              (Join-Path ${env:ProgramFiles(x86)} "NSIS"),
+              (Join-Path $env:ProgramFiles "NSIS"),
+              (Join-Path $env:ProgramData "chocolatey\bin"),
+              (Join-Path $env:ProgramData "chocolatey\lib\nsis")
+            )
+            foreach ($root in $roots) {
+              if (-not (Test-Path $root)) { continue }
+              $hit = Get-ChildItem -Path $root -Recurse -Filter makensis.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($hit) { return $hit.FullName }
+            }
+            return $null
+          }
+
+          $makensis = Find-Makensis
+          if (-not $makensis) {
+            throw "makensis.exe not found after installing NSIS"
+          }
+          $dir = Split-Path $makensis
+          Add-Content -Path $env:GITHUB_PATH -Value $dir
+          $env:PATH = "$dir;$env:PATH"
+          & $makensis /VERSION
+
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
 
       - name: Stamp product version
         env:
           APP_VERSION: ${{ needs.meta.outputs.app_version }}
+          OS_SLUG: ${{ matrix.slug }}
         run: |
           PY=python3
           command -v python3 >/dev/null 2>&1 || PY=python
           "$PY" - <<'PY'
-          import json, os, pathlib
+          import json, os, pathlib, re
           path = pathlib.Path("wails.json")
           data = json.loads(path.read_text())
           info = data.setdefault("info", {})
-          info["productVersion"] = os.environ["APP_VERSION"]
+          raw = os.environ["APP_VERSION"]
+          product = raw
+          # project.nsi sets VIProductVersion to "${INFO_PRODUCTVERSION}.0".
+          # NSIS accepts that only when the first three fields are numeric.
+          if os.environ.get("OS_SLUG") == "windows" and not re.fullmatch(r"\d+\.\d+\.\d+", raw):
+              product = "0.0.0"
+              print(f"APP_VERSION {raw!r} is not N.N.N; NSIS productVersion={product}")
+          info["productVersion"] = product
           path.write_text(json.dumps(data, indent=2) + "\n")
           print(f"wails.json info.productVersion={info['productVersion']}")
           PY
@@ -173,10 +219,19 @@ jobs:
         env:
           CGO_ENABLED: "1"
           APP_VERSION: ${{ needs.meta.outputs.app_version }}
+          OS_SLUG: ${{ matrix.slug }}
         run: |
           set -euo pipefail
           extra_ldflags="-X github.com/mushroom11s/tailcat-box/internal/appinfo.Version=${APP_VERSION}"
-          wails build -trimpath -ldflags "${extra_ldflags}"
+          if [ "${OS_SLUG}" = "windows" ]; then
+            command -v makensis
+            makensis /VERSION
+            # This runner built one arch. Wails passes only that binary to
+            # makensis, so the setup exe is single-arch (amd64 or arm64).
+            wails build -trimpath -ldflags "${extra_ldflags}" -nsis
+          else
+            wails build -trimpath -ldflags "${extra_ldflags}"
+          fi
           ls -la build/bin
 
       - name: Package artifact
@@ -199,18 +254,46 @@ jobs:
             find build/bin -name Info.plist -print >&2 || true
             exit 1
           fi
-          zip=$(echo dist-upload/*.zip)
-          unzip -p "${zip}" "tailcat-box.app/Contents/Info.plist" > "${RUNNER_TEMP}/shipped-Info.plist"
+          shopt -s nullglob
+          dmgs=(dist-upload/*.dmg)
+          if [ "${#dmgs[@]}" -ne 1 ]; then
+            echo "expected one dmg in dist-upload, found ${#dmgs[@]}" >&2
+            ls -la dist-upload >&2 || true
+            exit 1
+          fi
+          mount=$(mktemp -d)
+          attached=0
+          cleanup() {
+            if [ "${attached}" -eq 1 ]; then
+              hdiutil detach "${mount}" || hdiutil detach -force "${mount}" || true
+            fi
+          }
+          trap cleanup EXIT
+          hdiutil attach -nobrowse -readonly -mountpoint "${mount}" "${dmgs[0]}"
+          attached=1
+          # macOS runners use bash 3.2, which has no mapfile and whose find has no -quit.
+          shipped=""
+          while IFS= read -r candidate; do
+            if [ -n "${candidate}" ]; then
+              shipped="${candidate}"
+              break
+            fi
+          done < <(find "${mount}" -path '*.app/Contents/Info.plist' -print)
+          if [ -z "${shipped}" ]; then
+            echo "no Info.plist inside ${dmgs[0]}" >&2
+            find "${mount}" -print >&2 || true
+            exit 1
+          fi
           for key in NSMicrophoneUsageDescription NSCameraUsageDescription NSScreenCaptureUsageDescription; do
             /usr/libexec/PlistBuddy -c "Print :${key}" "${app_plist}" >/dev/null
-            /usr/libexec/PlistBuddy -c "Print :${key}" "${RUNNER_TEMP}/shipped-Info.plist" >/dev/null
+            /usr/libexec/PlistBuddy -c "Print :${key}" "${shipped}" >/dev/null
           done
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: tailcat-box-${{ matrix.slug }}-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
-          path: dist-upload/*.zip
+          path: dist-upload/tailcat-box-${{ matrix.slug }}-${{ matrix.arch }}-${{ needs.meta.outputs.version }}.*
           if-no-files-found: error
           retention-days: 14
 
@@ -255,7 +338,7 @@ jobs:
               echo "## ${VERSION}"
               echo
               echo "Automated build of Tailcat Box for macOS and Windows."
-              echo "Binaries are unsigned. See README for install warnings and adapter notes."
+              echo "Installers are unsigned. See README for install warnings and adapter notes."
             } > release-notes.md
           fi
           ls -la collected
@@ -268,7 +351,9 @@ jobs:
           tag_name: ${{ needs.meta.outputs.version }}
           name: ${{ needs.meta.outputs.version }}
           body_path: release-notes.md
-          files: collected/*.zip
+          files: |
+            collected/*.exe
+            collected/*.dmg
           fail_on_unmatched_files: true
           draft: false
           make_latest: true

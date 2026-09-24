@@ -20,7 +20,6 @@ export const zhCN = {
   lobbyNewKey: "新密钥名称",
   lobbySaveKey: "保存密钥",
   lobbyKeyNameRequired: "请填写新密钥的名称。",
-  lobbyCreatePermanent: "新建",
   lobbyCreating: "正在创建…",
   lobbyConnecting: "正在连接…",
   lobbyPeer: "对方地址（可选）",
@@ -101,8 +100,12 @@ export const zhCN = {
   updateNoPackage: "这个系统还没有对应的安装包。",
   updateInstallTitle: "安装步骤",
   updateInstallMac:
+    "1. 退出猫砂盆。\n2. 打开「下载」里的磁盘映像，把 Tailcat Box 拖进「应用程序」，替换原来的。\n3. 安装包没有签名。如果系统拦住了，按住 Control 点一下应用，再选「打开」。",
+  updateInstallMacZip:
     "1. 退出猫砂盆。\n2. 打开「下载」里的压缩包，把 Tailcat Box.app 拖进「应用程序」，替换原来的。\n3. 安装包没有签名。如果系统拦住了，按住 Control 点一下应用，再选「打开」。",
   updateInstallWin:
+    "1. 退出猫砂盆。\n2. 运行「下载」里的安装程序。它会安装猫砂盆，也可以换掉原来的那一份。\n3. 程序没有签名，Windows 可能会弹出 SmartScreen。选「更多信息」，再选「仍要运行」。",
+  updateInstallWinZip:
     "1. 退出猫砂盆。\n2. 打开「下载」里的压缩包，用里面的新程序替换原来的 tailcat-box.exe。\n3. 程序没有签名，Windows 可能会弹出 SmartScreen 提示。",
   updateInstallOther:
     "1. 退出猫砂盆。\n2. 用压缩包里的程序替换正在用的这份。\n3. 目前没有 Linux 安装包，这份构建也没有签名。",
@@ -328,11 +331,6 @@ export const zhCN = {
   chatBadFrame: "有一条消息读不出来。",
   chatRoomRestarted: "房间已重启。把新地址发给对方。",
   chatRestartRoom: "重启房间",
-  chatRestartHint: "重启房间后才会生效",
-  chatRestartTargetLead: "只重启这个房间：",
-  chatRestartTargetTrail: "其他房间保持连接。",
-  chatNewRoomKey: "新的房间密钥",
-  chatRoomKey: "房间密钥",
   keysDERPTitle: "密钥和 DERP",
   diagnosticsSection: "诊断",
   chatSession: "聊天会话",
