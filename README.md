@@ -14,22 +14,22 @@ Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on mac
 
 <p align="center">
   <b>Chat — send &amp; burn</b><br />
-  <img src="docs/assets/demo/chat-send-and-burn.gif" alt="Chat — send and burn" width="640" />
+  <img src="docs/assets/demo/en/chat-send-and-burn.gif" alt="Chat — send and burn" width="640" />
 </p>
 
 <p align="center">
   <b>Voice note — hold &amp; burn</b><br />
-  <img src="docs/assets/demo/voice-note-burn.gif" alt="Voice note — hold and burn" width="640" />
+  <img src="docs/assets/demo/en/voice-note-burn.gif" alt="Voice note — hold and burn" width="640" />
 </p>
 
 <p align="center">
   <b>Live voice / video</b><br />
-  <img src="docs/assets/demo/voice-video-call.gif" alt="Live voice and video" width="640" />
+  <img src="docs/assets/demo/en/voice-video-call.gif" alt="Live voice and video" width="640" />
 </p>
 
 <p align="center">
   <b>Tunnel — forward &amp; open browser</b><br />
-  <img src="docs/assets/demo/tunnel-forward.gif" alt="Tunnel — forward and open browser" width="640" />
+  <img src="docs/assets/demo/en/tunnel-forward.gif" alt="Tunnel — forward and open browser" width="640" />
 </p>
 
 **Tailcat Box** (Simplified Chinese: **猫砂盆**). GitHub: [mushroom11s/tailcat-box](https://github.com/mushroom11s/tailcat-box).
