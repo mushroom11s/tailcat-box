@@ -41,8 +41,11 @@ describe("Mew Share page", () => {
     expect(parsed?.addr.startsWith("tc:fake-miao-")).toBe(true);
     expect(parsed?.token).toBeTruthy();
     await waitFor(() => {
-      expect(document.querySelector(".miao-qr img")).toBeTruthy();
+      expect(document.querySelector(".miao-qr-frame > img")).toBeTruthy();
     });
+    const mark = document.querySelector(".miao-qr-mark img") as HTMLImageElement;
+    expect(mark.getAttribute("alt")).toBe("");
+    expect(mark.getAttribute("src") ?? "").toContain("icon");
   });
 
   it("rejects an oversize drop before staging", async () => {
@@ -119,8 +122,11 @@ describe("Mew Share page", () => {
     expect(qrPlace).toContain("grid-row: 2 / span 2");
     expect(qrPlace).toContain("align-self: start");
 
-    const qrRule = cssBlock(css, ".miao-qr img");
+    const qrRule = cssBlock(css, ".miao-qr-frame > img");
     const qrWidth = Number(qrRule.match(/width:\s*(\d+)px/)?.[1]);
+    expect(cssBlock(css, ".miao-qr-mark")).toContain("width: 22%");
+    expect(cssBlock(css, ".loading-cat.lg img")).toContain("width: 88px");
+    expect(cssBlock(css, ".loading-cat.sm img,\n.btn .loading-cat img")).toContain("width: 32px");
     expect(qrWidth).toBeGreaterThanOrEqual(160);
     expect(qrWidth).toBeLessThanOrEqual(180);
 

@@ -21,6 +21,15 @@ describe("LoadingCat", () => {
     expect(img?.getAttribute("alt")).toBe("");
   });
 
+  it("uses a larger frame for the prominent packing cat", () => {
+    render(<LoadingCat size="lg" layout="block" label="Packing…" />);
+    const status = screen.getByRole("status");
+    expect(status.className).toContain("lg");
+    expect(status.className).toContain("block");
+    expect(status.className).not.toContain("sm");
+    expect(status.querySelector("img")?.getAttribute("src") ?? "").not.toContain("loading-cat-sm");
+  });
+
   it("uses the small gif when size is sm", () => {
     render(<LoadingCat size="sm" label="Working…" />);
     const status = screen.getByRole("status");

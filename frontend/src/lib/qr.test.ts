@@ -2,8 +2,11 @@ import * as QRCode from "qrcode";
 import { describe, expect, it } from "vitest";
 import { acceptScannedText, decodeQrImageData, encodeQrDataURL, shareableAddress } from "./qr";
 
-function rasterize(text: string): { pixels: Uint8ClampedArray; width: number; height: number } {
-  const qr = QRCode.create(text, { errorCorrectionLevel: "M" });
+function rasterize(
+  text: string,
+  errorCorrectionLevel: "L" | "M" | "Q" | "H" = "M",
+): { pixels: Uint8ClampedArray; width: number; height: number } {
+  const qr = QRCode.create(text, { errorCorrectionLevel });
   const quiet = 4;
   const scale = 4;
   const count = qr.modules.size + quiet * 2;
@@ -30,6 +33,26 @@ function rasterize(text: string): { pixels: Uint8ClampedArray; width: number; he
   return { pixels, width, height: width };
 }
 
+function coverCenter(
+  image: { pixels: Uint8ClampedArray; width: number; height: number },
+  fraction: number,
+): { pixels: Uint8ClampedArray; width: number; height: number } {
+  const pixels = new Uint8ClampedArray(image.pixels);
+  const box = Math.round(image.width * fraction);
+  const x0 = Math.floor((image.width - box) / 2);
+  const y0 = Math.floor((image.height - box) / 2);
+  for (let y = y0; y < y0 + box; y++) {
+    for (let x = x0; x < x0 + box; x++) {
+      const i = (y * image.width + x) * 4;
+      pixels[i] = 255;
+      pixels[i + 1] = 255;
+      pixels[i + 2] = 255;
+      pixels[i + 3] = 255;
+    }
+  }
+  return { pixels, width: image.width, height: image.height };
+}
+
 describe("qr helpers", () => {
   it("accepts the same trimmed tc prefix as paste and join", () => {
     expect(shareableAddress("  tc:room  ")).toBe("tc:room");
@@ -51,6 +74,13 @@ describe("qr helpers", () => {
     const image = rasterize(text);
     expect(decodeQrImageData(image.pixels, image.width, image.height)).toBe(text);
     expect(text.includes("http")).toBe(false);
+  });
+
+  it("still scans when a center mark covers the share code", () => {
+    const text = "mw1.AAAHdGM6cm9vbQADYWJj";
+    const image = rasterize(text, "H");
+    const covered = coverCenter(image, 0.28);
+    expect(decodeQrImageData(covered.pixels, covered.width, covered.height)).toBe(text);
   });
 
   it("encodes an svg data URL of the raw string", async () => {

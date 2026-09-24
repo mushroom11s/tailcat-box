@@ -4,14 +4,15 @@ import catWebp from "../assets/loading-cat.webp";
 
 type Props = {
   label?: string;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   layout?: "inline" | "block";
 };
 
 export default function LoadingCat({ label, size = "md", layout = "inline" }: Props) {
   const gif = size === "sm" ? catSmGif : catGif;
+  const sizeClass = size === "md" ? "" : ` ${size}`;
   return (
-    <span className={`loading-cat${size === "sm" ? " sm" : ""}${layout === "block" ? " block" : ""}`} role="status">
+    <span className={`loading-cat${sizeClass}${layout === "block" ? " block" : ""}`} role="status">
       <picture>
         <source srcSet={catWebp} type="image/webp" />
         <img src={gif} alt="" />

@@ -2624,6 +2624,11 @@ textarea {
   height: 32px;
 }
 
+.loading-cat.lg img {
+  width: 88px;
+  height: 88px;
+}
+
 .loading-cat.block {
   display: flex;
   flex-direction: column;
@@ -2807,9 +2812,42 @@ textarea {
   background: white;
 }
 
-.miao-qr img {
+.miao-qr-frame {
+  position: relative;
   width: 172px;
   height: 172px;
+  line-height: 0;
+}
+
+.miao-qr-frame > img {
+  display: block;
+  width: 172px;
+  height: 172px;
+}
+
+.miao-qr-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22%;
+  height: 22%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.miao-qr-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .miao-files {

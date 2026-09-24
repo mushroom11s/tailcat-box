@@ -12,11 +12,13 @@ export function acceptScannedText(raw: string): { ok: true; value: string } | { 
   return value ? { ok: true, value } : { ok: false };
 }
 
+export type QrErrorCorrection = "L" | "M" | "Q" | "H";
+
 /** Encode the raw address or key. No URL scheme is added. */
-export async function encodeQrDataURL(text: string): Promise<string> {
+export async function encodeQrDataURL(text: string, errorCorrectionLevel: QrErrorCorrection = "M"): Promise<string> {
   const svg = await QRCode.toString(text, {
     type: "svg",
-    errorCorrectionLevel: "M",
+    errorCorrectionLevel,
     margin: 2,
     width: 280,
     color: { dark: "#000000", light: "#ffffff" },
