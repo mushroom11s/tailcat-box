@@ -1371,6 +1371,21 @@ export async function miaoShareStatus(): Promise<MiaoShare[]> {
   return sharesFrom(raw);
 }
 
+export async function miaoRestoreNotes(): Promise<string[]> {
+  if (!hasWailsBindings()) {
+    return [];
+  }
+  const app = goWindow().go?.main?.App as { MiaoRestoreNotes?: () => Promise<unknown> } | undefined;
+  if (typeof app?.MiaoRestoreNotes !== "function") {
+    return [];
+  }
+  const raw = await app.MiaoRestoreNotes();
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter((item): item is string => typeof item === "string" && item.trim() !== "");
+}
+
 export async function joinMiaoShare(payload: string, destDir: string): Promise<MiaoReceipt> {
   if (hasWailsBindings()) {
     return (await bindJoinMiaoShare(payload, destDir)) as MiaoReceipt;

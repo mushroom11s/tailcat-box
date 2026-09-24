@@ -25,7 +25,7 @@ import {
   type ReceiveJob,
   type Remaining,
 } from "../lib/miao";
-import { cancelMiaoReceive, discardMiaoReceive, endMiaoShare, hasWailsBindings, listMiaoReceives, miaoShareStatus, onTailcatEvent, selectDirectory, selectFiles, setMiaoReceiveDest, startMiaoReceive, startMiaoShare } from "../lib/wails";
+import { cancelMiaoReceive, discardMiaoReceive, endMiaoShare, hasWailsBindings, listMiaoReceives, miaoRestoreNotes, miaoShareStatus, onTailcatEvent, selectDirectory, selectFiles, setMiaoReceiveDest, startMiaoReceive, startMiaoShare } from "../lib/wails";
 
 type TTLMode = "1" | "7" | "15" | "custom" | "forever";
 type CountMode = "1" | "3" | "10" | "unlimited" | "custom";
@@ -328,10 +328,26 @@ export default function MiaoPage() {
         });
       })
       .catch(() => undefined);
+    void miaoRestoreNotes()
+      .then((notes) => {
+        if (!live || notes.length === 0) {
+          return;
+        }
+        const lines = notes
+          .map((note) => {
+            const key = miaoErrorKey(new Error(note));
+            return key ? t(key) : note;
+          })
+          .filter((line, index, all) => line !== "" && all.indexOf(line) === index);
+        if (lines.length) {
+          setError(lines.join(" "));
+        }
+      })
+      .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     return onTailcatEvent((ev) => {

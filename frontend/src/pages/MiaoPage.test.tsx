@@ -37,6 +37,7 @@ function clearGoApp(): void {
 afterEach(() => {
   clearGoApp();
   resetBrowserMiao();
+  localStorage.removeItem("tailcat-locale");
   cleanup();
 });
 
@@ -51,6 +52,44 @@ function renderPage() {
 }
 
 describe("Mew Share page", () => {
+  it("names the share and download modes in English and Chinese", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("tailcat-locale", "en");
+    const view = renderPage();
+    expect(screen.getByRole("tab", { name: "Share" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Download" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Send" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Receive" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Mew Share" })).toBeTruthy();
+
+    await user.click(screen.getByRole("tab", { name: "Download" }));
+    expect(screen.getByRole("tab", { name: "Download" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("button", { name: "Download" })).toBeTruthy();
+
+    view.unmount();
+    localStorage.setItem("tailcat-locale", "zh-CN");
+    renderPage();
+    expect(screen.getByRole("heading", { name: "喵传" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "共享" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "下载" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "发送" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "接收" })).toBeNull();
+  });
+
+  it("explains when a shared file could not be restored", async () => {
+    localStorage.setItem("tailcat-locale", "zh-CN");
+    installGoApp({
+      StartChatRoom: () => Promise.resolve({}),
+      SetUILocale: () => Promise.resolve(),
+      ListMiaoReceives: () => Promise.resolve([]),
+      MiaoShareStatus: () => Promise.resolve([]),
+      MiaoRestoreNotes: () => Promise.resolve(["A shared file is missing, so that share was not restored."]),
+    });
+    renderPage();
+    expect((await screen.findByRole("alert")).textContent).toBe("有一份共享的文件已经不在了，所以没有恢复。");
+    expect(screen.getByRole("heading", { name: "喵传" })).toBeTruthy();
+  });
+
   it("shows a drop zone, then an active share with a code and QR", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -98,7 +137,7 @@ describe("Mew Share page", () => {
     const token = (await screen.findByLabelText("Share code")) as HTMLTextAreaElement;
     const code = token.value;
 
-    await user.click(screen.getByRole("tab", { name: "Receive" }));
+    await user.click(screen.getByRole("tab", { name: "Download" }));
     const join = screen.getByRole("textbox", { name: "Share code" });
     await user.click(join);
     await user.paste(code);
@@ -107,7 +146,7 @@ describe("Mew Share page", () => {
     expect(await screen.findByText("Saved")).toBeTruthy();
     expect(screen.getAllByText("笔记.txt").length).toBeGreaterThan(0);
     expect((screen.getByRole("textbox", { name: "Share code" }) as HTMLTextAreaElement).value).toBe("");
-    await user.click(screen.getByRole("tab", { name: "Send" }));
+    await user.click(screen.getByRole("tab", { name: "Share" }));
     expect(await screen.findByText("Share ended. The temporary copies are gone.")).toBeTruthy();
     expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
   });
@@ -140,7 +179,7 @@ describe("Mew Share page", () => {
     const code = ((await screen.findByLabelText("Share code")) as HTMLTextAreaElement).value;
     setBrowserReceiveHold(true);
     try {
-      await user.click(screen.getByRole("tab", { name: "Receive" }));
+      await user.click(screen.getByRole("tab", { name: "Download" }));
       const join = screen.getByRole("textbox", { name: "Share code" });
       await user.click(join);
       await user.paste(code);
@@ -217,15 +256,15 @@ describe("Mew Share page", () => {
     renderPage();
     expect(await screen.findByRole("heading", { name: "Mew Share" })).toBeTruthy();
     expect(screen.queryByText("page blank")).toBeNull();
-    await user.click(screen.getByRole("tab", { name: "Receive" }));
+    await user.click(screen.getByRole("tab", { name: "Download" }));
     expect(await screen.findByText("Queued")).toBeTruthy();
     expect(document.querySelector(".miao-receive-card .miao-files")).toBeNull();
 
-    await user.click(screen.getByRole("tab", { name: "Send" }));
+    await user.click(screen.getByRole("tab", { name: "Share" }));
     expect(await screen.findByRole("article", { name: "share-1" })).toBeTruthy();
     expect(document.querySelector(".miao-active .miao-files")?.children.length ?? 0).toBe(0);
 
-    await user.click(screen.getByRole("tab", { name: "Receive" }));
+    await user.click(screen.getByRole("tab", { name: "Download" }));
     const join = screen.getByRole("textbox", { name: "Share code" });
     await user.click(join);
     await user.paste(code);

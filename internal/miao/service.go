@@ -36,6 +36,7 @@ var (
 	ErrUnknownReceive  = errors.New("Unknown download.")
 	ErrReceiveStarted  = errors.New("That download has already started.")
 	ErrPartialMismatch = errors.New("The partial file did not match. The download will start over.")
+	ErrShareMissing    = errors.New("A shared file is missing, so that share was not restored.")
 )
 
 const (
@@ -95,6 +96,7 @@ type Snapshot struct {
 	Downloads    int        `json:"downloads"`
 	Status       string     `json:"status"`
 	EndReason    string     `json:"endReason"`
+	CreatedAt    string     `json:"createdAt"`
 }
 
 // FileInfo is a display row. It does not include the storage path.
@@ -141,17 +143,25 @@ type Service struct {
 	order    []string
 	receives map[string]*receiveRun
 	events   chan adapter.Event
+	notes    []string
 }
 
 func New(ad adapter.ChatAdapter, root string) *Service {
+	s := &Service{ad: ad, root: root, hosts: map[string]*host{}, receives: map[string]*receiveRun{}, events: make(chan adapter.Event, 256)}
 	if root != "" {
 		_ = os.MkdirAll(root, 0o700)
-		sweep(root)
+		s.restore()
 	}
-	return &Service{ad: ad, root: root, hosts: map[string]*host{}, receives: map[string]*receiveRun{}, events: make(chan adapter.Event, 256)}
+	return s
 }
 
 func (s *Service) Events() <-chan adapter.Event { return s.events }
+
+func (s *Service) RestoreNotes() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.notes...)
+}
 
 func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (Snapshot, error) {
 	if err := validateLimits(lim); err != nil {
@@ -170,11 +180,17 @@ func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (
 		_ = pkg.Remove()
 		return Snapshot{}, err
 	}
+	keyJSON, err := s.newRoomKey()
+	if err != nil {
+		_ = pkg.Remove()
+		return Snapshot{}, err
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	room, err := s.ad.StartRoom(ctx, adapter.RoomOpts{
-		SessionID:  sess.ID,
-		Region:     net.Region,
-		DERPMapURL: net.DERPMapURL,
+		SessionID:      sess.ID,
+		PrivateKeyJSON: keyJSON,
+		Region:         net.Region,
+		DERPMapURL:     net.DERPMapURL,
 	})
 	if err != nil {
 		cancel()
@@ -182,20 +198,24 @@ func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (
 		return Snapshot{}, err
 	}
 	h := &host{
-		svc:     s,
-		id:      sess.ID,
-		token:   token,
-		dir:     pkg.Dir,
-		files:   pkg.Files,
-		total:   pkg.Total,
-		lim:     lim,
-		sess:    sess,
-		room:    room,
-		cancel:  cancel,
-		ctx:     ctx,
-		ready:   make(chan struct{}),
-		forever: lim.TTL <= 0,
-		expires: time.Time{},
+		svc:       s,
+		id:        sess.ID,
+		token:     token,
+		keyJSON:   keyJSON,
+		dir:       pkg.Dir,
+		files:     pkg.Files,
+		total:     pkg.Total,
+		lim:       lim,
+		sess:      sess,
+		room:      room,
+		cancel:    cancel,
+		ctx:       ctx,
+		ready:     make(chan struct{}),
+		forever:   lim.TTL <= 0,
+		expires:   time.Time{},
+		createdAt: sess.CreatedAt,
+		region:    net.Region,
+		derpURL:   net.DERPMapURL,
 	}
 	if lim.TTL > 0 {
 		h.expires = time.Now().Add(lim.TTL)
@@ -228,6 +248,11 @@ func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (
 	}
 	h.mu.Lock()
 	h.payload = payload
+	if err := h.writeStateLocked(); err != nil {
+		h.mu.Unlock()
+		h.end("error")
+		return Snapshot{}, err
+	}
 	if h.lim.TTL > 0 {
 		h.timer = time.AfterFunc(h.lim.TTL, func() { h.end("ttl") })
 	}
@@ -899,6 +924,10 @@ type host struct {
 	forever   bool
 	expires   time.Time
 	downloads int
+	keyJSON   string
+	createdAt time.Time
+	region    string
+	derpURL   string
 	sess      *session.Session
 	room      adapter.Room
 	cancel    context.CancelFunc
@@ -988,6 +1017,7 @@ func (h *host) handlePull(token, reply string, resume map[string]int64) {
 	h.mu.Lock()
 	if !h.ended {
 		h.downloads++
+		_ = h.writeStateLocked()
 	}
 	downloads := h.downloads
 	max := h.lim.MaxDownloads
@@ -1107,6 +1137,10 @@ func (h *host) end(reason string) {
 		h.mu.Unlock()
 		return
 	}
+	keep := reason == "shutdown" || reason == "unready"
+	if keep {
+		_ = h.writeStateLocked()
+	}
 	h.ended = true
 	h.reason = reason
 	if h.sess != nil && h.sess.Status != session.StatusStopped && h.sess.Status != session.StatusError {
@@ -1134,9 +1168,13 @@ func (h *host) end(reason string) {
 	if room != nil {
 		_ = room.Close()
 	}
-	_ = os.RemoveAll(dir)
+	if !keep {
+		_ = os.RemoveAll(dir)
+	}
 	h.svc.detach(h)
-	h.publish(snap)
+	if !keep {
+		h.publish(snap)
+	}
 	h.readyOnce.Do(func() { close(h.ready) })
 }
 
@@ -1163,6 +1201,10 @@ func (h *host) snapshotLocked() Snapshot {
 	if addr == "" && h.sess != nil {
 		addr = h.sess.Address
 	}
+	created := ""
+	if !h.createdAt.IsZero() {
+		created = h.createdAt.UTC().Format(time.RFC3339)
+	}
 	return Snapshot{
 		ID:           h.id,
 		Address:      addr,
@@ -1177,6 +1219,7 @@ func (h *host) snapshotLocked() Snapshot {
 		Downloads:    h.downloads,
 		Status:       status,
 		EndReason:    h.reason,
+		CreatedAt:    created,
 	}
 }
 
@@ -1638,18 +1681,5 @@ func asInt(v any) int64 {
 		return i
 	default:
 		return 0
-	}
-}
-
-func sweep(root string) {
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return
-	}
-	for _, entry := range entries {
-		if entry.Name() == incomingDirName {
-			continue
-		}
-		_ = os.RemoveAll(filepath.Join(root, entry.Name()))
 	}
 }
