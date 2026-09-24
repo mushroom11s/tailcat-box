@@ -179,7 +179,7 @@ function AppShell() {
   function pushError(message: string): void {
     const text = message.trim();
     if (text) {
-      pushRef.current(text, "error");
+      pushRef.current(text);
     }
   }
 
@@ -437,7 +437,7 @@ function AppShell() {
         if (room.error !== message) {
           nextRooms[sess.ID] = { ...room, error: message };
           changed = true;
-          pushRef.current(message, "error");
+          pushRef.current(message);
         }
         continue;
       }
@@ -446,7 +446,7 @@ function AppShell() {
       }
       nextTunnel[sess.ID] = raw;
       if (prevTunnel[sess.ID] !== raw) {
-        pushRef.current(raw, "error");
+        pushRef.current(raw);
       }
     }
     appliedChatErr.current = nextChat;

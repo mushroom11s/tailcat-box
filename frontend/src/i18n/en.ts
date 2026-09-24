@@ -398,7 +398,6 @@ export const en = {
   chatNotifyDenied: "System notifications are off, so new messages stay in the chat.",
   toastDismiss: "Dismiss",
   toastError: "Error",
-  toastWarn: "Warning",
 
   qrShow: "QR",
   qrShowLabel: "Show QR code",

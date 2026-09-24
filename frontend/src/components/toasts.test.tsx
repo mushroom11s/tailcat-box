@@ -7,14 +7,9 @@ import { ERROR_TOAST_MS, ToastProvider, useToasts } from "./toasts";
 function Probe() {
   const { push } = useToasts();
   return (
-    <>
-      <button type="button" onClick={() => push('fetching DERPMap for region -1: Get "https://tailcat.dev/derpmap.json": EOF')}>
-        push error
-      </button>
-      <button type="button" onClick={() => push("saved locally", "warn")}>
-        push warn
-      </button>
-    </>
+    <button type="button" onClick={() => push('fetching DERPMap for region -1: Get "https://tailcat.dev/derpmap.json": EOF')}>
+      push error
+    </button>
   );
 }
 
@@ -52,7 +47,7 @@ describe("toast stack", () => {
     expect(stack.parentElement).toBe(document.body);
     const alert = stack.querySelector("[role=alert]") as HTMLElement;
     expect(alert).toBeTruthy();
-    expect(alert.classList.contains("toast-error")).toBe(true);
+    expect(alert.classList.contains("toast")).toBe(true);
     expect(alert.querySelector(".toast-badge")?.textContent?.trim()).toBe("!");
     expect(alert.querySelector(".toast-label")?.textContent).toBe("Error");
     expect(alert.querySelector(".toast-message")?.textContent).toContain("derpmap.json");
@@ -100,15 +95,6 @@ describe("toast stack", () => {
       vi.advanceTimersByTime(1);
     });
     expect(screen.queryByRole("alert")).toBeNull();
-  });
-
-  it("renders a warn toast with the softer label", () => {
-    renderToasts();
-    fireEvent.click(screen.getByRole("button", { name: "push warn" }));
-    const alert = screen.getByRole("alert");
-    expect(alert.classList.contains("toast-warn")).toBe(true);
-    expect(alert.querySelector(".toast-label")?.textContent).toBe("Warning");
-    expect(alert.querySelector(".toast-message")?.textContent).toBe("saved locally");
   });
 
   it("uses 关闭 for the dismiss control in zh-CN", () => {

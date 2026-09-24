@@ -12,18 +12,14 @@ import { createPortal } from "react-dom";
 import { useI18n } from "../i18n";
 
 export const ERROR_TOAST_MS = 7000;
-export const WARN_TOAST_MS = 7000;
-
-export type ToastKind = "error" | "warn";
 
 type ToastItem = {
   id: number;
-  kind: ToastKind;
   message: string;
 };
 
 type ToastApi = {
-  push: (message: string, kind?: ToastKind) => void;
+  push: (message: string) => void;
 };
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -35,17 +31,17 @@ let toastSeq = 1;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const push = useCallback((message: string, kind: ToastKind = "error") => {
+  const push = useCallback((message: string) => {
     const text = message.trim();
     if (!text) {
       return;
     }
     const id = toastSeq++;
     setToasts((prev) => {
-      if (prev.some((item) => item.kind === kind && item.message === text)) {
+      if (prev.some((item) => item.message === text)) {
         return prev;
       }
-      return [...prev, { id, kind, message: text }].slice(-4);
+      return [...prev, { id, message: text }].slice(-4);
     });
   }, []);
 
@@ -75,7 +71,7 @@ function ToastStack({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id
         <ToastCard
           key={item.id}
           item={item}
-          label={t(item.kind === "warn" ? "toastWarn" : "toastError")}
+          label={t("toastError")}
           dismissLabel={t("toastDismiss")}
           onDismiss={onDismiss}
         />
@@ -99,7 +95,7 @@ function ToastCard({
   dismissLabel: string;
   onDismiss: (id: number) => void;
 }) {
-  const duration = item.kind === "warn" ? WARN_TOAST_MS : ERROR_TOAST_MS;
+  const duration = ERROR_TOAST_MS;
   const endsAt = useRef(0);
   const leftMs = useRef(duration);
   const timer = useRef<number | null>(null);
@@ -130,7 +126,7 @@ function ToastCard({
 
   return (
     <div
-      className={`toast toast-${item.kind}`}
+      className="toast"
       role="alert"
       onMouseEnter={() => {
         leftMs.current = Math.max(0, endsAt.current - Date.now());

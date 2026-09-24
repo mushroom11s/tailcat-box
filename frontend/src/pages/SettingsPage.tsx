@@ -218,7 +218,7 @@ export default function SettingsPage({
     const message = err instanceof Error ? err.message : String(err);
     const text = message.trim();
     if (text) {
-      pushRef.current(text, "error");
+      pushRef.current(text);
     }
   }
 

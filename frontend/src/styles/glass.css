@@ -2918,10 +2918,6 @@ textarea {
   -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--saturate));
 }
 
-.toast-warn {
-  border-color: color-mix(in srgb, var(--warn) 50%, var(--glass-border));
-}
-
 .toast-badge {
   width: 22px;
   height: 22px;
@@ -2935,10 +2931,6 @@ textarea {
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
-}
-
-.toast-warn .toast-badge {
-  background: var(--warn);
 }
 
 .toast-copy {
@@ -2956,10 +2948,6 @@ textarea {
   font-weight: 650;
   line-height: 1.2;
   color: var(--danger);
-}
-
-.toast-warn .toast-label {
-  color: var(--warn);
 }
 
 .toast-message {
