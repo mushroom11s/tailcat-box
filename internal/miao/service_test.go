@@ -54,8 +54,8 @@ func TestShareDownloadThenCleanup(t *testing.T) {
 		t.Fatalf("body=%q", body)
 	}
 	waitEmpty(t, root)
-	if svc.Status().Status != "idle" {
-		t.Fatalf("status=%s", svc.Status().Status)
+	if len(svc.List()) != 0 {
+		t.Fatalf("still active: %+v", svc.List())
 	}
 
 	again, err := svc.Join(ctx, snap.Payload, t.TempDir(), adapter.NetworkOpts{})
@@ -99,8 +99,63 @@ func TestTTLEndDeletesCopies(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitEmpty(t, root)
-	if svc.Status().Status != "idle" {
-		t.Fatalf("status=%s", svc.Status().Status)
+	if len(svc.List()) != 0 {
+		t.Fatalf("still active: %+v", svc.List())
+	}
+}
+
+func TestConcurrentSharesStayIndependent(t *testing.T) {
+	root := t.TempDir()
+	svc := New(adapter.NewFake(), root)
+	first, err := svc.Start([]Source{{Name: "one.txt", Data: []byte("one")}}, Limits{MaxDownloads: 1}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := svc.Start([]Source{{Name: "two.txt", Data: []byte("two")}}, Limits{TTL: time.Hour, TTLDays: 1, MaxDownloads: 3}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID == second.ID || first.Token == second.Token || first.Payload == second.Payload {
+		t.Fatalf("shares were not distinct: %+v %+v", first, second)
+	}
+	if len(svc.List()) != 2 {
+		t.Fatalf("list=%d", len(svc.List()))
+	}
+	if _, err := os.Stat(filepath.Join(root, first.ID)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, second.ID)); err != nil {
+		t.Fatal(err)
+	}
+
+	receipt, err := svc.Join(context.Background(), first.Payload, t.TempDir(), adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(receipt.Files) != 1 || receipt.Files[0].Name != "one.txt" {
+		t.Fatalf("receipt=%+v", receipt.Files)
+	}
+	body, err := os.ReadFile(receipt.Files[0].Path)
+	if err != nil || string(body) != "one" {
+		t.Fatalf("body=%q err=%v", body, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, first.ID)); !os.IsNotExist(err) {
+		t.Fatalf("ended share still on disk: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, second.ID)); err != nil {
+		t.Fatal(err)
+	}
+	listed := svc.List()
+	if len(listed) != 1 || listed[0].ID != second.ID {
+		t.Fatalf("list=%+v", listed)
+	}
+
+	if err := svc.End(second.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitEmpty(t, root)
+	if len(svc.List()) != 0 {
+		t.Fatalf("still active: %+v", svc.List())
 	}
 }
 

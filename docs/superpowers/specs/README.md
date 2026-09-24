@@ -6,4 +6,4 @@
 - [Tailcat Box Liquid Glass](2026-09-22-tailcat-box-liquid-glass-design.md) — stronger frosted-glass visual pass over the existing Chat, Tunnel, and Settings shell.
 - [Multi-room chat](2026-09-23-tailcat-box-multi-room-chat-design.md) — concurrent listeners under Chat, with a create lobby when no room is open. Design only.
 - [In-app update Phase 1](2026-09-23-tailcat-box-in-app-update-design.md) — check GitHub Releases, show a NEW! badge, download the platform zip, and guide the install. Phase 2 install-and-restart is documented only.
-- [喵传 (Miao Share)](../../design/miao-share.md) — drop a package, share one Tailcat code, and let another Tailcat Box download it. Implemented v1.
+- [喵传 (Mew Share)](../../design/miao-share.md) — drop a package, keep several shares at once, and let another Tailcat Box download one of them. Implemented v1.

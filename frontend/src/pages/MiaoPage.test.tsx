@@ -1,11 +1,13 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { LocaleProvider } from "../i18n";
+import { resetBrowserMiao } from "../lib/miaoBrowser";
 import { MAX_SHARE_BYTES } from "../lib/miao";
 import MiaoPage from "./MiaoPage";
 
 afterEach(() => {
+  resetBrowserMiao();
   cleanup();
 });
 
@@ -17,11 +19,11 @@ function renderPage() {
   );
 }
 
-describe("Miao Share page", () => {
+describe("Mew Share page", () => {
   it("shows a drop zone, then an active share with a code and QR", async () => {
     const user = userEvent.setup();
     renderPage();
-    expect(screen.getByRole("heading", { name: "Miao Share" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Mew Share" })).toBeTruthy();
     expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
 
     const input = screen.getByLabelText("Choose files") as HTMLInputElement;
@@ -30,7 +32,8 @@ describe("Miao Share page", () => {
 
     expect(await screen.findByRole("button", { name: "End share" })).toBeTruthy();
     expect(screen.getByText("notes.txt")).toBeTruthy();
-    const token = document.querySelector("#miao-token") as HTMLTextAreaElement;
+    expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
+    const token = (await screen.findByLabelText("Share code")) as HTMLTextAreaElement;
     expect(token.value).toContain("tc:fake-miao-");
     expect(token.value).toContain('"kind":"miao"');
     await waitFor(() => {
@@ -67,6 +70,26 @@ describe("Miao Share page", () => {
     expect(screen.getByText("笔记.txt")).toBeTruthy();
     await user.click(screen.getByRole("tab", { name: "Send" }));
     expect(await screen.findByText("Share ended. The temporary copies are gone.")).toBeTruthy();
+    expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
+  });
+
+  it("keeps the other share and the drop zone when one share ends", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const input = screen.getByLabelText("Choose files") as HTMLInputElement;
+    await user.upload(input, new File(["a"], "notes.txt", { type: "text/plain" }));
+    expect(await screen.findByRole("article", { name: "notes.txt" })).toBeTruthy();
+    await user.upload(input, new File(["b"], "second.txt", { type: "text/plain" }));
+    expect(await screen.findByRole("article", { name: "second.txt" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "End share" }).length).toBe(2);
+    expect(screen.getByRole("heading", { name: "Active shares" })).toBeTruthy();
+    expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
+
+    await user.click(within(screen.getByRole("article", { name: "notes.txt" })).getByRole("button", { name: "End share" }));
+    expect(await screen.findByText("Share ended. The temporary copies are gone.")).toBeTruthy();
+    expect(screen.queryByRole("article", { name: "notes.txt" })).toBeNull();
+    expect(screen.getByRole("article", { name: "second.txt" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "End share" })).toBeTruthy();
     expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
   });
 });

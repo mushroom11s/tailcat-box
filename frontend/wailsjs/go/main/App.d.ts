@@ -41,7 +41,7 @@ export function ListRemote(arg1:string,arg2:string):Promise<Array<adapter.FileEn
 
 export function ListSessions():Promise<Array<session.Session>>;
 
-export function MiaoShareStatus():Promise<Record<string, unknown>>;
+export function MiaoShareStatus():Promise<Array<Record<string, unknown>>>;
 
 export function ParseAddr(arg1:string):Promise<string>;
 

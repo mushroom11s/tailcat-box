@@ -54,7 +54,7 @@ import {
 import { BrowserOpenURL, EventsOn } from "../../wailsjs/runtime/runtime";
 import { adapter, main, session, store } from "../../wailsjs/go/models";
 import { createBrowserHub } from "./chatBrowser";
-import { browserEndMiao, browserJoinMiao, browserStartMiao, setMiaoBrowserEmit } from "./miaoBrowser";
+import { browserEndMiao, browserJoinMiao, browserListMiao, browserStartMiao, setMiaoBrowserEmit } from "./miaoBrowser";
 import type { MiaoFileInput, MiaoReceipt, MiaoShare } from "./miao";
 
 export type Session = {
@@ -1357,24 +1357,12 @@ export async function endMiaoShare(id: string): Promise<void> {
   browserEndMiao(id);
 }
 
-export async function miaoShareStatus(): Promise<MiaoShare> {
+export async function miaoShareStatus(): Promise<MiaoShare[]> {
   if (hasWailsBindings()) {
-    return (await bindMiaoShareStatus()) as MiaoShare;
+    const raw = await bindMiaoShareStatus();
+    return Array.isArray(raw) ? (raw as MiaoShare[]) : [];
   }
-  return {
-    id: "",
-    address: "",
-    token: "",
-    payload: "",
-    files: [],
-    total: 0,
-    forever: true,
-    ttlDays: 0,
-    expiresAt: "",
-    maxDownloads: 0,
-    downloads: 0,
-    status: "idle",
-  };
+  return browserListMiao();
 }
 
 export async function joinMiaoShare(payload: string, destDir: string): Promise<MiaoReceipt> {

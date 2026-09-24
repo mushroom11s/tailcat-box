@@ -28,7 +28,8 @@ type Stored = MiaoShare & {
   timer?: ReturnType<typeof setTimeout>;
 };
 
-let current: Stored | null = null;
+const shares = new Map<string, Stored>();
+const order: string[] = [];
 let seq = 0;
 
 function id(): string {
@@ -39,8 +40,8 @@ function id(): string {
   return `${hex}${seq.toString(16)}`;
 }
 
-function publish(share: Stored, status: string, endReason = ""): MiaoShare {
-  const snap: MiaoShare = {
+function publicSnap(share: Stored, status = share.status, endReason = share.endReason): MiaoShare {
+  return {
     id: share.id,
     address: share.address,
     token: share.token,
@@ -55,15 +56,67 @@ function publish(share: Stored, status: string, endReason = ""): MiaoShare {
     status,
     endReason,
   };
+}
+
+function publish(share: Stored, status: string, endReason = ""): MiaoShare {
+  share.status = status;
+  share.endReason = endReason;
+  const snap = publicSnap(share, status, endReason);
   emit({ SessionID: share.id, Kind: "miao", Data: JSON.stringify(snap) });
   return snap;
 }
 
-function clearTimer(share: Stored | null): void {
+function clearTimer(share: Stored | undefined): void {
   if (share?.timer) {
     clearTimeout(share.timer);
     share.timer = undefined;
   }
+}
+
+function remember(share: Stored): void {
+  if (!shares.has(share.id)) {
+    order.unshift(share.id);
+  }
+  shares.set(share.id, share);
+}
+
+function forget(shareID: string): void {
+  const share = shares.get(shareID);
+  clearTimer(share);
+  shares.delete(shareID);
+  const index = order.indexOf(shareID);
+  if (index >= 0) {
+    order.splice(index, 1);
+  }
+}
+
+function findByPayload(addr: string, token: string): Stored | undefined {
+  for (const shareID of order) {
+    const share = shares.get(shareID);
+    if (share && share.address === addr && share.token === token) {
+      return share;
+    }
+  }
+  return undefined;
+}
+
+export function browserListMiao(): MiaoShare[] {
+  const out: MiaoShare[] = [];
+  for (const shareID of order) {
+    const share = shares.get(shareID);
+    if (share && share.status === "active") {
+      out.push(publicSnap(share));
+    }
+  }
+  return out;
+}
+
+export function resetBrowserMiao(): void {
+  for (const share of shares.values()) {
+    clearTimer(share);
+  }
+  shares.clear();
+  order.splice(0, order.length);
 }
 
 export async function browserStartMiao(files: MiaoFileInput[], ttlDays: number, forever: boolean, maxDownloads: number): Promise<MiaoShare> {
@@ -80,10 +133,6 @@ export async function browserStartMiao(files: MiaoFileInput[], ttlDays: number, 
   }
   if (shareTooLarge(decoded.map((file) => file.size)) || total > 300 * 1024 * 1024) {
     throw new Error("This share is larger than 300 MiB.");
-  }
-  if (current) {
-    clearTimer(current);
-    publish(current, "ended", "replaced");
   }
   const shareID = id();
   const token = id();
@@ -107,28 +156,31 @@ export async function browserStartMiao(files: MiaoFileInput[], ttlDays: number, 
     maxDownloads,
     downloads: 0,
     status: "active",
+    endReason: "",
     blobs,
   };
   if (!forever && ttlDays > 0) {
     stored.timer = setTimeout(() => {
-      if (current?.id === shareID) {
-        publish(stored, "ended", "ttl");
-        clearTimer(stored);
-        current = null;
+      const live = shares.get(shareID);
+      if (!live) {
+        return;
       }
+      publish(live, "ended", "ttl");
+      forget(shareID);
     }, ttlDays * 24 * 60 * 60 * 1000);
   }
-  current = stored;
+  remember(stored);
   return publish(stored, "active");
 }
 
 export function browserEndMiao(shareID: string): void {
-  if (!current || current.id !== shareID) {
+  const share = shares.get(shareID);
+  if (!share) {
     throw new Error("Unknown share.");
   }
-  clearTimer(current);
-  publish(current, "ended", "manual");
-  current = null;
+  clearTimer(share);
+  publish(share, "ended", "manual");
+  forget(shareID);
 }
 
 export function browserJoinMiao(raw: string): MiaoReceipt {
@@ -136,7 +188,8 @@ export function browserJoinMiao(raw: string): MiaoReceipt {
   if (!payload) {
     throw new Error("That share code is not valid.");
   }
-  if (!current || current.token !== payload.token || current.address !== payload.addr) {
+  const current = findByPayload(payload.addr, payload.token);
+  if (!current) {
     throw new Error("Could not reach the host. They need to stay online.");
   }
   if (current.maxDownloads > 0 && current.downloads >= current.maxDownloads) {
@@ -147,13 +200,13 @@ export function browserJoinMiao(raw: string): MiaoReceipt {
     name: file.name,
     size: file.size,
     path: "",
-    dataBase64: current?.blobs[String(index)] ?? "",
+    dataBase64: current.blobs[String(index)] ?? "",
   }));
   if (current.maxDownloads > 0 && current.downloads >= current.maxDownloads) {
     clearTimer(current);
     publish(current, "ended", "count");
-    current = null;
-  } else if (current) {
+    forget(current.id);
+  } else {
     publish(current, "active");
   }
   return { files };

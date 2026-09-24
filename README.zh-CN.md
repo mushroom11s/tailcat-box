@@ -37,7 +37,7 @@ macOS 和 Windows 上的 [Tailscale Tailcat](https://github.com/tailscale/tailca
 
 ## 功能
 
-- **喵传** — 拖入文件（最多 300 MiB），分享一个二维码。另一台猫砂盆在这台电脑保持在线时，通过 Tailcat 把文件下载走
+- **喵传** — 拖入文件（每份最多 300 MiB），可以同时开多份分享，每份有自己的二维码。另一台猫砂盆在这台电脑保持在线时，通过 Tailcat 把其中一份下载走
 - **聊天** — 开一个房间，交换 Tailcat 地址，发文字、文件和语音，也能实时语音、视频和共享屏幕
 - **穿透** — 把 TCP 端口挂到 Tailcat 地址上，再转到这台电脑，也可以打开对方的网页端口
 - **设置** — 跟随系统 / 浅色 / 深色，中英文，密钥和 DERP，诊断，本机信息，开机启动
@@ -146,7 +146,7 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 | Windows | `%AppData%\tailcat-box` |
 | Linux | `~/.config/tailcat-box` |
 
-如果这台电脑上已经有旧目录 `<用户配置目录>/tailcat-desktop-client`，而还没有 `tailcat-box`，密钥和设置会继续用旧目录。想换过去，把那个文件夹改名为 `tailcat-box`。也可以用 `TAILCAT_KEYS_DIR` 和 `TAILCAT_SETTINGS_DIR` 指定目录。聊天文件在 `<用户配置目录>/tailcat-box/chat`（`TAILCAT_CHAT_DIR` 可以改这个路径）。喵传的临时副本在 `<用户配置目录>/tailcat-box/miao`（`TAILCAT_MIAO_DIR`），分享结束就会删掉。
+如果这台电脑上已经有旧目录 `<用户配置目录>/tailcat-desktop-client`，而还没有 `tailcat-box`，密钥和设置会继续用旧目录。想换过去，把那个文件夹改名为 `tailcat-box`。也可以用 `TAILCAT_KEYS_DIR` 和 `TAILCAT_SETTINGS_DIR` 指定目录。聊天文件在 `<用户配置目录>/tailcat-box/chat`（`TAILCAT_CHAT_DIR` 可以改这个路径）。喵传的临时副本在 `<用户配置目录>/tailcat-box/miao`（`TAILCAT_MIAO_DIR`），那一份分享结束就会删掉。
 
 设置里的密钥页还会列出 Tailcat 命令行的密钥目录（一般是 `~/.config/tailcat/keys`），方便把命令行的密钥导进来。
 

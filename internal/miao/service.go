@@ -79,12 +79,13 @@ type Receipt struct {
 	Files []SavedFile `json:"files"`
 }
 
-// Service hosts at most one share and can also join someone else's share.
+// Service hosts any number of shares at once and can also join someone else's share.
 type Service struct {
 	ad     adapter.ChatAdapter
 	root   string
 	mu     sync.Mutex
-	host   *host
+	hosts  map[string]*host
+	order  []string
 	events chan adapter.Event
 }
 
@@ -93,7 +94,7 @@ func New(ad adapter.ChatAdapter, root string) *Service {
 		_ = os.MkdirAll(root, 0o700)
 		sweep(root)
 	}
-	return &Service{ad: ad, root: root, events: make(chan adapter.Event, 32)}
+	return &Service{ad: ad, root: root, hosts: map[string]*host{}, events: make(chan adapter.Event, 64)}
 }
 
 func (s *Service) Events() <-chan adapter.Event { return s.events }
@@ -101,13 +102,6 @@ func (s *Service) Events() <-chan adapter.Event { return s.events }
 func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (Snapshot, error) {
 	if err := validateLimits(lim); err != nil {
 		return Snapshot{}, err
-	}
-	s.mu.Lock()
-	old := s.host
-	s.host = nil
-	s.mu.Unlock()
-	if old != nil {
-		old.end("replaced")
 	}
 	if s.root == "" {
 		return Snapshot{}, fmt.Errorf("share storage is not configured")
@@ -153,7 +147,11 @@ func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (
 		h.expires = time.Now().Add(lim.TTL)
 	}
 	s.mu.Lock()
-	s.host = h
+	if s.hosts == nil {
+		s.hosts = map[string]*host{}
+	}
+	s.hosts[h.id] = h
+	s.order = append([]string{h.id}, s.order...)
 	s.mu.Unlock()
 	go h.readLoop()
 	select {
@@ -185,36 +183,52 @@ func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (
 	return snap, nil
 }
 
-func (s *Service) Status() Snapshot {
+// List returns active shares, newest first.
+func (s *Service) List() []Snapshot {
 	s.mu.Lock()
-	h := s.host
-	s.mu.Unlock()
-	if h == nil {
-		return Snapshot{Status: "idle"}
+	hosts := make([]*host, 0, len(s.order))
+	for _, id := range s.order {
+		if h := s.hosts[id]; h != nil {
+			hosts = append(hosts, h)
+		}
 	}
-	return h.snapshot()
+	s.mu.Unlock()
+	out := make([]Snapshot, 0, len(hosts))
+	for _, h := range hosts {
+		snap := h.snapshot()
+		if snap.Status != "active" {
+			continue
+		}
+		out = append(out, snap)
+	}
+	return out
 }
 
-func (s *Service) Session() (session.Session, bool) {
+func (s *Service) Sessions() []session.Session {
 	s.mu.Lock()
-	h := s.host
+	hosts := make([]*host, 0, len(s.order))
+	for _, id := range s.order {
+		if h := s.hosts[id]; h != nil {
+			hosts = append(hosts, h)
+		}
+	}
 	s.mu.Unlock()
-	if h == nil {
-		return session.Session{}, false
+	out := make([]session.Session, 0, len(hosts))
+	for _, h := range hosts {
+		h.mu.Lock()
+		if h.sess != nil && !h.ended {
+			out = append(out, *h.sess)
+		}
+		h.mu.Unlock()
 	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.sess == nil || h.ended {
-		return session.Session{}, false
-	}
-	return *h.sess, true
+	return out
 }
 
 func (s *Service) End(id string) error {
 	s.mu.Lock()
-	h := s.host
+	h := s.hosts[id]
 	s.mu.Unlock()
-	if h == nil || h.id != id {
+	if h == nil {
 		return fmt.Errorf("Unknown share.")
 	}
 	h.end("manual")
@@ -223,9 +237,12 @@ func (s *Service) End(id string) error {
 
 func (s *Service) Close() {
 	s.mu.Lock()
-	h := s.host
+	hosts := make([]*host, 0, len(s.hosts))
+	for _, h := range s.hosts {
+		hosts = append(hosts, h)
+	}
 	s.mu.Unlock()
-	if h != nil {
+	for _, h := range hosts {
 		h.end("shutdown")
 	}
 }
@@ -544,8 +561,15 @@ func (h *host) publish(snap Snapshot) {
 
 func (s *Service) detach(h *host) {
 	s.mu.Lock()
-	if s.host == h {
-		s.host = nil
+	if s.hosts[h.id] == h {
+		delete(s.hosts, h.id)
+		next := make([]string, 0, len(s.order))
+		for _, id := range s.order {
+			if id != h.id {
+				next = append(next, id)
+			}
+		}
+		s.order = next
 	}
 	s.mu.Unlock()
 }

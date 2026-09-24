@@ -17,7 +17,7 @@ import {
   type MiaoShare,
   type Remaining,
 } from "../lib/miao";
-import { endMiaoShare, hasWailsBindings, joinMiaoShare, onTailcatEvent, selectDirectory, selectFiles, startMiaoShare } from "../lib/wails";
+import { endMiaoShare, hasWailsBindings, joinMiaoShare, miaoShareStatus, onTailcatEvent, selectDirectory, selectFiles, startMiaoShare } from "../lib/wails";
 
 type TTLMode = "1" | "7" | "15" | "custom" | "forever";
 type CountMode = "1" | "3" | "10" | "unlimited" | "custom";
@@ -54,61 +54,34 @@ function baseName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-export default function MiaoPage() {
+function upsertShare(list: MiaoShare[], snap: MiaoShare): MiaoShare[] {
+  const index = list.findIndex((item) => item.id === snap.id);
+  if (index < 0) {
+    return [snap, ...list];
+  }
+  const next = list.slice();
+  next[index] = snap;
+  return next;
+}
+
+function ShareCard({
+  share,
+  now,
+  onEnd,
+}: {
+  share: MiaoShare;
+  now: number;
+  onEnd: (id: string) => void;
+}) {
   const { t } = useI18n();
-  const [mode, setMode] = useState<Mode>("send");
-  const [ttlMode, setTTLMode] = useState<TTLMode>("1");
-  const [customDays, setCustomDays] = useState("30");
-  const [countMode, setCountMode] = useState<CountMode>("1");
-  const [customCount, setCustomCount] = useState("5");
-  const [share, setShare] = useState<MiaoShare | null>(null);
-  const [busy, setBusy] = useState<"" | "pack" | "join">("");
-  const [dragOver, setDragOver] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [code, setCode] = useState("");
-  const [saved, setSaved] = useState<MiaoReceipt | null>(null);
   const [qrSrc, setQrSrc] = useState("");
   const [qrFailed, setQrFailed] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
-  const inputRef = useRef<HTMLInputElement>(null);
-  const shareRef = useRef<MiaoShare | null>(null);
-  shareRef.current = share;
+  const left = downloadsLeft(share.maxDownloads, share.downloads);
+  const ttl = remainingTTL(share.expiresAt, share.forever, now);
+  const label = share.files.map((file) => file.name).join(", ") || share.id;
 
   useEffect(() => {
-    return onTailcatEvent((ev) => {
-      if (ev.Kind !== "miao" || !ev.Data) {
-        return;
-      }
-      let snap: MiaoShare;
-      try {
-        snap = JSON.parse(ev.Data) as MiaoShare;
-      } catch {
-        return;
-      }
-      if (snap.status === "ended") {
-        if (shareRef.current?.id === snap.id) {
-          setShare(null);
-          setNotice(t("miaoEnded"));
-        }
-        return;
-      }
-      if (!shareRef.current || shareRef.current.id === snap.id) {
-        setShare(snap);
-      }
-    });
-  }, [t]);
-
-  useEffect(() => {
-    if (!share || share.forever) {
-      return;
-    }
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [share]);
-
-  useEffect(() => {
-    const payload = share?.payload ?? "";
+    const payload = share.payload;
     if (!payload) {
       setQrSrc("");
       setQrFailed(false);
@@ -130,7 +103,121 @@ export default function MiaoPage() {
     return () => {
       live = false;
     };
-  }, [share?.payload]);
+  }, [share.payload]);
+
+  return (
+    <article className="glass miao-active" aria-label={label}>
+      <div className="miao-active-grid">
+        <div>
+          <h3>{t("miaoFiles")}</h3>
+          <ul className="miao-files">
+            {share.files.map((file) => (
+              <li key={`${file.name}:${file.size}`}>
+                <span>{file.name}</span>
+                <span className="miao-size">{formatBytes(file.size)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="chat-quiet">
+            {t("miaoTotal")} {formatBytes(share.total)}
+          </p>
+          <p className="chat-quiet">
+            {t("miaoRemaining")} {ttlLabel(ttl, t)}
+          </p>
+          <p className="chat-quiet">
+            {t("miaoDownloadsLeft")} {left === null ? t("miaoUnlimited") : String(left)}
+          </p>
+          <label className="field" htmlFor={`miao-token-${share.id}`}>
+            {t("miaoToken")}
+            <textarea id={`miao-token-${share.id}`} readOnly value={share.payload} rows={3} />
+          </label>
+          <div className="row">
+            <button className="btn btn-ghost" type="button" onClick={() => void copyText(share.payload)}>
+              {t("miaoCopyCode")}
+            </button>
+            <button className="btn btn-danger" type="button" onClick={() => onEnd(share.id)}>
+              {t("miaoEnd")}
+            </button>
+          </div>
+        </div>
+        <div className="miao-qr">
+          {qrFailed ? <p className="err">{t("qrEncodeFailed")}</p> : null}
+          {qrSrc ? <img src={qrSrc} alt={t("miaoToken")} width={220} height={220} /> : <LoadingCat label={t("miaoPacking")} />}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export default function MiaoPage() {
+  const { t } = useI18n();
+  const [mode, setMode] = useState<Mode>("send");
+  const [ttlMode, setTTLMode] = useState<TTLMode>("1");
+  const [customDays, setCustomDays] = useState("30");
+  const [countMode, setCountMode] = useState<CountMode>("1");
+  const [customCount, setCustomCount] = useState("5");
+  const [shares, setShares] = useState<MiaoShare[]>([]);
+  const [busy, setBusy] = useState<"" | "pack" | "join">("");
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [code, setCode] = useState("");
+  const [saved, setSaved] = useState<MiaoReceipt | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const inputRef = useRef<HTMLInputElement>(null);
+  const endedRef = useRef(new Set<string>());
+  const ticking = shares.some((share) => !share.forever);
+
+  useEffect(() => {
+    let live = true;
+    void miaoShareStatus()
+      .then((list) => {
+        if (!live) {
+          return;
+        }
+        const incoming = list.filter((share) => share.id && share.status === "active" && !endedRef.current.has(share.id));
+        setShares((current) => {
+          const seen = new Set(current.map((share) => share.id));
+          const extra = incoming.filter((share) => !seen.has(share.id));
+          return extra.length ? [...current, ...extra] : current;
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return onTailcatEvent((ev) => {
+      if (ev.Kind !== "miao" || !ev.Data) {
+        return;
+      }
+      let snap: MiaoShare;
+      try {
+        snap = JSON.parse(ev.Data) as MiaoShare;
+      } catch {
+        return;
+      }
+      if (snap.status === "ended") {
+        endedRef.current.add(snap.id);
+        setShares((list) => list.filter((item) => item.id !== snap.id));
+        setNotice(t("miaoEnded"));
+        return;
+      }
+      if (snap.status === "active" && snap.id) {
+        setShares((list) => upsertShare(list, snap));
+      }
+    });
+  }, [t]);
+
+  useEffect(() => {
+    if (!ticking) {
+      return;
+    }
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [ticking]);
 
   function limits(): { ttlDays: number; forever: boolean; maxDownloads: number } | { error: MessageKey } {
     let forever = false;
@@ -177,7 +264,7 @@ export default function MiaoPage() {
     setNotice("");
     try {
       const snap = await startMiaoShare(files, chosen.ttlDays, chosen.forever, chosen.maxDownloads);
-      setShare(snap);
+      setShares((list) => upsertShare(list, snap));
     } catch (err) {
       showError(err, "miaoNeedFile");
     } finally {
@@ -210,7 +297,7 @@ export default function MiaoPage() {
         })),
       );
       const snap = await startMiaoShare(inputs, chosen.ttlDays, chosen.forever, chosen.maxDownloads);
-      setShare(snap);
+      setShares((list) => upsertShare(list, snap));
     } catch (err) {
       showError(err, "miaoNeedFile");
     } finally {
@@ -244,14 +331,12 @@ export default function MiaoPage() {
     void acceptFileList(Array.from(ev.dataTransfer.files ?? []));
   }
 
-  async function endShare(): Promise<void> {
-    if (!share) {
-      return;
-    }
+  async function endShare(id: string): Promise<void> {
+    endedRef.current.add(id);
     setError("");
     try {
-      await endMiaoShare(share.id);
-      setShare(null);
+      await endMiaoShare(id);
+      setShares((list) => list.filter((item) => item.id !== id));
       setNotice(t("miaoEnded"));
     } catch (err) {
       showError(err, "miaoEndedRemote");
@@ -297,9 +382,6 @@ export default function MiaoPage() {
     }
   }
 
-  const left = share ? downloadsLeft(share.maxDownloads, share.downloads) : null;
-  const ttl = share ? remainingTTL(share.expiresAt, share.forever, now) : null;
-
   return (
     <section className="page miao-page">
       <header className="chat-lobby-head">
@@ -334,49 +416,15 @@ export default function MiaoPage() {
       {notice ? <p className="chat-quiet">{notice}</p> : null}
 
       {mode === "send" ? (
-        share ? (
-          <div className="glass miao-active">
-            <div className="miao-active-grid">
-              <div>
-                <h3>{t("miaoFiles")}</h3>
-                <ul className="miao-files">
-                  {share.files.map((file) => (
-                    <li key={`${file.name}:${file.size}`}>
-                      <span>{file.name}</span>
-                      <span className="miao-size">{formatBytes(file.size)}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="chat-quiet">
-                  {t("miaoTotal")} {formatBytes(share.total)}
-                </p>
-                <p className="chat-quiet">
-                  {t("miaoRemaining")} {ttlLabel(ttl, t)}
-                </p>
-                <p className="chat-quiet">
-                  {t("miaoDownloadsLeft")} {left === null ? t("miaoUnlimited") : String(left)}
-                </p>
-                <label className="field" htmlFor="miao-token">
-                  {t("miaoToken")}
-                  <textarea id="miao-token" readOnly value={share.payload} rows={3} />
-                </label>
-                <div className="row">
-                  <button className="btn btn-ghost" type="button" onClick={() => void copyText(share.payload)}>
-                    {t("miaoCopyCode")}
-                  </button>
-                  <button className="btn btn-danger" type="button" onClick={() => void endShare()}>
-                    {t("miaoEnd")}
-                  </button>
-                </div>
-              </div>
-              <div className="miao-qr">
-                {qrFailed ? <p className="err">{t("qrEncodeFailed")}</p> : null}
-                {qrSrc ? <img src={qrSrc} alt={t("miaoToken")} width={220} height={220} /> : <LoadingCat label={t("miaoPacking")} />}
-              </div>
+        <div className="miao-send">
+          {shares.length ? (
+            <div className="miao-share-list">
+              <h3>{t("miaoActive")}</h3>
+              {shares.map((share) => (
+                <ShareCard key={share.id} share={share} now={now} onEnd={(id) => void endShare(id)} />
+              ))}
             </div>
-          </div>
-        ) : (
-          <>
+          ) : null}
             <div className="miao-limits">
               <label className="field">
                 {t("miaoTTL")}
@@ -464,8 +512,7 @@ export default function MiaoPage() {
                 void acceptFileList(list);
               }}
             />
-          </>
-        )
+        </div>
       ) : (
         <div className="glass miao-join">
           <p className="lede">{t("miaoJoinHelp")}</p>

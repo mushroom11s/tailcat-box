@@ -30,7 +30,7 @@ describe("phase 1 chat shell", () => {
     renderApp();
 
     const nav = document.querySelectorAll(".nav-btn");
-    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["Miao Share", "Chat", "+ New room", "Tunnel", "Settings"]);
+    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["Mew Share", "Chat", "+ New room", "Tunnel", "Settings"]);
     expect(document.querySelector(".sidebar-footer .nav-btn")?.textContent).toBe("Settings");
     expect(document.querySelector(".brand-mark")?.tagName).toBe("IMG");
     expect(screen.getByRole("heading", { name: "Tailcat Box" })).toBeTruthy();

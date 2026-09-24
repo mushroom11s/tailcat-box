@@ -37,7 +37,7 @@ Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on mac
 
 ## Features
 
-- **Miao Share (喵传)** — drop files (up to 300 MiB), share one QR code, and let another Tailcat Box download them over Tailcat while this device stays online
+- **Mew Share (喵传)** — drop files (up to 300 MiB per share) and keep several shares going at once. Each share has its own QR code. Another Tailcat Box downloads one share over Tailcat while this device stays online
 - **Chat** — open a room, exchange a Tailcat address, and send text, files, voice notes, or a live voice, video, or screen share
 - **Tunnel** — serve TCP ports, forward them to this machine, or browse the peer’s web port
 - **Settings** — system / light / dark theme, English and 简体中文, keys and DERP, diagnostics, client and system info, launch at login
@@ -146,7 +146,7 @@ New installs store keys and settings under `<user-config>/tailcat-box` (keys are
 | Windows | `%AppData%\tailcat-box` |
 | Linux | `~/.config/tailcat-box` |
 
-If `<user-config>/tailcat-desktop-client` already exists and `tailcat-box` does not, the app keeps using the old directory for keys and settings. Move or rename that folder to `tailcat-box` when you want the new path. Override those directories with `TAILCAT_KEYS_DIR` and `TAILCAT_SETTINGS_DIR`. Chat files are stored in `<user-config>/tailcat-box/chat` (override with `TAILCAT_CHAT_DIR`). Miao Share temp copies live in `<user-config>/tailcat-box/miao` (override with `TAILCAT_MIAO_DIR`) and are deleted when the share ends.
+If `<user-config>/tailcat-desktop-client` already exists and `tailcat-box` does not, the app keeps using the old directory for keys and settings. Move or rename that folder to `tailcat-box` when you want the new path. Override those directories with `TAILCAT_KEYS_DIR` and `TAILCAT_SETTINGS_DIR`. Chat files are stored in `<user-config>/tailcat-box/chat` (override with `TAILCAT_CHAT_DIR`). Mew Share temp copies live in `<user-config>/tailcat-box/miao` (override with `TAILCAT_MIAO_DIR`) and are deleted when that share ends.
 
 The Keys page also lists the Tailcat CLI key directory (`~/.config/tailcat/keys`, or the OS equivalent) so you can import those keys.
 
@@ -173,7 +173,7 @@ Unsigned builds still hit Gatekeeper before the app opens (System Settings → P
 - `internal/session` — session state
 - `internal/store` — named keys and network settings
 - `internal/tray` — Open, Hide, Chat, Tunnel, Settings, session count, Quit
-- `frontend/` — Miao Share, Chat, Tunnel, and Settings
+- `frontend/` — Mew Share, Chat, Tunnel, and Settings
 
 The Go module path in `go.mod` is `github.com/mushroom11s/tailcat-box`.
 

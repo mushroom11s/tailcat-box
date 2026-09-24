@@ -435,9 +435,7 @@ func (a *App) ListSessions() []session.Session {
 		out = append(out, a.rooms.Sessions()...)
 	}
 	if a.miao != nil {
-		if sess, ok := a.miao.Session(); ok {
-			out = append(out, sess)
-		}
+		out = append(out, a.miao.Sessions()...)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if !out[i].CreatedAt.Equal(out[j].CreatedAt) {
@@ -636,12 +634,16 @@ func (a *App) EndMiaoShare(id string) error {
 	return a.miao.End(id)
 }
 
-// MiaoShareStatus returns the active share, or an idle snapshot.
-func (a *App) MiaoShareStatus() miao.Snapshot {
+// MiaoShareStatus returns every share that is still listening.
+func (a *App) MiaoShareStatus() []miao.Snapshot {
 	if a.miao == nil {
-		return miao.Snapshot{Status: "idle"}
+		return []miao.Snapshot{}
 	}
-	return a.miao.Status()
+	list := a.miao.List()
+	if list == nil {
+		return []miao.Snapshot{}
+	}
+	return list
 }
 
 // JoinMiaoShare downloads a share into destDir. The host must stay online.

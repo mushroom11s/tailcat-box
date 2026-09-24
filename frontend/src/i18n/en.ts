@@ -415,13 +415,13 @@ export const en = {
   qrEncodeFailed: "Could not build a QR code.",
   qrClose: "Close",
 
-  navMiao: "Miao Share",
-  miaoTitle: "Miao Share",
-  miaoLede: "Drop files, share one code, and a peer downloads them over Tailcat. You both stay in Tailcat Box, and this device has to stay online.",
+  navMiao: "Mew Share",
+  miaoTitle: "Mew Share",
+  miaoLede: "Drop files into a share. Several shares can stay up at once, each with its own code. A peer downloads one share over Tailcat. You both stay in Tailcat Box, and this device has to stay online.",
   miaoSend: "Send",
   miaoReceive: "Receive",
   miaoDrop: "Drop files here, or click to choose.",
-  miaoDropHint: "Several files go out as one share. 300 MiB max.",
+  miaoDropHint: "Several files go out as one share. Each share is 300 MiB max.",
   miaoTTL: "Keep for",
   miaoDay1: "1 day",
   miaoDay7: "7 days",
@@ -440,6 +440,7 @@ export const en = {
   miaoNeedFile: "Choose at least one file.",
   miaoFolder: "Choose files, not folders.",
   miaoPacking: "Packing…",
+  miaoActive: "Active shares",
   miaoFiles: "Files",
   miaoTotal: "Total",
   miaoToken: "Share code",
@@ -464,7 +465,7 @@ export const en = {
   miaoCustomDaysInvalid: "Enter a number of days.",
   miaoCustomCountInvalid: "Enter a download count.",
   tunnelBusy: "Working…",
-  kindMiao: "Miao Share",
+  kindMiao: "Mew Share",
 } as const;
 
 export type MessageKey = keyof typeof en;

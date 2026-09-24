@@ -217,7 +217,7 @@ describe("phase 4 live media dock", () => {
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     expect(await screen.findByRole("button", { name: "Voice" })).toBeTruthy();
     const names = Array.from(document.querySelectorAll(".nav-btn")).map((node) => node.textContent ?? "");
-    expect(names[0]).toBe("Miao Share");
+    expect(names[0]).toBe("Mew Share");
     expect(names[1]).toBe("Chat");
     expect(names[2]).toBe("+ New room");
     expect(names.at(-2)).toBe("Tunnel");

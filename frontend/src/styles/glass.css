@@ -2644,6 +2644,28 @@ textarea {
   margin-bottom: 0;
 }
 
+.miao-send {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.miao-share-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  max-height: 46%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.miao-share-list > h3 {
+  margin: 0;
+}
+
 .miao-limits {
   display: flex;
   flex-wrap: wrap;
@@ -2657,7 +2679,7 @@ textarea {
 
 .miao-drop {
   flex: 1;
-  min-height: 240px;
+  min-height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
