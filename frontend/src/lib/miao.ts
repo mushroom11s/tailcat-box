@@ -284,7 +284,7 @@ export type JoinPayload = {
   token: string;
 };
 
-const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode" | "miaoUnreachable" | "miaoEndedRemote" | "miaoBusyPeer" | "miaoCustomDaysInvalid" | "miaoCustomCountInvalid" | "miaoFolder" | "miaoPickFolder" | "miaoUnknownReceive" | "miaoReceiveStarted" | "miaoPartialMismatch"> = {
+const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode" | "miaoUnreachable" | "miaoEndedRemote" | "miaoBusyPeer" | "miaoCustomDaysInvalid" | "miaoCustomCountInvalid" | "miaoFolder" | "miaoPickFolder" | "miaoUnknownReceive" | "miaoReceiveStarted" | "miaoPartialMismatch" | "miaoMissingFile" | "miaoShareUnready"> = {
   "This share is larger than 300 MiB.": "miaoTooBig",
   "Choose at least one file.": "miaoNeedFile",
   "Choose files, not folders.": "miaoFolder",
@@ -298,6 +298,8 @@ const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode"
   "Unknown download.": "miaoUnknownReceive",
   "That download has already started.": "miaoReceiveStarted",
   "The partial file did not match. The download will start over.": "miaoPartialMismatch",
+  "A shared file is missing, so that share was not restored.": "miaoMissingFile",
+  "A share could not be restored.": "miaoShareUnready",
 };
 
 export type MiaoErrorKey = (typeof KNOWN_ERRORS)[string];
