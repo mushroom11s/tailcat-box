@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { LocaleProvider } from "../i18n";
-import { resetBrowserMiao } from "../lib/miaoBrowser";
+import { releaseBrowserReceiveHolds, resetBrowserMiao, setBrowserReceiveHold } from "../lib/miaoBrowser";
 import { MAX_SHARE_BYTES, parseJoin } from "../lib/miao";
 import css from "../styles/glass.css?inline";
 import MiaoPage from "./MiaoPage";
@@ -74,8 +74,9 @@ describe("Mew Share page", () => {
     await user.paste(code);
     await user.click(screen.getByRole("button", { name: "Download" }));
 
-    expect(await screen.findByRole("heading", { name: "Saved" })).toBeTruthy();
-    expect(screen.getByText("笔记.txt")).toBeTruthy();
+    expect(await screen.findByText("Saved")).toBeTruthy();
+    expect(screen.getAllByText("笔记.txt").length).toBeGreaterThan(0);
+    expect((screen.getByRole("textbox", { name: "Share code" }) as HTMLTextAreaElement).value).toBe("");
     await user.click(screen.getByRole("tab", { name: "Send" }));
     expect(await screen.findByText("Share ended. The temporary copies are gone.")).toBeTruthy();
     expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
@@ -99,6 +100,57 @@ describe("Mew Share page", () => {
     expect(screen.getByRole("article", { name: "second.txt" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "End share" })).toBeTruthy();
     expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
+  });
+
+  it("keeps the code field usable and resumes an interrupted download", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const input = screen.getByLabelText("Choose files") as HTMLInputElement;
+    await user.upload(input, new File(["purr"], "notes.txt", { type: "text/plain" }));
+    const code = ((await screen.findByLabelText("Share code")) as HTMLTextAreaElement).value;
+    setBrowserReceiveHold(true);
+    try {
+      await user.click(screen.getByRole("tab", { name: "Receive" }));
+      const join = screen.getByRole("textbox", { name: "Share code" });
+      await user.click(join);
+      await user.paste(code);
+      await user.click(screen.getByRole("button", { name: "Download" }));
+      expect(await screen.findByText("Connecting…")).toBeTruthy();
+      expect((join as HTMLTextAreaElement).value).toBe("");
+      expect((screen.getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(true);
+      await user.click(join);
+      await user.paste(code);
+      expect((screen.getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(false);
+      await user.click(screen.getByRole("button", { name: "Download" }));
+      expect(screen.getAllByRole("progressbar")).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: "Cancel" })).toHaveLength(1);
+
+      releaseBrowserReceiveHolds();
+      await waitFor(() => {
+        const values = screen.getAllByRole("progressbar").map((bar) => Number(bar.getAttribute("aria-valuenow")));
+        expect(values.some((value) => value > 0 && value < 100)).toBe(true);
+      });
+      expect(screen.getByText("Downloading…")).toBeTruthy();
+      expect(screen.getAllByText("notes.txt").length).toBeGreaterThan(0);
+      const partial = Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(await screen.findByText("Interrupted")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Discard" })).toBeTruthy();
+      expect(Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))).toBe(partial);
+
+      await user.click(join);
+      await user.paste(code);
+      await user.click(screen.getByRole("button", { name: "Download" }));
+      expect(screen.getAllByRole("progressbar")).toHaveLength(1);
+      expect(Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))).toBeGreaterThan(0);
+      setBrowserReceiveHold(false);
+      expect(await screen.findByText("Saved")).toBeTruthy();
+      expect((screen.getByRole("textbox", { name: "Share code" }) as HTMLTextAreaElement).disabled).toBe(false);
+    } finally {
+      setBrowserReceiveHold(false);
+      releaseBrowserReceiveHolds();
+    }
   });
 
   it("scrolls the send column so active cards stay whole", async () => {

@@ -12,13 +12,18 @@ import {
   fileToBase64,
   formatBytes,
   miaoErrorKey,
+  parseReceiveJob,
+  receivePercent,
+  receiveTerminal,
   remainingTTL,
   shareTooLarge,
-  type MiaoReceipt,
+  upsertReceiveJob,
   type MiaoShare,
+  type ReceiveJob,
+  type ReceiveStatus,
   type Remaining,
 } from "../lib/miao";
-import { endMiaoShare, hasWailsBindings, joinMiaoShare, miaoShareStatus, onTailcatEvent, selectDirectory, selectFiles, startMiaoShare } from "../lib/wails";
+import { cancelMiaoReceive, discardMiaoReceive, endMiaoShare, hasWailsBindings, listMiaoReceives, miaoShareStatus, onTailcatEvent, selectDirectory, selectFiles, setMiaoReceiveDest, startMiaoReceive, startMiaoShare } from "../lib/wails";
 
 type TTLMode = "1" | "7" | "15" | "custom" | "forever";
 type CountMode = "1" | "3" | "10" | "unlimited" | "custom";
@@ -53,6 +58,33 @@ function ttlLabel(ttl: Remaining | null, t: (key: MessageKey) => string): string
 function baseName(path: string): string {
   const parts = path.split(/[/\\]/);
   return parts[parts.length - 1] || path;
+}
+
+function receiveStatusLabel(status: ReceiveStatus, t: (key: MessageKey) => string): string {
+  switch (status) {
+    case "connecting":
+      return t("miaoStatusConnecting");
+    case "queued":
+      return t("miaoStatusQueued");
+    case "downloading":
+      return t("miaoStatusDownloading");
+    case "done":
+      return t("miaoSaved");
+    case "failed":
+      return t("miaoStatusFailed");
+    case "cancelled":
+      return t("miaoStatusCancelled");
+    case "interrupted":
+      return t("miaoStatusInterrupted");
+  }
+}
+
+function receiveErrorText(job: ReceiveJob, t: (key: MessageKey) => string): string {
+  if (!job.error) {
+    return "";
+  }
+  const key = miaoErrorKey(new Error(job.error));
+  return key ? t(key) : job.error;
 }
 
 function upsertShare(list: MiaoShare[], snap: MiaoShare): MiaoShare[] {
@@ -152,6 +184,87 @@ function ShareCard({
   );
 }
 
+function ReceiveCard({
+  job,
+  onCancel,
+  onChangeFolder,
+  onResume,
+  onDiscard,
+}: {
+  job: ReceiveJob;
+  onCancel: (id: string) => void;
+  onChangeFolder: (job: ReceiveJob) => void;
+  onResume: (job: ReceiveJob) => void;
+  onDiscard: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const names = job.files.map((file) => file.name).join(", ");
+  const label = names || t("miaoReceiveJob");
+  const status = receiveStatusLabel(job.status, t);
+  const pct = receivePercent(job);
+  const active = !receiveTerminal(job.status);
+  const canChangeFolder = hasWailsBindings() && (job.status === "connecting" || job.status === "queued");
+  const canResume = job.status === "interrupted" || job.status === "failed";
+  const error = receiveErrorText(job, t);
+  return (
+    <article className="glass miao-active miao-receive-card" aria-label={label}>
+      <h3>{names || t("miaoFiles")}</h3>
+      <p className="miao-receive-status">{status}</p>
+      {job.files.length ? (
+        <ul className="miao-files">
+          {job.files.map((file) => (
+            <li key={`${file.name}:${file.size}`}>
+              <span>{file.name}</span>
+              <span className="miao-size">{formatBytes(file.size)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div
+        className="miao-progress"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        aria-label={status}
+      >
+        <span style={{ width: `${pct}%` }} />
+      </div>
+      <p className="chat-quiet miao-receive-bytes">
+        {formatBytes(job.bytesDone)} / {formatBytes(job.bytesTotal)}
+      </p>
+      {job.dest ? (
+        <p className="chat-quiet">
+          {t("miaoSaveTo")} {job.dest}
+        </p>
+      ) : null}
+      {error ? <p className="err">{error}</p> : null}
+      {active ? (
+        <div className="row">
+          {canChangeFolder ? (
+            <button className="btn btn-ghost" type="button" onClick={() => onChangeFolder(job)}>
+              {t("miaoChangeFolder")}
+            </button>
+          ) : null}
+          <button className="btn btn-ghost" type="button" onClick={() => onCancel(job.id)}>
+            {t("miaoCancel")}
+          </button>
+        </div>
+      ) : null}
+      {canResume ? (
+        <div className="row">
+          <button className="btn" type="button" onClick={() => onResume(job)}>
+            {t("miaoResume")}
+          </button>
+          <button className="btn btn-ghost" type="button" onClick={() => onDiscard(job.id)}>
+            {t("miaoDiscard")}
+          </button>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 export default function MiaoPage() {
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("send");
@@ -165,14 +278,24 @@ export default function MiaoPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [code, setCode] = useState("");
-  const [saved, setSaved] = useState<MiaoReceipt | null>(null);
+  const [jobs, setJobs] = useState<ReceiveJob[]>([]);
+  const [lastDest, setLastDest] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const inputRef = useRef<HTMLInputElement>(null);
   const endedRef = useRef(new Set<string>());
+  const savedRef = useRef(new Set<string>());
   const ticking = shares.some((share) => !share.forever);
 
   useEffect(() => {
     let live = true;
+    void listMiaoReceives()
+      .then((listed) => {
+        if (!live) {
+          return;
+        }
+        setJobs((current) => listed.reduce((list, job) => upsertReceiveJob(list, job), current));
+      })
+      .catch(() => undefined);
     void miaoShareStatus()
       .then((list) => {
         if (!live) {
@@ -193,6 +316,28 @@ export default function MiaoPage() {
 
   useEffect(() => {
     return onTailcatEvent((ev) => {
+      if (ev.Kind === "miao-receive" && ev.Data) {
+        const job = parseReceiveJob(ev.Data);
+        if (!job) {
+          return;
+        }
+        setJobs((list) => upsertReceiveJob(list, job));
+        if (job.status === "done" && !hasWailsBindings() && !savedRef.current.has(job.id)) {
+          savedRef.current.add(job.id);
+          for (const file of job.saved ?? []) {
+            if (!file.dataBase64 || typeof URL.createObjectURL !== "function") {
+              continue;
+            }
+            const url = URL.createObjectURL(base64ToBlob(file.dataBase64));
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = file.name;
+            link.click();
+            URL.revokeObjectURL(url);
+          }
+        }
+        return;
+      }
       if (ev.Kind !== "miao" || !ev.Data) {
         return;
       }
@@ -346,42 +491,103 @@ export default function MiaoPage() {
     }
   }
 
+  async function ensureDest(): Promise<string | null> {
+    if (lastDest) {
+      return lastDest;
+    }
+    if (!hasWailsBindings()) {
+      return "";
+    }
+    const dest = await selectDirectory(t("miaoPickFolder"));
+    if (!dest) {
+      return null;
+    }
+    setLastDest(dest);
+    return dest;
+  }
+
+  async function changeDefaultFolder(): Promise<void> {
+    if (!hasWailsBindings()) {
+      return;
+    }
+    const dest = await selectDirectory(t("miaoPickFolder"));
+    if (!dest) {
+      return;
+    }
+    setLastDest(dest);
+  }
+
+  async function changeJobFolder(job: ReceiveJob): Promise<void> {
+    if (!hasWailsBindings()) {
+      return;
+    }
+    const dest = await selectDirectory(t("miaoPickFolder"));
+    if (!dest) {
+      return;
+    }
+    setLastDest(dest);
+    if (job.status !== "connecting" && job.status !== "queued") {
+      return;
+    }
+    try {
+      await setMiaoReceiveDest(job.id, dest);
+      setJobs((list) => list.map((item) => (item.id === job.id ? { ...item, dest } : item)));
+    } catch (err) {
+      showError(err, "miaoPickFolder");
+    }
+  }
+
+  async function cancelJob(id: string): Promise<void> {
+    setError("");
+    try {
+      await cancelMiaoReceive(id);
+    } catch (err) {
+      showError(err, "miaoUnknownReceive");
+    }
+  }
+
+  async function resumeJob(job: ReceiveJob): Promise<void> {
+    const raw = (job.payload || "").trim();
+    if (!raw) {
+      setError(t("miaoBadCode"));
+      return;
+    }
+    setError("");
+    try {
+      const next = await startMiaoReceive(raw, job.dest);
+      setJobs((list) => upsertReceiveJob(list, next));
+    } catch (err) {
+      showError(err, "miaoUnreachable");
+    }
+  }
+
+  async function discardJob(id: string): Promise<void> {
+    setError("");
+    try {
+      await discardMiaoReceive(id);
+      setJobs((list) => list.filter((item) => item.id !== id));
+    } catch (err) {
+      showError(err, "miaoUnknownReceive");
+    }
+  }
+
   async function join(): Promise<void> {
     const raw = code.trim();
     if (!acceptMiaoCode(raw).ok) {
       setError(t("miaoBadCode"));
       return;
     }
-    setBusy("join");
     setError("");
-    setSaved(null);
     try {
-      let dest = "";
-      if (hasWailsBindings()) {
-        dest = await selectDirectory(t("miaoPickFolder"));
-        if (!dest) {
-          return;
-        }
+      const dest = await ensureDest();
+      if (dest === null) {
+        return;
       }
-      const receipt = await joinMiaoShare(raw, dest);
-      setSaved(receipt);
-      if (!hasWailsBindings() && typeof URL.createObjectURL === "function") {
-        for (const file of receipt.files) {
-          if (!file.dataBase64) {
-            continue;
-          }
-          const url = URL.createObjectURL(base64ToBlob(file.dataBase64));
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = file.name;
-          link.click();
-          URL.revokeObjectURL(url);
-        }
-      }
+      const job = await startMiaoReceive(raw, dest);
+      setJobs((list) => upsertReceiveJob(list, job));
+      setCode("");
     } catch (err) {
       showError(err, "miaoUnreachable");
-    } finally {
-      setBusy("");
     }
   }
 
@@ -519,37 +725,49 @@ export default function MiaoPage() {
           ) : null}
         </div>
       ) : (
-        <div className="glass miao-join">
-          <p className="lede">{t("miaoJoinHelp")}</p>
-          <div className="field">
-            <label htmlFor="miao-join-code">{t("miaoToken")}</label>
-            <div className="qr-field">
-              <textarea
-                id="miao-join-code"
-                rows={3}
-                value={code}
-                placeholder={t("miaoJoinPlaceholder")}
-                onChange={(ev) => setCode(ev.target.value)}
-              />
-              <QrScanButton disabled={busy !== ""} accept={acceptMiaoCode} invalidKey="miaoBadCode" onAccept={setCode} />
+        <div className="miao-receive">
+          <div className="glass miao-join">
+            <p className="lede">{t("miaoJoinHelp")}</p>
+            <div className="field">
+              <label htmlFor="miao-join-code">{t("miaoToken")}</label>
+              <div className="qr-field">
+                <textarea
+                  id="miao-join-code"
+                  rows={3}
+                  value={code}
+                  placeholder={t("miaoJoinPlaceholder")}
+                  onChange={(ev) => setCode(ev.target.value)}
+                />
+                <QrScanButton accept={acceptMiaoCode} invalidKey="miaoBadCode" onAccept={setCode} />
+              </div>
+            </div>
+            <p className="chat-quiet miao-dest-line">{lastDest ? `${t("miaoSaveTo")} ${lastDest}` : t("miaoFolderLater")}</p>
+            <div className="row">
+              <button className="btn" type="button" disabled={!code.trim()} onClick={() => void join()}>
+                {t("miaoJoin")}
+              </button>
+              {hasWailsBindings() ? (
+                <button className="btn btn-ghost" type="button" onClick={() => void changeDefaultFolder()}>
+                  {t("miaoChangeFolder")}
+                </button>
+              ) : null}
             </div>
           </div>
-          <div className="row">
-            <button className="btn" type="button" disabled={busy !== "" || !code.trim()} onClick={() => void join()}>
-              {busy === "join" ? <LoadingCat size="sm" label={t("miaoJoining")} /> : t("miaoJoin")}
-            </button>
-          </div>
-          {saved ? (
-            <div>
-              <h3>{t("miaoSaved")}</h3>
-              <ul className="miao-files">
-                {saved.files.map((file) => (
-                  <li key={`${file.name}:${file.path}`}>
-                    <span>{file.name}</span>
-                    <span className="miao-size">{file.path || formatBytes(file.size)}</span>
-                  </li>
+          {jobs.length ? (
+            <div className="miao-share-list">
+              <h3>{t("miaoReceiveJobs")}</h3>
+              <div className="miao-share-cards">
+                {jobs.map((job) => (
+                  <ReceiveCard
+                    key={job.id}
+                    job={job}
+                    onCancel={(id) => void cancelJob(id)}
+                    onChangeFolder={(item) => void changeJobFolder(item)}
+                    onResume={(item) => void resumeJob(item)}
+                    onDiscard={(id) => void discardJob(id)}
+                  />
                 ))}
-              </ul>
+              </div>
             </div>
           ) : null}
         </div>

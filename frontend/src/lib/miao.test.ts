@@ -1,6 +1,18 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { browserJoinMiao, browserStartMiao, resetBrowserMiao } from "./miaoBrowser";
-import { acceptMiaoCode, downloadsLeft, encodeJoin, MAX_SHARE_BYTES, parseJoin, remainingTTL, shareTooLarge } from "./miao";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { browserCancelReceive, browserDiscardReceive, browserJoinMiao, browserReceiveHeld, browserStartMiao, browserStartReceive, releaseBrowserReceiveHolds, resetBrowserMiao, setBrowserReceiveHold, setMiaoBrowserEmit } from "./miaoBrowser";
+import {
+  acceptMiaoCode,
+  downloadsLeft,
+  encodeJoin,
+  MAX_SHARE_BYTES,
+  parseJoin,
+  parseReceiveJob,
+  receivePercent,
+  remainingTTL,
+  shareTooLarge,
+  upsertReceiveJob,
+  type ReceiveJob,
+} from "./miao";
 
 afterEach(() => {
   resetBrowserMiao();
@@ -54,6 +66,122 @@ describe("miao share helpers", () => {
     expect(downloadsLeft(1, 0)).toBe(1);
     expect(downloadsLeft(1, 1)).toBe(0);
     expect(downloadsLeft(0, 4)).toBeNull();
+  });
+
+  it("keeps receive progress and does not rewind a job", () => {
+    const connecting: ReceiveJob = { id: "a", status: "connecting", bytesDone: 0, bytesTotal: 0, files: [], dest: "/tmp" };
+    const queued: ReceiveJob = { ...connecting, id: "b", status: "queued" };
+    const partial: ReceiveJob = {
+      id: "a",
+      status: "downloading",
+      bytesDone: 40,
+      bytesTotal: 100,
+      files: [{ name: "notes.txt", size: 100 }],
+      dest: "/tmp",
+    };
+    let jobs = upsertReceiveJob([], connecting);
+    jobs = upsertReceiveJob(jobs, queued);
+    jobs = upsertReceiveJob(jobs, partial);
+    jobs = upsertReceiveJob(jobs, { ...connecting, status: "connecting" });
+    jobs = upsertReceiveJob(jobs, { ...partial, bytesDone: 10 });
+    expect(jobs.map((job) => job.id)).toEqual(["b", "a"]);
+    const active = jobs.find((job) => job.id === "a");
+    const waiting = jobs.find((job) => job.id === "b");
+    if (!active || !waiting) {
+      throw new Error("missing jobs");
+    }
+    expect(active).toMatchObject({ status: "downloading", bytesDone: 40, bytesTotal: 100 });
+    expect(active.files[0]?.name).toBe("notes.txt");
+    expect(waiting.status).toBe("queued");
+    expect(receivePercent(active)).toBe(40);
+    expect(receivePercent(waiting)).toBe(0);
+    const done = upsertReceiveJob(jobs, { ...partial, status: "done", bytesDone: 100, error: "" });
+    const finished = done.find((job) => job.id === "a");
+    if (!finished) {
+      throw new Error("missing finished job");
+    }
+    expect(finished.status).toBe("done");
+    expect(receivePercent(finished)).toBe(100);
+    const stuck = upsertReceiveJob(done, { ...partial, status: "downloading", bytesDone: 80 });
+    expect(stuck.find((job) => job.id === "a")?.status).toBe("done");
+    const interrupted = upsertReceiveJob(jobs, { ...partial, status: "interrupted", bytesDone: 40, resumable: true, payload: "mw1.keep" });
+    const resumed = upsertReceiveJob(interrupted, { ...partial, status: "connecting", bytesDone: 40, payload: "mw1.keep" });
+    expect(resumed.find((job) => job.id === "a")).toMatchObject({ status: "connecting", bytesDone: 40, payload: "mw1.keep" });
+    expect(parseReceiveJob(JSON.stringify({ ...partial, status: "interrupted", resumable: true }))?.status).toBe("interrupted");
+    expect(parseReceiveJob("{")).toBeNull();
+  });
+
+  it("queues a second receive for the same share and reports progress", async () => {
+    const seen: ReceiveJob[] = [];
+    setMiaoBrowserEmit((ev) => {
+      if (ev.Kind !== "miao-receive" || !ev.Data) {
+        return;
+      }
+      const job = parseReceiveJob(ev.Data);
+      if (job) {
+        seen.push(job);
+      }
+    });
+    const share = await browserStartMiao([{ name: "a.txt", path: "", dataBase64: btoa("hello") }], 1, false, 3);
+    const other = await browserStartMiao([{ name: "b.txt", path: "", dataBase64: btoa("yo") }], 1, false, 1);
+    const first = browserStartReceive(share.payload, "/tmp/in");
+    const second = browserStartReceive(share.payload, "/tmp/other");
+    const same = browserStartReceive(share.payload, "/tmp/in");
+    const parallel = browserStartReceive(other.payload, "/tmp/in");
+    expect(first.status).toBe("connecting");
+    expect(second.status).toBe("queued");
+    expect(same.id).toBe(first.id);
+    expect(parallel.status).toBe("connecting");
+    await vi.waitFor(() => {
+      expect(seen.some((job) => job.id === first.id && job.status === "downloading" && job.bytesDone > 0 && job.bytesDone < job.bytesTotal)).toBe(true);
+      expect(seen.some((job) => job.id === second.id && job.status === "queued")).toBe(true);
+      expect(seen.some((job) => job.id === first.id && job.status === "done" && job.bytesDone === job.bytesTotal)).toBe(true);
+      expect(seen.some((job) => job.id === second.id && job.status === "downloading")).toBe(true);
+      expect(seen.some((job) => job.id === second.id && job.status === "done")).toBe(true);
+      expect(seen.some((job) => job.id === parallel.id && job.status === "downloading")).toBe(true);
+    });
+  });
+
+  it("continues a partial download from the bytes already received", async () => {
+    const seen: ReceiveJob[] = [];
+    setMiaoBrowserEmit((ev) => {
+      if (ev.Kind !== "miao-receive" || !ev.Data) {
+        return;
+      }
+      const job = parseReceiveJob(ev.Data);
+      if (job) {
+        seen.push(job);
+      }
+    });
+    setBrowserReceiveHold(true);
+    try {
+      const share = await browserStartMiao([{ name: "a.txt", path: "", dataBase64: btoa("hello-resume") }], 1, false, 3);
+      const first = browserStartReceive(share.payload, "/tmp/in");
+      await vi.waitFor(() => {
+        expect(browserReceiveHeld()).toBeGreaterThan(0);
+      });
+      releaseBrowserReceiveHolds();
+      await vi.waitFor(() => {
+        expect(seen.some((job) => job.id === first.id && job.status === "downloading" && job.bytesDone > 0 && job.bytesDone < job.bytesTotal)).toBe(true);
+      });
+      browserCancelReceive(first.id);
+      const stopped = seen.find((job) => job.id === first.id && job.status === "interrupted");
+      if (!stopped || stopped.bytesDone <= 0) {
+        throw new Error("missing partial");
+      }
+      const again = browserStartReceive(share.payload, "/tmp/in");
+      expect(again.id).toBe(first.id);
+      expect(again.bytesDone).toBe(stopped.bytesDone);
+      expect(again.bytesDone).toBeGreaterThan(0);
+      setBrowserReceiveHold(false);
+      await vi.waitFor(() => {
+        expect(seen.some((job) => job.id === first.id && job.status === "done" && job.bytesDone === job.bytesTotal)).toBe(true);
+      });
+      browserDiscardReceive(first.id);
+    } finally {
+      setBrowserReceiveHold(false);
+      releaseBrowserReceiveHolds();
+    }
   });
 
   it("formats a finite TTL and forever", () => {

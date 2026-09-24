@@ -44,7 +44,23 @@ Host listens with an ephemeral Tailcat room (the same `StartRoom` path as chat).
 {"v":1,"kind":"miao","addr":"tc…","token":"…"}
 ```
 
-The peer listens on its own room, dials the host, and sends a `miao-pull` TCH1 envelope on port 102 with the token and its reply address. The host checks the token and streams `miao-manifest`, `miao-chunk`, and `miao-done`. A bad token is refused and does not end the share. One transfer runs at a time; another pull waits until the current one finishes. Temp copies live under `<user-config>/tailcat-box/miao` (`TAILCAT_MIAO_DIR` overrides that).
+The peer listens on its own room, dials the host, and sends a `miao-pull` TCH1 envelope on port 102 with the token and its reply address. The host checks the token and streams `miao-manifest`, `miao-chunk`, and `miao-done`. A `miao-pull` may include `resume: [{id, offset}]`. The host then starts each file at that byte offset. An omitted `resume` still starts at 0, so older peers keep working. A bad token is refused and does not end the share. One transfer runs at a time per share; another pull for that share waits until the current one finishes, and a queued pull keeps the offsets it asked for. While it waits, the host sends `miao-queued` so the receiver can show Queued. Temp copies live under `<user-config>/tailcat-box/miao` (`TAILCAT_MIAO_DIR` overrides that). The receiver's resume index lives in `incoming/` under that directory and is kept across restarts.
+
+### Receive jobs
+
+The receive tab keeps the code field and Download button available. Each Download starts a new job and clears the code. `StartMiaoReceive` returns the job id immediately. Different shares download together. A second job for a share the host is already sending stays queued until that pull finishes, then its progress moves.
+
+Chunk writes emit Tailcat events with Kind `miao-receive` and JSON `{id,status,bytesDone,bytesTotal,files,error,dest,saved,payload,resumable}`. Status is `connecting`, `queued`, `downloading`, `done`, `failed`, `cancelled`, or `interrupted`. Each card shows the file names once the manifest arrives, the size, a progress bar, and that status.
+
+The first download asks for a folder. Later jobs reuse it. A job can change its folder while it is still connecting or queued and no bytes have been kept. An in-progress job can be cancelled.
+
+### Resume
+
+A download that stops because the peer disconnects, the app quits, or the transfer errors keeps the bytes already received. The receiver writes `<dest>/.tailcat-miao/<fingerprint>/<id>.part` plus `state.json`. The fingerprint is the share address and token. The sidecar stores the job id, code, destination, and each file's size and offset. The same record is copied under the app `incoming/` index so the receive list can come back after a restart.
+
+Joining the same code into the same folder continues that job instead of starting a second copy. The card shows **继续 / Resume** and the progress already reached. A finished file is renamed into the destination and the partial state is removed. Discard, or a cancel that received nothing, deletes the partials. If the host has ended the share, Resume reports that and Discard still removes the leftover.
+
+A partial whose length or declared size does not match is deleted and fetched again from byte 0. If the bytes are the right length but fail the checksum, the partial is dropped and the error says the download will start over. Resume state is for this device and this folder; copying a partial to another computer is out of scope.
 
 ### Loading mascot
 
@@ -63,4 +79,6 @@ The peer listens on its own room, dials the host, and sends a `miao-pull` TCH1 e
 - Oversize reject before any temp copy; renamed storage plus display names; TTL and download-cap end delete that share's copies
 - Concurrent shares stay independent: ending or exhausting one leaves the others and their temp files
 - Browser fake: drop zone stays beside the active list, each share has its own QR/token, join targets one token, and cap cleanup removes only that share
+- Receive jobs: progress events advance bytes, a second pull of the same share is queued, and a different share downloads without waiting
+- Resume: a second pull continues from the partial offset, progress events start at that offset, a short or mismatched partial is fetched again, and corrupted bytes fail clearly before a clean retry
 - `LoadingCat` renders the mascot when a label is shown
