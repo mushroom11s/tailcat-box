@@ -1625,6 +1625,12 @@ textarea {
   font-size: 18px;
 }
 
+.onboarding-progress {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
 .modal p {
   margin: 0 0 16px;
   color: var(--muted);

@@ -47,6 +47,22 @@ export const en = {
   desktopNotifications: "Desktop notifications",
   desktopNotificationsHelp:
     "When the window is minimized or in the background, mention a peer joining, a Mew Share coming in, or a download finishing.",
+  onboardingOpen: "Show guide",
+  onboardingProgress: "{n} / {total}",
+  onboardingStep1Title: "Share your address",
+  onboardingStep1Body:
+    "Open Chat and start a room. Copy the address, or its QR code, and send it to the other person. That address is how they reach this room. Save a key if you want the same address next time.",
+  onboardingStep2Title: "Join or create a room",
+  onboardingStep2Body:
+    "Use + New room to start a temporary room, or paste their address and connect. A few rooms can stay open. Switch them from the sidebar.",
+  onboardingStep3Title: "Mew Share pickup codes",
+  onboardingStep3Body:
+    "Mew Share is for files. Drop files in to get a pickup code, then send that code. The other person pastes it under Download. Both of you stay in Tailcat Box, and this device stays online. A pickup code is not your chat address.",
+  onboardingNext: "Next",
+  onboardingBack: "Back",
+  onboardingDone: "Done",
+  onboardingSkip: "Skip",
+  onboardingDismiss: "Don't show again",
 
   tunnelTitle: "Tunnel",
   tunnelLede:

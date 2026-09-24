@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import Onboarding from "./components/Onboarding";
 import { ToastProvider, useToasts } from "./components/toasts";
 import ChatPage, { type ChatMessage } from "./pages/ChatPage";
 import LobbyPage from "./pages/LobbyPage";
@@ -20,6 +21,7 @@ import {
 } from "./lib/desktopNotify";
 import { parseReceiveJob } from "./lib/miao";
 import { NICKNAME_KEY, readNickname } from "./lib/nickname";
+import { shouldAutoShowOnboarding, writeOnboardingSeen } from "./lib/onboarding";
 import { ensureOsNotifications, focusAppWindow, sendOsNotification, type NotifyData } from "./lib/osNotify";
 import { applyRemark, readRemarks, writeRemarks, type RemarkMap } from "./lib/remark";
 import { remarkIsShared, roomPrimaryLabel, roomTooltip } from "./lib/roomLabel";
@@ -93,6 +95,7 @@ function AppShell() {
   const pushRef = useRef(push);
   pushRef.current = push;
   const [page, setPageState] = useState<Page>("miao");
+  const [guideOpen, setGuideOpen] = useState(() => shouldAutoShowOnboarding());
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const [nickname, setNickname] = useState(() => readNickname());
   const [remarks, setRemarks] = useState<RemarkMap>(() => readRemarks());
@@ -1055,6 +1058,7 @@ function AppShell() {
             onSaveNetwork={(nextRegion, nextDERP) => run(() => setNetworkSettings(nextRegion, nextDERP))}
             desktopNotifications={desktopNotify}
             onDesktopNotifications={setDesktopNotifications}
+            onShowGuide={() => setGuideOpen(true)}
           />
         )}
       </main>
@@ -1081,6 +1085,14 @@ function AppShell() {
           </div>
         </div>
       ) : null}
+      <Onboarding
+        open={guideOpen}
+        onSkip={() => setGuideOpen(false)}
+        onDismiss={() => {
+          writeOnboardingSeen();
+          setGuideOpen(false);
+        }}
+      />
     </div>
   );
 }
