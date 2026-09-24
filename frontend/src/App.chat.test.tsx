@@ -131,20 +131,16 @@ describe("phase 1 chat shell", () => {
     }
   });
 
-  it("reaches Keys & DERP and Diagnostics inside Settings", async () => {
+  it("reaches Keys & DERP inside Settings", async () => {
     const user = userEvent.setup();
     await renderApp();
-    await user.click(screen.getByRole("button", { name: "Create temporary room" }));
-    await screen.findByRole("button", { name: "Copy" });
-    await user.click(screen.getByRole("button", { name: "Show room details" }));
-    await user.type(screen.getByLabelText("Peer"), "tc:fake-echo");
-    await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("heading", { name: "Keys & DERP" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Diagnostics" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Diagnostics" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "诊断" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ping" })).toBeNull();
     expect(screen.queryByLabelText("Room key")).toBeNull();
     expect(screen.queryByRole("button", { name: "Restart room" })).toBeNull();
-    expect((screen.getByLabelText("Address") as HTMLInputElement).value).toBe("tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Chat" }));
     expect(screen.queryByRole("heading", { name: "Services" })).toBeNull();
     expect(document.querySelectorAll(".nav-btn").length).toBe(6);

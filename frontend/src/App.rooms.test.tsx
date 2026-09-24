@@ -166,7 +166,7 @@ describe("phase A multi-room lobby", () => {
     expect(screen.getByText("echo").textContent).toBe("echo");
   });
 
-  it("refuses the 9th room and lists every chat session", async () => {
+  it("refuses the 9th room", async () => {
     const user = userEvent.setup();
     await renderApp();
     for (let i = 0; i < 8; i += 1) {
@@ -182,10 +182,6 @@ describe("phase A multi-room lobby", () => {
     expect(document.querySelector(".chat-lobby")).toBeTruthy();
     expect(document.querySelectorAll(".nav-child:not(.nav-new)")).toHaveLength(8);
     expect((await listSessions()).filter((item) => item.Kind === "chat")).toHaveLength(8);
-
-    await user.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByRole("heading", { name: "Chat sessions" })).toBeTruthy();
-    expect(screen.getAllByText(/^tc:fake-room-/)).toHaveLength(8);
   });
 
   it("uses the Chinese lobby strings", async () => {
