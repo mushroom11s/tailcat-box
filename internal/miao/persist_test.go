@@ -244,6 +244,9 @@ func TestShareRecordStaysListedWhenListenFails(t *testing.T) {
 	if got.ID != snap.ID || got.Payload != snap.Payload || got.Token != snap.Token || got.Status != "active" {
 		t.Fatalf("record=%+v want id/payload/token from %+v", got, snap)
 	}
+	if got.Listening {
+		t.Fatal("a share that failed to listen is marked online")
+	}
 	if got.Downloads != 1 || got.MaxDownloads != 3 {
 		t.Fatalf("downloads=%d/%d", got.Downloads, got.MaxDownloads)
 	}
@@ -301,7 +304,7 @@ func TestShareListensAgainAfterAFailedRestore(t *testing.T) {
 	if joined != nil {
 		t.Fatal(joined)
 	}
-	if listed := again.List(); len(listed) != 1 || listed[0].Downloads != 1 || listed[0].Payload != snap.Payload {
+	if listed := again.List(); len(listed) != 1 || listed[0].Downloads != 1 || listed[0].Payload != snap.Payload || !listed[0].Listening {
 		t.Fatalf("after download=%+v", listed)
 	}
 }

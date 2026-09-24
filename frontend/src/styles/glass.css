@@ -1207,6 +1207,13 @@ textarea {
   font-size: 13px;
 }
 
+.miao-warn {
+  margin: 0 0 8px;
+  color: var(--warn);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .card-actions {
   display: flex;
   gap: 8px;

@@ -20,8 +20,11 @@ import {
   parseShare,
   receivePercent,
   receiveTerminal,
+  expiresSoon,
+  nextRetryDelay,
   remainingTTL,
   shareTooLarge,
+  shouldAutoRetryDownload,
   upsertReceiveJob,
   type MiaoShare,
   type ReceiveJob,
@@ -122,6 +125,8 @@ function ShareCard({
   const [qrFailed, setQrFailed] = useState(false);
   const left = downloadsLeft(share.maxDownloads, share.downloads);
   const ttl = remainingTTL(share.expiresAt, share.forever, now);
+  const expiring = expiresSoon(share.expiresAt, share.forever, now);
+  const offlineShare = share.listening === false;
   const files = share.files ?? [];
   const label = files.map((file) => file.name).join(", ") || share.id;
 
@@ -163,6 +168,16 @@ function ShareCard({
           ))}
         </ul>
         <div className="miao-share-meta">
+          {offlineShare ? (
+            <p className="miao-warn" role="status">
+              {t("miaoListenFailed")}
+            </p>
+          ) : null}
+          {expiring ? (
+            <p className="miao-warn" role="status">
+              {t("miaoExpiringSoon")}
+            </p>
+          ) : null}
           <p className="chat-quiet">
             {t("miaoTotal")} {formatBytes(share.total)}
           </p>
@@ -187,7 +202,9 @@ function ShareCard({
         </div>
         <div className="miao-qr">
           {qrFailed ? <p className="err">{t("qrEncodeFailed")}</p> : null}
-          {qrSrc ? <img src={qrSrc} alt={t("miaoToken")} width={172} height={172} /> : (
+          {qrSrc ? <img src={qrSrc} alt={t("miaoToken")} width={172} height={172} /> : offlineShare ? (
+            <p className="miao-warn" role="status">{t("miaoListenFailed")}</p>
+          ) : (
             <LoadingCat size="lg" layout="block" label={t("miaoPacking")} />
           )}
         </div>
@@ -198,15 +215,21 @@ function ShareCard({
 
 function ReceiveCard({
   job,
+  now,
+  retrying,
   onCancel,
   onChangeFolder,
   onResume,
+  onRetry,
   onDiscard,
 }: {
   job: ReceiveJob;
+  now: number;
+  retrying: boolean;
   onCancel: (id: string) => void;
   onChangeFolder: (job: ReceiveJob) => void;
   onResume: (job: ReceiveJob) => void;
+  onRetry: (job: ReceiveJob) => void;
   onDiscard: (id: string) => void;
 }) {
   const { t } = useI18n();
@@ -217,8 +240,10 @@ function ReceiveCard({
   const pct = receivePercent(job);
   const active = !receiveTerminal(job.status);
   const canChangeFolder = hasWailsBindings() && (job.status === "connecting" || job.status === "queued");
-  const canResume = job.status === "interrupted" || job.status === "failed";
+  const canResume = job.status === "interrupted";
+  const canRetry = job.status === "failed";
   const error = receiveErrorText(job, t);
+  const expiring = expiresSoon(job.expiresAt ?? "", false, now);
   return (
     <article className="glass miao-active miao-receive-card" aria-label={label}>
       <h3>{names || t("miaoFiles")}</h3>
@@ -259,6 +284,12 @@ function ReceiveCard({
           {t("miaoSaveTo")} {job.dest}
         </p>
       ) : null}
+      {expiring ? (
+        <p className="miao-warn" role="status">
+          {t("miaoExpiringSoon")}
+        </p>
+      ) : null}
+      {retrying ? <p className="chat-quiet">{t("miaoRetrying")}</p> : null}
       {error ? <p className="err">{error}</p> : null}
       {active ? (
         <div className="row">
@@ -272,11 +303,18 @@ function ReceiveCard({
           </button>
         </div>
       ) : null}
-      {canResume ? (
+      {canResume || canRetry ? (
         <div className="row">
-          <button className="btn" type="button" onClick={() => onResume(job)}>
-            {t("miaoResume")}
-          </button>
+          {canResume ? (
+            <button className="btn" type="button" onClick={() => onResume(job)}>
+              {t("miaoResume")}
+            </button>
+          ) : null}
+          {canRetry ? (
+            <button className="btn" type="button" onClick={() => onRetry(job)}>
+              {t("miaoRetry")}
+            </button>
+          ) : null}
           <button className="btn btn-ghost" type="button" onClick={() => onDiscard(job.id)}>
             {t("miaoDiscard")}
           </button>
@@ -302,10 +340,16 @@ export default function MiaoPage() {
   const [jobs, setJobs] = useState<ReceiveJob[]>([]);
   const [lastDest, setLastDest] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
+  const [retrying, setRetrying] = useState<Record<string, boolean>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+  const jobsRef = useRef(jobs);
+  const retryAttempts = useRef<Record<string, number>>({});
+  const retryTimers = useRef<Record<string, number>>({});
+  jobsRef.current = jobs;
   const endedRef = useRef(new Set<string>());
   const savedRef = useRef(new Set<string>());
-  const ticking = shares.some((share) => !share.forever);
+  const ticking = shares.some((share) => !share.forever) || jobs.some((job) => Boolean(job.expiresAt));
 
   function sharePasteFailure(reason: PasteFailure): MessageKey {
     if (reason === "empty") {
@@ -419,6 +463,18 @@ export default function MiaoPage() {
       }
     });
   }, [t]);
+
+  useEffect(() => {
+    function sync() {
+      setOnline(navigator.onLine);
+    }
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
 
   useEffect(() => {
     if (!ticking) {
@@ -607,6 +663,17 @@ export default function MiaoPage() {
     }
   }
 
+  async function retryJob(job: ReceiveJob): Promise<void> {
+    const pending = retryTimers.current[job.id];
+    if (pending) {
+      window.clearTimeout(pending);
+      delete retryTimers.current[job.id];
+    }
+    retryAttempts.current[job.id] = 0;
+    setRetrying((current) => ({ ...current, [job.id]: false }));
+    await resumeJob(job);
+  }
+
   async function resumeJob(job: ReceiveJob): Promise<void> {
     const raw = (job.payload || "").trim();
     if (!raw) {
@@ -621,6 +688,65 @@ export default function MiaoPage() {
       showError(err, "miaoUnreachable");
     }
   }
+
+  const resumeRef = useRef(resumeJob);
+  resumeRef.current = resumeJob;
+
+  // Connecting/downloading must not reset the attempt count: a retry goes
+  // through those states before it can fail again, and the next wait is longer.
+  const scheduleRetryRef = useRef<(job: ReceiveJob) => void>(() => undefined);
+  scheduleRetryRef.current = (job: ReceiveJob) => {
+    if (!shouldAutoRetryDownload(job.status, job.error ?? "") || retryTimers.current[job.id]) {
+      return;
+    }
+    const attempt = retryAttempts.current[job.id] ?? 0;
+    const delay = nextRetryDelay(attempt);
+    if (delay == null) {
+      return;
+    }
+    setRetrying((current) => ({ ...current, [job.id]: true }));
+    retryTimers.current[job.id] = window.setTimeout(() => {
+      delete retryTimers.current[job.id];
+      const latest = jobsRef.current.find((item) => item.id === job.id);
+      setRetrying((current) => ({ ...current, [job.id]: false }));
+      if (!latest || !shouldAutoRetryDownload(latest.status, latest.error ?? "")) {
+        return;
+      }
+      retryAttempts.current[job.id] = attempt + 1;
+      void resumeRef.current(latest).catch(() => {
+        const after = jobsRef.current.find((item) => item.id === job.id);
+        if (after) {
+          scheduleRetryRef.current(after);
+        }
+      });
+    }, delay);
+  };
+
+  useEffect(() => {
+    for (const job of jobs) {
+      if (!shouldAutoRetryDownload(job.status, job.error ?? "")) {
+        const pending = retryTimers.current[job.id];
+        if (pending) {
+          window.clearTimeout(pending);
+          delete retryTimers.current[job.id];
+        }
+        if (job.status === "done" || job.status === "cancelled" || job.status === "interrupted") {
+          retryAttempts.current[job.id] = 0;
+        }
+        continue;
+      }
+      scheduleRetryRef.current(job);
+    }
+  }, [jobs]);
+
+  useEffect(() => {
+    const timers = retryTimers.current;
+    return () => {
+      for (const id of Object.keys(timers)) {
+        window.clearTimeout(timers[id]);
+      }
+    };
+  }, []);
 
   async function discardJob(id: string): Promise<void> {
     setError("");
@@ -658,6 +784,11 @@ export default function MiaoPage() {
         <h2>{t("miaoTitle")}</h2>
         <p className="lede">{t("miaoLede")}</p>
       </header>
+      {online ? null : (
+        <p className="err" role="alert">
+          {t("miaoOffline")}
+        </p>
+      )}
       <div className="row miao-modes" role="tablist">
         <button
           className={mode === "send" ? "btn" : "btn btn-ghost"}
@@ -828,9 +959,12 @@ export default function MiaoPage() {
                   <ReceiveCard
                     key={job.id}
                     job={job}
+                    now={now}
+                    retrying={Boolean(retrying[job.id])}
                     onCancel={(id) => void cancelJob(id)}
                     onChangeFolder={(item) => void changeJobFolder(item)}
                     onResume={(item) => void resumeJob(item)}
+                    onRetry={(item) => void retryJob(item)}
                     onDiscard={(id) => void discardJob(id)}
                   />
                 ))}
