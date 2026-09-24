@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useToasts } from "../components/toasts";
 import DiagnosticsSection from "../components/DiagnosticsSection";
 import KeysDERPSection from "../components/KeysDERPSection";
 import ReleaseNotes from "../components/ReleaseNotes";
@@ -209,7 +210,17 @@ export default function SettingsPage({
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
   const [localBusy, setBusy] = useState(false);
-  const [localError, setError] = useState("");
+  const { push } = useToasts();
+  const pushRef = useRef(push);
+  pushRef.current = push;
+
+  function report(err: unknown): void {
+    const message = err instanceof Error ? err.message : String(err);
+    const text = message.trim();
+    if (text) {
+      pushRef.current(text);
+    }
+  }
 
   async function refresh(): Promise<void> {
     const [nextClient, nextSystem] = await Promise.all([getClientInfo(), getSystemInfo()]);
@@ -219,7 +230,7 @@ export default function SettingsPage({
 
   useEffect(() => {
     void refresh().catch((err) => {
-      setError(err instanceof Error ? err.message : String(err));
+      report(err);
     });
   }, []);
 
@@ -240,7 +251,7 @@ export default function SettingsPage({
         }
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : String(err));
+        report(err);
       });
     return () => {
       offStatus();
@@ -273,13 +284,12 @@ export default function SettingsPage({
   async function onCheckNow(): Promise<void> {
     setBusy(true);
     setChecking(true);
-    setError("");
     try {
       const [nextUpdate, nextClient] = await Promise.all([checkForUpdate(), getClientInfo()]);
       setUpdate(nextUpdate);
       setClient(nextClient);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      report(err);
     } finally {
       setChecking(false);
       setBusy(false);
@@ -290,11 +300,10 @@ export default function SettingsPage({
     setBusy(true);
     setDownloading(true);
     setProgress(0);
-    setError("");
     try {
       setUpdate(await downloadUpdate());
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      report(err);
     } finally {
       setDownloading(false);
       setBusy(false);
@@ -303,11 +312,10 @@ export default function SettingsPage({
 
   async function onReveal(): Promise<void> {
     setBusy(true);
-    setError("");
     try {
       await revealDownloadedUpdate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      report(err);
     } finally {
       setBusy(false);
     }
@@ -315,11 +323,10 @@ export default function SettingsPage({
 
   async function onToggleLaunch(enabled: boolean): Promise<void> {
     setBusy(true);
-    setError("");
     try {
       setSystem(await setLaunchAtLogin(enabled));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      report(err);
     } finally {
       setBusy(false);
     }
@@ -499,8 +506,6 @@ export default function SettingsPage({
           ) : null}
         </InfoCard>
       </div>
-
-      {localError ? <p className="err">{localError}</p> : null}
 
       <KeysDERPSection
         keys={keys}

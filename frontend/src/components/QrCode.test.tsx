@@ -176,7 +176,6 @@ describe("qr share and scan", () => {
           ]}
           links={{ serve: "port" }}
           busy={false}
-          error=""
           onAdd={vi.fn()}
           onStart={vi.fn()}
           onStop={vi.fn()}

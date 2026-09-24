@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ToastProvider, useToasts } from "./components/toasts";
 import ChatPage, { type ChatMessage } from "./pages/ChatPage";
 import LobbyPage from "./pages/LobbyPage";
 import MiaoPage from "./pages/MiaoPage";
@@ -55,6 +56,7 @@ type Theme = "system" | "light" | "dark";
 
 const THEME_KEY = "tailcat-theme";
 const CHAT_KINDS = new Set(["room-ready", "peer", "message", "transfer", "discard"]);
+const TUNNEL_KINDS = new Set(["port_serve", "forward"]);
 
 const NAV: Array<{ id: Exclude<Page, "settings">; labelKey: "navChat" | "navTunnel" }> = [
   { id: "chat", labelKey: "navChat" },
@@ -78,8 +80,11 @@ function readTheme(): Theme {
   return "system";
 }
 
-export default function App() {
+function AppShell() {
   const { t, locale } = useI18n();
+  const { push } = useToasts();
+  const pushRef = useRef(push);
+  pushRef.current = push;
   const [page, setPageState] = useState<Page>("chat");
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const [nickname, setNickname] = useState(() => readNickname());
@@ -104,7 +109,6 @@ export default function App() {
   const [mappings, setMappings] = useState<PortMappingRecord[]>(() => readMappings());
   const [links, setLinks] = useState<Record<string, string>>({});
   const [tunnelBusy, setTunnelBusy] = useState(false);
-  const [tunnelError, setTunnelError] = useState("");
   const [liveSignal, setLiveSignal] = useState<{ seq: number; data: string } | null>(null);
   const [roomKey, setRoomKey] = useState("");
   const roomKeyRef = useRef("");
@@ -120,6 +124,8 @@ export default function App() {
   const pendingRef = useRef<TailcatEvent[]>([]);
   const localeRef = useRef(locale);
   const notifiedIds = useRef(new Set<string>());
+  const appliedChatErr = useRef<Record<string, string>>({});
+  const appliedTunnelErr = useRef<Record<string, string>>({});
   const [notifyDenied, setNotifyDenied] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [updateFocus, setUpdateFocus] = useState(0);
@@ -168,6 +174,13 @@ export default function App() {
   function showError(err: unknown): string {
     const message = err instanceof Error ? err.message : String(err);
     return localizeChatError(message, t) || message;
+  }
+
+  function pushError(message: string): void {
+    const text = message.trim();
+    if (text) {
+      pushRef.current(text);
+    }
   }
 
   function drain(id: string): TailcatEvent[] {
@@ -224,7 +237,7 @@ export default function App() {
     let room = emptyRoom(sess.ID, peerDraft);
     room.keyName = keyName;
     room.address = sess.Address || "";
-    room.error = sess.Err || "";
+    room.error = sess.Err ? showError(sess.Err) : "";
     const queued = drain(sess.ID);
     for (const ev of queued) {
       room = applyRoomEvent(room, ev);
@@ -240,6 +253,9 @@ export default function App() {
     roomKeyRef.current = keyName;
     setRoomKey(keyName);
     setLiveSignal(null);
+    if (room.error) {
+      pushError(room.error);
+    }
   }
 
   function syncKey(id: string): void {
@@ -396,6 +412,52 @@ export default function App() {
   }, [refresh]);
 
   useEffect(() => {
+    const prevChat = appliedChatErr.current;
+    const prevTunnel = appliedTunnelErr.current;
+    const nextChat: Record<string, string> = {};
+    const nextTunnel: Record<string, string> = {};
+    const roomsNow = roomsRef.current;
+    let changed = false;
+    const nextRooms = { ...roomsNow };
+    for (const sess of sessions) {
+      const raw = (sess.Err || "").trim();
+      if (sess.Kind === "chat") {
+        if (!raw) {
+          continue;
+        }
+        const room = nextRooms[sess.ID];
+        if (!room) {
+          continue;
+        }
+        nextChat[sess.ID] = raw;
+        if (prevChat[sess.ID] === raw) {
+          continue;
+        }
+        const message = localizeChatError(raw, (key) => translate(localeRef.current, key)) || raw;
+        if (room.error !== message) {
+          nextRooms[sess.ID] = { ...room, error: message };
+          changed = true;
+          pushRef.current(message);
+        }
+        continue;
+      }
+      if (!TUNNEL_KINDS.has(sess.Kind) || !raw) {
+        continue;
+      }
+      nextTunnel[sess.ID] = raw;
+      if (prevTunnel[sess.ID] !== raw) {
+        pushRef.current(raw);
+      }
+    }
+    appliedChatErr.current = nextChat;
+    appliedTunnelErr.current = nextTunnel;
+    if (changed) {
+      roomsRef.current = nextRooms;
+      setRooms(nextRooms);
+    }
+  }, [sessions]);
+
+  useEffect(() => {
     if (!region && !derpMapURL) {
       return;
     }
@@ -439,7 +501,7 @@ export default function App() {
       setLobbyPeer("");
       setPage("chat");
     } catch (err) {
-      setLobbyError(showError(err));
+      pushError(showError(err));
     } finally {
       releaseLobby();
     }
@@ -464,7 +526,7 @@ export default function App() {
       setLobbyPeer("");
       setPage("chat");
     } catch (err) {
-      setLobbyError(showError(err));
+      pushError(showError(err));
     } finally {
       releaseLobby();
     }
@@ -484,7 +546,7 @@ export default function App() {
       const next = await listKeys();
       setKeys((prev) => (sameKeys(prev, next) ? prev : next));
     } catch (err) {
-      setLobbyError(showError(err));
+      pushError(showError(err));
     }
   }
 
@@ -509,10 +571,12 @@ export default function App() {
     try {
       await stopChatRoom(id);
     } catch (err) {
+      const message = showError(err);
       const current = roomsRef.current[id];
-      if (current) {
-        commitRooms({ ...roomsRef.current, [id]: { ...current, error: showError(err) } });
+      if (current && current.error !== message) {
+        commitRooms({ ...roomsRef.current, [id]: { ...current, error: message } });
       }
+      pushError(message);
       return;
     }
     pendingRef.current = pendingRef.current.filter((ev) => ev.SessionID !== id);
@@ -557,13 +621,15 @@ export default function App() {
       try {
         await connectChatPeer(sess.ID, addr);
       } catch (err) {
+        const message = showError(err);
         const current = roomsRef.current[sess.ID];
-        if (current) {
-          commitRooms({ ...roomsRef.current, [sess.ID]: { ...current, error: showError(err) } });
+        if (current && current.error !== message) {
+          commitRooms({ ...roomsRef.current, [sess.ID]: { ...current, error: message } });
         }
+        pushError(message);
       }
     } catch (err) {
-      setLobbyError(showError(err));
+      pushError(showError(err));
     } finally {
       releaseLobby();
     }
@@ -575,12 +641,11 @@ export default function App() {
     }
     tunnelBusyRef.current = true;
     setTunnelBusy(true);
-    setTunnelError("");
     try {
       await action();
       await refresh();
     } catch (err) {
-      setTunnelError(err instanceof Error ? err.message : String(err));
+      pushError(err instanceof Error ? err.message : String(err));
     } finally {
       tunnelBusyRef.current = false;
       setTunnelBusy(false);
@@ -646,14 +711,7 @@ export default function App() {
       await action();
       await refresh();
     } catch (err) {
-      const message = showError(err);
-      const id = focusRef.current;
-      const current = !lobbyRef.current && id ? roomsRef.current[id] : undefined;
-      if (current && id) {
-        commitRooms({ ...roomsRef.current, [id]: { ...current, error: message } });
-      } else {
-        setLobbyError(message);
-      }
+      pushError(showError(err));
     }
   }
 
@@ -688,7 +746,7 @@ export default function App() {
         caps: [],
         messages: prev.messages.slice(),
         transfers: prev.transfers.slice(),
-        error: sess.Err || "",
+        error: sess.Err ? showError(sess.Err) : "",
       };
       for (const ev of drain(sess.ID)) {
         room = applyRoomEvent(room, ev);
@@ -708,12 +766,20 @@ export default function App() {
           commitLobby(false);
         }
       }
+      if (room.error) {
+        pushError(room.error);
+      }
     } catch (err) {
+      const message = showError(err);
       const current = roomsRef.current[id];
       if (!current) {
+        pushError(message);
         return;
       }
-      commitRooms({ ...roomsRef.current, [id]: { ...current, error: showError(err) } });
+      if (current.error !== message) {
+        commitRooms({ ...roomsRef.current, [id]: { ...current, error: message } });
+      }
+      pushError(message);
     }
   }
 
@@ -914,7 +980,6 @@ export default function App() {
             sessions={sessions}
             links={links}
             busy={tunnelBusy}
-            error={tunnelError}
             onAdd={addMapping}
             onStart={(id) => void startMapping(id)}
             onStop={(id) => void stopMapping(id)}
@@ -978,6 +1043,14 @@ export default function App() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppShell />
+    </ToastProvider>
   );
 }
 

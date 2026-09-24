@@ -176,7 +176,10 @@ describe("lobby room start loading", () => {
 
     pending.reject(new Error("network down"));
 
-    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "network down");
+    const alert = await screen.findByRole("alert");
+    expect(alert.closest(".toast-stack")).toBeTruthy();
+    expect(alert.querySelector(".toast-message")?.textContent).toBe("network down");
+    expect(document.querySelector(".chat-lobby .err")).toBeNull();
     expect(panelByHeading("Temporary room").querySelector(".chat-lobby-busy")).toBeNull();
     expect(button("Create temporary room").disabled).toBe(false);
     expect(button("Create").disabled).toBe(false);
@@ -191,14 +194,18 @@ describe("lobby room start loading", () => {
     renderApp();
 
     await user.click(button("Create"));
-    expect(screen.getByText("Choose a saved key.")).toBeTruthy();
+    const keyAlert = screen.getByText("Choose a saved key.");
+    expect(keyAlert.closest(".chat-lobby")).toBeTruthy();
+    expect(keyAlert.closest(".toast-stack")).toBeNull();
     expect(button("Create").disabled).toBe(false);
     expect(screen.queryByRole("button", { name: "Creating…" })).toBeNull();
     expect(document.querySelector(".chat-lobby-busy")).toBeNull();
 
     await user.type(screen.getByLabelText("Peer address (optional)"), "nope");
     await user.click(button("Connect"));
-    expect(screen.getByText("Paste a Tailcat address that starts with tc.")).toBeTruthy();
+    const addrAlert = screen.getByText("Paste a Tailcat address that starts with tc.");
+    expect(addrAlert.closest(".chat-lobby")).toBeTruthy();
+    expect(addrAlert.closest(".toast-stack")).toBeNull();
     expect(button("Connect").disabled).toBe(false);
     expect(screen.queryByRole("button", { name: "Connecting…" })).toBeNull();
     expect(document.querySelector(".chat-lobby-busy")).toBeNull();
