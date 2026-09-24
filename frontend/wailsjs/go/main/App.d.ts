@@ -5,6 +5,8 @@ import {main} from '../models';
 import {store} from '../models';
 import {adapter} from '../models';
 
+export function CancelMiaoReceive(arg1:string):Promise<void>;
+
 export function CheckForUpdate():Promise<main.UpdateStatus>;
 
 export function ConnectChatPeer(arg1:string,arg2:string):Promise<void>;
@@ -71,6 +73,8 @@ export function SendChatVoice(arg1:string,arg2:string,arg3:number,arg4:string,ar
 
 export function SetLaunchAtLogin(arg1:boolean):Promise<main.SystemInfo>;
 
+export function SetMiaoReceiveDest(arg1:string,arg2:string):Promise<void>;
+
 export function SetNetworkSettings(arg1:string,arg2:string):Promise<void>;
 
 export function SetUILocale(arg1:string):Promise<void>;
@@ -86,6 +90,8 @@ export function StartExec(arg1:string):Promise<session.Session>;
 export function StartExitNode():Promise<session.Session>;
 
 export function StartFilesServe(arg1:string,arg2:string):Promise<session.Session>;
+
+export function StartMiaoReceive(arg1:string,arg2:string):Promise<Record<string, unknown>>;
 
 export function StartMiaoShare(arg1:Array<{name:string,path:string,dataBase64:string}>,arg2:number,arg3:boolean,arg4:number):Promise<Record<string, unknown>>;
 

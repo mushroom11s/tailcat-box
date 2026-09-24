@@ -27,13 +27,28 @@ const (
 )
 
 var (
-	ErrEnded       = errors.New("The share has ended.")
-	ErrUnreachable = errors.New("Could not reach the host. They need to stay online.")
-	ErrBusy        = errors.New("The share is busy. Try again in a moment.")
-	ErrNeedDir     = errors.New("Choose a folder to save into.")
-	ErrBadDays     = errors.New("Enter a number of days.")
-	ErrBadCount    = errors.New("Enter a download count.")
+	ErrEnded          = errors.New("The share has ended.")
+	ErrUnreachable    = errors.New("Could not reach the host. They need to stay online.")
+	ErrBusy           = errors.New("The share is busy. Try again in a moment.")
+	ErrNeedDir        = errors.New("Choose a folder to save into.")
+	ErrBadDays        = errors.New("Enter a number of days.")
+	ErrBadCount       = errors.New("Enter a download count.")
+	ErrUnknownReceive = errors.New("Unknown download.")
+	ErrReceiveStarted = errors.New("That download has already started.")
 )
+
+const (
+	receiveConnecting  = "connecting"
+	receiveQueued      = "queued"
+	receiveDownloading = "downloading"
+	receiveDone        = "done"
+	receiveFailed      = "failed"
+	receiveCancelled   = "cancelled"
+)
+
+// transferHook is nil outside tests. A test can pause the host between the
+// manifest and each chunk so a second pull is observable as queued.
+var transferHook func(stage string)
 
 // Limits controls when a share closes. TTL 0 means no expiry. MaxDownloads 0 means unlimited.
 type Limits struct {
@@ -79,14 +94,28 @@ type Receipt struct {
 	Files []SavedFile `json:"files"`
 }
 
+// ReceiveJob is one download started from the receive tab.
+// Status is connecting, queued, downloading, done, failed, or cancelled.
+type ReceiveJob struct {
+	ID         string      `json:"id"`
+	Status     string      `json:"status"`
+	BytesDone  int64       `json:"bytesDone"`
+	BytesTotal int64       `json:"bytesTotal"`
+	Files      []FileInfo  `json:"files"`
+	Saved      []SavedFile `json:"saved,omitempty"`
+	Error      string      `json:"error,omitempty"`
+	Dest       string      `json:"dest"`
+}
+
 // Service hosts any number of shares at once and can also join someone else's share.
 type Service struct {
-	ad     adapter.ChatAdapter
-	root   string
-	mu     sync.Mutex
-	hosts  map[string]*host
-	order  []string
-	events chan adapter.Event
+	ad       adapter.ChatAdapter
+	root     string
+	mu       sync.Mutex
+	hosts    map[string]*host
+	order    []string
+	receives map[string]*receiveRun
+	events   chan adapter.Event
 }
 
 func New(ad adapter.ChatAdapter, root string) *Service {
@@ -94,7 +123,7 @@ func New(ad adapter.ChatAdapter, root string) *Service {
 		_ = os.MkdirAll(root, 0o700)
 		sweep(root)
 	}
-	return &Service{ad: ad, root: root, hosts: map[string]*host{}, events: make(chan adapter.Event, 64)}
+	return &Service{ad: ad, root: root, hosts: map[string]*host{}, receives: map[string]*receiveRun{}, events: make(chan adapter.Event, 256)}
 }
 
 func (s *Service) Events() <-chan adapter.Event { return s.events }
@@ -249,11 +278,225 @@ func (s *Service) Close() {
 
 // Join connects to the host in payload and writes the package into dest.
 func (s *Service) Join(ctx context.Context, raw, dest string, net adapter.NetworkOpts) (Receipt, error) {
+	return s.join(ctx, nil, raw, dest, net)
+}
+
+// StartReceive validates the code and folder, then downloads in the background.
+// The returned job is already connecting. Later progress is emitted as miao-receive events.
+func (s *Service) StartReceive(parent context.Context, raw, dest string, net adapter.NetworkOpts) (ReceiveJob, error) {
+	if _, err := ParseJoin(raw); err != nil {
+		return ReceiveJob{}, err
+	}
+	dest = strings.TrimSpace(dest)
+	if dest == "" {
+		return ReceiveJob{}, ErrNeedDir
+	}
+	if err := os.MkdirAll(dest, 0o700); err != nil {
+		return ReceiveJob{}, err
+	}
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, 10*time.Minute)
+	run := &receiveRun{
+		cancel: cancel,
+		job: ReceiveJob{
+			ID:     session.New(session.KindMiao).ID,
+			Status: receiveConnecting,
+			Dest:   dest,
+			Files:  []FileInfo{},
+		},
+	}
+	s.mu.Lock()
+	if s.receives == nil {
+		s.receives = map[string]*receiveRun{}
+	}
+	s.receives[run.job.ID] = run
+	s.mu.Unlock()
+	snap := run.snapshot()
+	s.publishReceive(snap, false)
+	go func() {
+		defer cancel()
+		receipt, err := s.join(ctx, run, raw, dest, net)
+		if err == nil {
+			s.finishReceive(run, receiveDone, "", receipt.Files)
+			return
+		}
+		if errors.Is(err, context.Canceled) {
+			s.finishReceive(run, receiveCancelled, "", nil)
+			return
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = ErrUnreachable
+		}
+		s.finishReceive(run, receiveFailed, err.Error(), nil)
+	}()
+	return snap, nil
+}
+
+// CancelReceive stops an in-progress download. A finished job is left as it is.
+func (s *Service) CancelReceive(id string) error {
+	s.mu.Lock()
+	run := s.receives[id]
+	s.mu.Unlock()
+	if run == nil {
+		return ErrUnknownReceive
+	}
+	run.mu.Lock()
+	cancel := run.cancel
+	done := receiveTerminal(run.job.Status)
+	run.mu.Unlock()
+	if done || cancel == nil {
+		return nil
+	}
+	cancel()
+	return nil
+}
+
+// SetReceiveDest changes the folder for a job that has not started writing files.
+func (s *Service) SetReceiveDest(id, dest string) error {
+	dest = strings.TrimSpace(dest)
+	if dest == "" {
+		return ErrNeedDir
+	}
+	s.mu.Lock()
+	run := s.receives[id]
+	s.mu.Unlock()
+	if run == nil {
+		return ErrUnknownReceive
+	}
+	if err := os.MkdirAll(dest, 0o700); err != nil {
+		return err
+	}
+	run.mu.Lock()
+	if receiveTerminal(run.job.Status) || run.writing {
+		run.mu.Unlock()
+		return ErrReceiveStarted
+	}
+	run.job.Dest = dest
+	snap := run.snapshotLocked()
+	run.mu.Unlock()
+	s.publishReceive(snap, false)
+	return nil
+}
+
+type receiveRun struct {
+	mu      sync.Mutex
+	job     ReceiveJob
+	cancel  context.CancelFunc
+	writing bool
+}
+
+func (r *receiveRun) snapshot() ReceiveJob {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.snapshotLocked()
+}
+
+func (r *receiveRun) snapshotLocked() ReceiveJob {
+	job := r.job
+	if job.Files == nil {
+		job.Files = []FileInfo{}
+	} else {
+		job.Files = append([]FileInfo(nil), r.job.Files...)
+	}
+	if r.job.Saved != nil {
+		job.Saved = append([]SavedFile(nil), r.job.Saved...)
+	}
+	return job
+}
+
+func receiveTerminal(status string) bool {
+	return status == receiveDone || status == receiveFailed || status == receiveCancelled
+}
+
+func (s *Service) noteReceive(run *receiveRun, upd receiveUpdate) {
+	run.mu.Lock()
+	if receiveTerminal(run.job.Status) {
+		run.mu.Unlock()
+		return
+	}
+	if upd.status != "" {
+		run.job.Status = upd.status
+	}
+	if upd.files != nil {
+		run.job.Files = upd.files
+	}
+	if upd.bytesTotal > 0 {
+		run.job.BytesTotal = upd.bytesTotal
+	}
+	run.job.BytesDone = upd.bytesDone
+	if upd.status == receiveDownloading {
+		run.writing = true
+	}
+	snap := run.snapshotLocked()
+	run.mu.Unlock()
+	s.publishReceive(snap, false)
+}
+
+func (s *Service) finishReceive(run *receiveRun, status, errText string, saved []SavedFile) {
+	run.mu.Lock()
+	if receiveTerminal(run.job.Status) {
+		run.mu.Unlock()
+		return
+	}
+	run.job.Status = status
+	run.job.Error = errText
+	if status == receiveDone {
+		run.job.Saved = saved
+		if len(run.job.Files) == 0 {
+			files := make([]FileInfo, 0, len(saved))
+			for _, file := range saved {
+				files = append(files, FileInfo{Name: file.Name, Size: file.Size, SHA256: file.SHA256})
+			}
+			run.job.Files = files
+		}
+		if run.job.BytesTotal <= 0 {
+			var total int64
+			for _, file := range saved {
+				total += file.Size
+			}
+			run.job.BytesTotal = total
+		}
+		run.job.BytesDone = run.job.BytesTotal
+	}
+	snap := run.snapshotLocked()
+	run.mu.Unlock()
+	s.publishReceive(snap, true)
+}
+
+func (s *Service) publishReceive(job ReceiveJob, terminal bool) {
+	if job.Files == nil {
+		job.Files = []FileInfo{}
+	}
+	body, err := json.Marshal(job)
+	if err != nil {
+		return
+	}
+	ev := adapter.Event{SessionID: job.ID, Kind: "miao-receive", Data: string(body)}
+	if !terminal {
+		s.emit(ev)
+		return
+	}
+	select {
+	case s.events <- ev:
+	case <-time.After(2 * time.Second):
+	}
+}
+
+func (s *Service) join(ctx context.Context, run *receiveRun, raw, dest string, net adapter.NetworkOpts) (Receipt, error) {
 	payload, err := ParseJoin(raw)
 	if err != nil {
 		return Receipt{}, err
 	}
 	dest = strings.TrimSpace(dest)
+	if run != nil {
+		run.mu.Lock()
+		if chosen := strings.TrimSpace(run.job.Dest); chosen != "" {
+			dest = chosen
+		}
+		run.mu.Unlock()
+	}
 	if dest == "" {
 		return Receipt{}, ErrNeedDir
 	}
@@ -262,6 +505,19 @@ func (s *Service) Join(ctx context.Context, raw, dest string, net adapter.Networ
 	}
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	var progress func(receiveUpdate)
+	var destFn func() string
+	if run != nil {
+		progress = func(upd receiveUpdate) { s.noteReceive(run, upd) }
+		destFn = func() string {
+			run.mu.Lock()
+			defer run.mu.Unlock()
+			if chosen := strings.TrimSpace(run.job.Dest); chosen != "" {
+				return chosen
+			}
+			return dest
+		}
 	}
 	sess := session.New(session.KindMiao)
 	roomCtx, cancel := context.WithCancel(ctx)
@@ -278,13 +534,14 @@ func (s *Service) Join(ctx context.Context, raw, dest string, net adapter.Networ
 
 	ready := make(chan string, 1)
 	done := make(chan joinResult, 1)
-	go receivePackage(room, dest, ready, done)
+	go receivePackage(ctx, room, dest, destFn, ready, done, progress)
 
 	var local string
 	select {
 	case local = <-ready:
 	case <-ctx.Done():
-		return Receipt{}, ctx.Err()
+		_ = room.Close()
+		return waitJoin(ctx, done)
 	case <-time.After(20 * time.Second):
 		return Receipt{}, ErrUnreachable
 	}
@@ -309,8 +566,20 @@ func (s *Service) Join(ctx context.Context, raw, dest string, net adapter.Networ
 		}
 		return Receipt{Files: res.files}, nil
 	case <-ctx.Done():
-		return Receipt{}, ctx.Err()
+		_ = room.Close()
+		return waitJoin(ctx, done)
 	}
+}
+
+func waitJoin(ctx context.Context, done <-chan joinResult) (Receipt, error) {
+	res := <-done
+	if res.err == nil {
+		return Receipt{Files: res.files}, nil
+	}
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return Receipt{}, context.Canceled
+	}
+	return Receipt{}, res.err
 }
 
 func validateLimits(lim Limits) error {
@@ -341,6 +610,7 @@ type host struct {
 	ready     chan struct{}
 	readyOnce sync.Once
 	mu        sync.Mutex
+	sendMu    sync.Mutex
 	ended     bool
 	reason    string
 	sending   bool
@@ -386,10 +656,17 @@ func (h *host) handlePull(token, reply string) {
 		return
 	}
 	if h.sending {
+		match := subtle.ConstantTimeCompare([]byte(token), []byte(h.token)) == 1
+		if !match {
+			h.mu.Unlock()
+			h.sendDeny(reply, "bad-token")
+			return
+		}
 		h.queued = true
 		h.qToken = token
 		h.qReply = reply
 		h.mu.Unlock()
+		h.notifyQueued(reply)
 		return
 	}
 	h.sending = true
@@ -403,11 +680,10 @@ func (h *host) handlePull(token, reply string) {
 		return
 	}
 	if !match {
-		_ = room.SetPeer(reply)
-		_ = sendDeny(h.ctx, room, "bad-token")
+		h.sendDeny(reply, "bad-token")
 		return
 	}
-	if err := h.sendPackage(room, reply, files); err != nil {
+	if err := h.sendPackage(reply, files); err != nil {
 		return
 	}
 	h.mu.Lock()
@@ -440,10 +716,47 @@ func (h *host) finishSend() {
 	}
 }
 
-func (h *host) sendPackage(room adapter.Room, reply string, files []StagedFile) error {
-	if err := room.SetPeer(reply); err != nil {
+func (h *host) notifyQueued(reply string) {
+	if !strings.HasPrefix(reply, "tc") {
+		return
+	}
+	frame, err := chat.Pack(map[string]any{"type": "miao-queued"}, nil)
+	if err != nil {
+		return
+	}
+	h.mu.Lock()
+	ctx := h.ctx
+	h.mu.Unlock()
+	_ = h.sendFrame(ctx, reply, frame)
+}
+
+func (h *host) sendDeny(reply, reason string) {
+	if !strings.HasPrefix(reply, "tc") {
+		return
+	}
+	frame, err := chat.Pack(map[string]any{"type": "miao-deny", "reason": reason}, nil)
+	if err != nil {
+		return
+	}
+	h.mu.Lock()
+	ctx := h.ctx
+	h.mu.Unlock()
+	_ = h.sendFrame(ctx, reply, frame)
+}
+
+func (h *host) sendFrame(ctx context.Context, reply string, frame []byte) error {
+	h.sendMu.Lock()
+	defer h.sendMu.Unlock()
+	if h.room == nil {
+		return fmt.Errorf("room closed")
+	}
+	if err := h.room.SetPeer(reply); err != nil {
 		return err
 	}
+	return dial(ctx, h.room, frame)
+}
+
+func (h *host) sendPackage(reply string, files []StagedFile) error {
 	metaFiles := make([]map[string]any, 0, len(files))
 	for _, file := range files {
 		metaFiles = append(metaFiles, map[string]any{
@@ -457,11 +770,16 @@ func (h *host) sendPackage(room adapter.Room, reply string, files []StagedFile) 
 	if err != nil {
 		return err
 	}
-	if err := dial(h.ctx, room, frame); err != nil {
+	if transferHook != nil {
+		transferHook("manifest")
+	}
+	if err := h.sendFrame(h.ctx, reply, frame); err != nil {
 		return err
 	}
 	for _, file := range files {
-		if err := sendFile(h.ctx, room, file); err != nil {
+		if err := sendFile(h.ctx, func(frame []byte) error {
+			return h.sendFrame(h.ctx, reply, frame)
+		}, file); err != nil {
 			return err
 		}
 	}
@@ -469,7 +787,7 @@ func (h *host) sendPackage(room adapter.Room, reply string, files []StagedFile) 
 	if err != nil {
 		return err
 	}
-	return dial(h.ctx, room, done)
+	return h.sendFrame(h.ctx, reply, done)
 }
 
 func (h *host) end(reason string) {
@@ -581,15 +899,7 @@ func (s *Service) emit(ev adapter.Event) {
 	}
 }
 
-func sendDeny(ctx context.Context, room adapter.Room, reason string) error {
-	frame, err := chat.Pack(map[string]any{"type": "miao-deny", "reason": reason}, nil)
-	if err != nil {
-		return err
-	}
-	return dial(ctx, room, frame)
-}
-
-func sendFile(ctx context.Context, room adapter.Room, file StagedFile) error {
+func sendFile(ctx context.Context, send func([]byte) error, file StagedFile) error {
 	in, err := os.Open(file.Path)
 	if err != nil {
 		return err
@@ -598,6 +908,11 @@ func sendFile(ctx context.Context, room adapter.Room, file StagedFile) error {
 	buf := make([]byte, chunkSize)
 	var offset int64
 	for {
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
 		n, err := in.Read(buf)
 		if n > 0 {
 			frame, packErr := chat.Pack(map[string]any{
@@ -608,10 +923,13 @@ func sendFile(ctx context.Context, room adapter.Room, file StagedFile) error {
 			if packErr != nil {
 				return packErr
 			}
-			if err := dial(ctx, room, frame); err != nil {
+			if err := send(frame); err != nil {
 				return err
 			}
 			offset += int64(n)
+			if transferHook != nil {
+				transferHook("chunk")
+			}
 		}
 		if err == io.EOF {
 			return nil
@@ -636,6 +954,13 @@ type joinResult struct {
 	err   error
 }
 
+type receiveUpdate struct {
+	status     string
+	files      []FileInfo
+	bytesDone  int64
+	bytesTotal int64
+}
+
 type incomingFile struct {
 	id   string
 	name string
@@ -646,9 +971,11 @@ type incomingFile struct {
 	file *os.File
 }
 
-func receivePackage(room adapter.Room, dest string, ready chan<- string, done chan<- joinResult) {
+func receivePackage(ctx context.Context, room adapter.Room, dest string, destFn func() string, ready chan<- string, done chan<- joinResult, progress func(receiveUpdate)) {
 	writers := map[string]*incomingFile{}
 	var order []string
+	var bytesDone int64
+	var bytesTotal int64
 	cleanup := func() {
 		for _, item := range writers {
 			if item.file != nil {
@@ -663,7 +990,18 @@ func receivePackage(room adapter.Room, dest string, ready chan<- string, done ch
 		cleanup()
 		done <- joinResult{err: err}
 	}
+	note := func(upd receiveUpdate) {
+		if progress != nil {
+			progress(upd)
+		}
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	for ev := range room.Events() {
+		if ctx.Err() != nil {
+			break
+		}
 		switch ev.Kind {
 		case adapter.ChatEventReady:
 			select {
@@ -690,19 +1028,33 @@ func receivePackage(room adapter.Room, dest string, ready chan<- string, done ch
 					fail(ErrEnded)
 				}
 				return
+			case "miao-queued":
+				note(receiveUpdate{status: receiveQueued, bytesDone: bytesDone, bytesTotal: bytesTotal})
 			case "miao-manifest":
 				files, err := parseManifest(meta["files"])
 				if err != nil {
 					fail(err)
 					return
 				}
+				folder := dest
+				if destFn != nil {
+					if chosen := strings.TrimSpace(destFn()); chosen != "" {
+						folder = chosen
+					}
+				}
+				if err := os.MkdirAll(folder, 0o700); err != nil {
+					fail(err)
+					return
+				}
+				infos := make([]FileInfo, 0, len(files))
+				var total int64
 				for _, file := range files {
 					name, err := cleanDisplayName(file.name)
 					if err != nil {
 						fail(err)
 						return
 					}
-					path, err := uniquePath(dest, name)
+					path, err := uniquePath(folder, name)
 					if err != nil {
 						fail(err)
 						return
@@ -715,7 +1067,11 @@ func receivePackage(room adapter.Room, dest string, ready chan<- string, done ch
 					item := &incomingFile{id: file.id, name: name, size: file.size, sha: file.sha, path: path, file: out}
 					writers[file.id] = item
 					order = append(order, file.id)
+					infos = append(infos, FileInfo{Name: name, Size: file.size, SHA256: file.sha})
+					total += file.size
 				}
+				bytesTotal = total
+				note(receiveUpdate{status: receiveDownloading, files: infos, bytesDone: bytesDone, bytesTotal: bytesTotal})
 			case "miao-chunk":
 				id, _ := meta["id"].(string)
 				item := writers[id]
@@ -732,6 +1088,8 @@ func receivePackage(room adapter.Room, dest string, ready chan<- string, done ch
 				if end > item.got {
 					item.got = end
 				}
+				bytesDone += int64(len(payload))
+				note(receiveUpdate{status: receiveDownloading, bytesDone: bytesDone, bytesTotal: bytesTotal})
 			case "miao-done":
 				saved := make([]SavedFile, 0, len(order))
 				for _, id := range order {
@@ -760,6 +1118,10 @@ func receivePackage(room adapter.Room, dest string, ready chan<- string, done ch
 				return
 			}
 		}
+	}
+	if ctx.Err() != nil {
+		fail(ctx.Err())
+		return
 	}
 	fail(ErrUnreachable)
 }

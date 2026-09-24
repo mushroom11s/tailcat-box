@@ -40,6 +40,124 @@ export type MiaoReceipt = {
   files: MiaoSavedFile[];
 };
 
+export type ReceiveStatus = "connecting" | "queued" | "downloading" | "done" | "failed" | "cancelled";
+
+export type ReceiveJob = {
+  id: string;
+  status: ReceiveStatus;
+  bytesDone: number;
+  bytesTotal: number;
+  files: MiaoFileInfo[];
+  saved?: MiaoSavedFile[];
+  error?: string;
+  dest: string;
+};
+
+const RECEIVE_RANK: Record<ReceiveStatus, number> = {
+  connecting: 0,
+  queued: 1,
+  downloading: 2,
+  done: 3,
+  failed: 3,
+  cancelled: 3,
+};
+
+export function isReceiveStatus(value: unknown): value is ReceiveStatus {
+  return value === "connecting" || value === "queued" || value === "downloading" || value === "done" || value === "failed" || value === "cancelled";
+}
+
+export function receiveTerminal(status: ReceiveStatus): boolean {
+  return RECEIVE_RANK[status] >= 3;
+}
+
+export function receivePercent(job: ReceiveJob): number {
+  if (job.status === "done") {
+    return 100;
+  }
+  if (!Number.isFinite(job.bytesTotal) || job.bytesTotal <= 0) {
+    return 0;
+  }
+  const ratio = job.bytesDone / job.bytesTotal;
+  if (!Number.isFinite(ratio)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(ratio * 100)));
+}
+
+export function parseReceiveJob(raw: string): ReceiveJob | null {
+  try {
+    const value = JSON.parse(raw) as Partial<ReceiveJob>;
+    if (!value || typeof value.id !== "string" || !value.id || !isReceiveStatus(value.status)) {
+      return null;
+    }
+    return {
+      id: value.id,
+      status: value.status,
+      bytesDone: asCount(value.bytesDone),
+      bytesTotal: asCount(value.bytesTotal),
+      files: asFiles(value.files),
+      saved: Array.isArray(value.saved) ? value.saved : undefined,
+      error: typeof value.error === "string" ? value.error : "",
+      dest: typeof value.dest === "string" ? value.dest : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function upsertReceiveJob(list: ReceiveJob[], job: ReceiveJob): ReceiveJob[] {
+  const index = list.findIndex((item) => item.id === job.id);
+  if (index < 0) {
+    return [job, ...list];
+  }
+  const prev = list[index];
+  if (RECEIVE_RANK[job.status] < RECEIVE_RANK[prev.status]) {
+    return list;
+  }
+  if (receiveTerminal(prev.status) && job.status !== prev.status) {
+    return list;
+  }
+  const bytesDone = job.status === prev.status ? Math.max(prev.bytesDone, job.bytesDone) : job.bytesDone;
+  const next = list.slice();
+  next[index] = {
+    ...prev,
+    ...job,
+    bytesDone,
+    bytesTotal: job.bytesTotal > 0 ? job.bytesTotal : prev.bytesTotal,
+    files: job.files.length ? job.files : prev.files,
+    saved: job.saved?.length ? job.saved : prev.saved,
+    dest: job.dest || prev.dest,
+    error: job.status === "done" || job.status === "cancelled" ? "" : job.error || prev.error,
+  };
+  return next;
+}
+
+function asCount(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value ?? 0);
+  if (!Number.isFinite(n) || n < 0) {
+    return 0;
+  }
+  return n;
+}
+
+function asFiles(value: unknown): MiaoFileInfo[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const files: MiaoFileInfo[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const row = item as Partial<MiaoFileInfo>;
+    if (typeof row.name !== "string" || !row.name) {
+      continue;
+    }
+    files.push({ name: row.name, size: asCount(row.size), sha256: row.sha256 });
+  }
+  return files;
+}
+
 export type JoinPayload = {
   v: number;
   kind: string;
@@ -47,7 +165,7 @@ export type JoinPayload = {
   token: string;
 };
 
-const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode" | "miaoUnreachable" | "miaoEndedRemote" | "miaoBusyPeer" | "miaoCustomDaysInvalid" | "miaoCustomCountInvalid" | "miaoFolder" | "miaoPickFolder"> = {
+const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode" | "miaoUnreachable" | "miaoEndedRemote" | "miaoBusyPeer" | "miaoCustomDaysInvalid" | "miaoCustomCountInvalid" | "miaoFolder" | "miaoPickFolder" | "miaoUnknownReceive" | "miaoReceiveStarted"> = {
   "This share is larger than 300 MiB.": "miaoTooBig",
   "Choose at least one file.": "miaoNeedFile",
   "Choose files, not folders.": "miaoFolder",
@@ -58,6 +176,8 @@ const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode"
   "Enter a number of days.": "miaoCustomDaysInvalid",
   "Enter a download count.": "miaoCustomCountInvalid",
   "Choose a folder to save into.": "miaoPickFolder",
+  "Unknown download.": "miaoUnknownReceive",
+  "That download has already started.": "miaoReceiveStarted",
 };
 
 export type MiaoErrorKey = (typeof KNOWN_ERRORS)[string];

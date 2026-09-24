@@ -1,11 +1,14 @@
 package miao
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -193,6 +196,196 @@ func TestLegacyJSONStillJoins(t *testing.T) {
 	if len(again.Files) != 1 || again.Files[0].Name != "legacy.txt" {
 		t.Fatalf("compact receipt=%+v", again.Files)
 	}
+}
+
+func TestReceiveProgressAndQueuedPull(t *testing.T) {
+	root := t.TempDir()
+	svc := New(adapter.NewFake(), root)
+	events := collectReceive(t, svc)
+	payload := bytes.Repeat([]byte("a"), chunkSize+32)
+	snap, err := svc.Start([]Source{{Name: "big.bin", Data: payload}}, Limits{MaxDownloads: 3}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := hookTransfer(t, "chunk")
+	firstDest := t.TempDir()
+	first, err := svc.StartReceive(context.Background(), snap.Payload, firstDest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Status != receiveConnecting || first.ID == "" {
+		t.Fatalf("job=%+v", first)
+	}
+	partial := waitReceive(t, events, first.ID, receiveDownloading, func(job ReceiveJob) bool {
+		return job.BytesDone > 0 && job.BytesDone < int64(len(payload)) && len(job.Files) == 1 && job.Files[0].Name == "big.bin"
+	})
+	if partial.BytesTotal != int64(len(payload)) {
+		t.Fatalf("total=%d", partial.BytesTotal)
+	}
+	secondDest := t.TempDir()
+	second, err := svc.StartReceive(context.Background(), snap.Payload, secondDest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queued := waitReceive(t, events, second.ID, receiveQueued, nil)
+	if queued.BytesDone != 0 {
+		t.Fatalf("queued progress=%d", queued.BytesDone)
+	}
+	release()
+	doneFirst := waitReceive(t, events, first.ID, receiveDone, nil)
+	doneSecond := waitReceive(t, events, second.ID, receiveDone, nil)
+	if doneFirst.BytesDone != int64(len(payload)) || doneSecond.BytesDone != int64(len(payload)) {
+		t.Fatalf("done=%d %d", doneFirst.BytesDone, doneSecond.BytesDone)
+	}
+	for _, dir := range []string{firstDest, secondDest} {
+		body, err := os.ReadFile(filepath.Join(dir, "big.bin"))
+		if err != nil || !bytes.Equal(body, payload) {
+			t.Fatalf("saved %s err=%v match=%v", dir, err, err == nil && bytes.Equal(body, payload))
+		}
+	}
+}
+
+func TestReceiveFolderCanChangeBeforeDownload(t *testing.T) {
+	root := t.TempDir()
+	svc := New(adapter.NewFake(), root)
+	events := collectReceive(t, svc)
+	snap, err := svc.Start([]Source{{Name: "note.txt", Data: []byte("hello")}}, Limits{MaxDownloads: 1}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := hookTransfer(t, "manifest")
+	original := t.TempDir()
+	job, err := svc.StartReceive(context.Background(), snap.Payload, original, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitReceive(t, events, job.ID, receiveConnecting, nil)
+	next := t.TempDir()
+	if err := svc.SetReceiveDest(job.ID, next); err != nil {
+		t.Fatal(err)
+	}
+	release()
+	done := waitReceive(t, events, job.ID, receiveDone, nil)
+	if done.Dest != next {
+		t.Fatalf("dest=%s", done.Dest)
+	}
+	body, err := os.ReadFile(filepath.Join(next, "note.txt"))
+	if err != nil || string(body) != "hello" {
+		t.Fatalf("body=%q err=%v", body, err)
+	}
+	entries, err := os.ReadDir(original)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("original=%v err=%v", entries, err)
+	}
+	if err := svc.SetReceiveDest(job.ID, t.TempDir()); !errors.Is(err, ErrReceiveStarted) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestCancelReceiveDropsPartialFile(t *testing.T) {
+	root := t.TempDir()
+	svc := New(adapter.NewFake(), root)
+	events := collectReceive(t, svc)
+	payload := bytes.Repeat([]byte("z"), chunkSize+8)
+	snap, err := svc.Start([]Source{{Name: "partial.bin", Data: payload}}, Limits{MaxDownloads: 2}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := hookTransfer(t, "chunk")
+	dest := t.TempDir()
+	job, err := svc.StartReceive(context.Background(), snap.Payload, dest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitReceive(t, events, job.ID, receiveDownloading, func(job ReceiveJob) bool { return job.BytesDone > 0 })
+	if err := svc.CancelReceive(job.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.CancelReceive("missing"); !errors.Is(err, ErrUnknownReceive) {
+		t.Fatalf("err=%v", err)
+	}
+	cancelled := waitReceive(t, events, job.ID, receiveCancelled, nil)
+	if cancelled.Error != "" {
+		t.Fatalf("error=%q", cancelled.Error)
+	}
+	release()
+	entries, err := os.ReadDir(dest)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("left behind=%v err=%v", entries, err)
+	}
+	if _, err := svc.StartReceive(context.Background(), "not-a-code", dest, adapter.NetworkOpts{}); !errors.Is(err, ErrBadCode) {
+		t.Fatalf("err=%v", err)
+	}
+	if _, err := svc.StartReceive(context.Background(), snap.Payload, " ", adapter.NetworkOpts{}); !errors.Is(err, ErrNeedDir) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func hookTransfer(t *testing.T, stage string) func() {
+	t.Helper()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	var releaseOnce sync.Once
+	transferHook = func(got string) {
+		if got != stage {
+			return
+		}
+		once.Do(func() {
+			close(entered)
+			<-release
+		})
+	}
+	unlock := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(func() {
+		transferHook = nil
+		unlock()
+	})
+	return func() {
+		select {
+		case <-entered:
+		case <-time.After(8 * time.Second):
+			t.Errorf("timed out waiting for transfer stage %s", stage)
+		}
+		unlock()
+	}
+}
+
+func collectReceive(t *testing.T, svc *Service) <-chan ReceiveJob {
+	t.Helper()
+	out := make(chan ReceiveJob, 64)
+	go func() {
+		for ev := range svc.Events() {
+			if ev.Kind != "miao-receive" || ev.Data == "" {
+				continue
+			}
+			var job ReceiveJob
+			if err := json.Unmarshal([]byte(ev.Data), &job); err != nil {
+				continue
+			}
+			select {
+			case out <- job:
+			default:
+			}
+		}
+	}()
+	return out
+}
+
+func waitReceive(t *testing.T, events <-chan ReceiveJob, id, status string, check func(ReceiveJob) bool) ReceiveJob {
+	t.Helper()
+	deadline := time.After(8 * time.Second)
+	for {
+		select {
+		case job := <-events:
+			if job.ID == id && job.Status == status && (check == nil || check(job)) {
+				return job
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for %s status %s", id, status)
+		}
+	}
+	return ReceiveJob{}
 }
 
 func names(entries []os.DirEntry) []string {

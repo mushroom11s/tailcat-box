@@ -44,7 +44,15 @@ Host listens with an ephemeral Tailcat room (the same `StartRoom` path as chat).
 {"v":1,"kind":"miao","addr":"tc…","token":"…"}
 ```
 
-The peer listens on its own room, dials the host, and sends a `miao-pull` TCH1 envelope on port 102 with the token and its reply address. The host checks the token and streams `miao-manifest`, `miao-chunk`, and `miao-done`. A bad token is refused and does not end the share. One transfer runs at a time; another pull waits until the current one finishes. Temp copies live under `<user-config>/tailcat-box/miao` (`TAILCAT_MIAO_DIR` overrides that).
+The peer listens on its own room, dials the host, and sends a `miao-pull` TCH1 envelope on port 102 with the token and its reply address. The host checks the token and streams `miao-manifest`, `miao-chunk`, and `miao-done`. A bad token is refused and does not end the share. One transfer runs at a time per share; another pull for that share waits until the current one finishes. While it waits, the host sends `miao-queued` so the receiver can show Queued. Temp copies live under `<user-config>/tailcat-box/miao` (`TAILCAT_MIAO_DIR` overrides that).
+
+### Receive jobs
+
+The receive tab keeps the code field and Download button available. Each Download starts a new job and clears the code. `StartMiaoReceive` returns the job id immediately. Different shares download together. A second job for a share the host is already sending stays queued until that pull finishes, then its progress moves.
+
+Chunk writes emit Tailcat events with Kind `miao-receive` and JSON `{id,status,bytesDone,bytesTotal,files,error,dest,saved}`. Status is `connecting`, `queued`, `downloading`, `done`, `failed`, or `cancelled`. Each card shows the file names once the manifest arrives, the size, a progress bar, and that status.
+
+The first download asks for a folder. Later jobs reuse it. A job can change its folder while it is still connecting or queued. An in-progress job can be cancelled.
 
 ### Loading mascot
 
@@ -63,4 +71,5 @@ The peer listens on its own room, dials the host, and sends a `miao-pull` TCH1 e
 - Oversize reject before any temp copy; renamed storage plus display names; TTL and download-cap end delete that share's copies
 - Concurrent shares stay independent: ending or exhausting one leaves the others and their temp files
 - Browser fake: drop zone stays beside the active list, each share has its own QR/token, join targets one token, and cap cleanup removes only that share
+- Receive jobs: progress events advance bytes, a second pull of the same share is queued, and a different share downloads without waiting
 - `LoadingCat` renders the mascot when a label is shown

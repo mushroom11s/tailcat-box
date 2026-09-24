@@ -4,6 +4,7 @@ import {
   CreateKey as bindCreateKey,
   DecodeChatVoice as bindDecodeChatVoice,
   DeleteKey as bindDeleteKey,
+  CancelMiaoReceive as bindCancelMiaoReceive,
   EndMiaoShare as bindEndMiaoShare,
   DiscardChatMessage as bindDiscardChatMessage,
   DownloadUpdate as bindDownloadUpdate,
@@ -30,6 +31,8 @@ import {
   StartChatRoom as bindStartChatRoom,
   StartCopy as bindStartCopy,
   StartFilesServe as bindStartFilesServe,
+  SetMiaoReceiveDest as bindSetMiaoReceiveDest,
+  StartMiaoReceive as bindStartMiaoReceive,
   StartMiaoShare as bindStartMiaoShare,
   ListRemote as bindListRemote,
   SelectDirectory as bindSelectDirectory,
@@ -54,8 +57,8 @@ import {
 import { BrowserOpenURL, EventsOn } from "../../wailsjs/runtime/runtime";
 import { adapter, main, session, store } from "../../wailsjs/go/models";
 import { createBrowserHub } from "./chatBrowser";
-import { browserEndMiao, browserJoinMiao, browserListMiao, browserStartMiao, setMiaoBrowserEmit } from "./miaoBrowser";
-import type { MiaoFileInput, MiaoReceipt, MiaoShare } from "./miao";
+import { browserCancelReceive, browserEndMiao, browserJoinMiao, browserListMiao, browserSetReceiveDest, browserStartMiao, browserStartReceive, setMiaoBrowserEmit } from "./miaoBrowser";
+import type { MiaoFileInput, MiaoReceipt, MiaoShare, ReceiveJob } from "./miao";
 
 export type Session = {
   ID: string;
@@ -1370,6 +1373,29 @@ export async function joinMiaoShare(payload: string, destDir: string): Promise<M
     return (await bindJoinMiaoShare(payload, destDir)) as MiaoReceipt;
   }
   return browserJoinMiao(payload);
+}
+
+export async function startMiaoReceive(payload: string, destDir: string): Promise<ReceiveJob> {
+  if (hasWailsBindings()) {
+    return (await bindStartMiaoReceive(payload, destDir)) as ReceiveJob;
+  }
+  return browserStartReceive(payload, destDir);
+}
+
+export async function cancelMiaoReceive(id: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindCancelMiaoReceive(id);
+    return;
+  }
+  browserCancelReceive(id);
+}
+
+export async function setMiaoReceiveDest(id: string, destDir: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindSetMiaoReceiveDest(id, destDir);
+    return;
+  }
+  browserSetReceiveDest(id, destDir);
 }
 
 export function onTrayNavigate(callback: (page: string) => void): () => void {

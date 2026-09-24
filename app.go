@@ -664,6 +664,39 @@ func (a *App) JoinMiaoShare(payload string, destDir string) (miao.Receipt, error
 	return a.miao.Join(ctx, payload, destDir, net)
 }
 
+// StartMiaoReceive begins a download and returns immediately.
+// Progress arrives as tailcat events with Kind "miao-receive".
+func (a *App) StartMiaoReceive(payload string, destDir string) (miao.ReceiveJob, error) {
+	if a.miao == nil {
+		return miao.ReceiveJob{}, fmt.Errorf("share storage is not configured")
+	}
+	net := adapter.NetworkOpts{}
+	if a.svc != nil {
+		net = a.svc.NetworkOpts()
+	}
+	parent := a.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	return a.miao.StartReceive(parent, payload, destDir, net)
+}
+
+// CancelMiaoReceive stops a download that is still in progress.
+func (a *App) CancelMiaoReceive(id string) error {
+	if a.miao == nil {
+		return miao.ErrUnknownReceive
+	}
+	return a.miao.CancelReceive(id)
+}
+
+// SetMiaoReceiveDest changes the save folder before files start writing.
+func (a *App) SetMiaoReceiveDest(id string, destDir string) error {
+	if a.miao == nil {
+		return miao.ErrUnknownReceive
+	}
+	return a.miao.SetReceiveDest(id, destDir)
+}
+
 // StartRecv starts a write-only receive inbox (CLI `recv`).
 func (a *App) StartRecv(inboxDir string, acceptDirs bool) (session.Session, error) {
 	return a.svc.StartRecv(inboxDir, acceptDirs)
