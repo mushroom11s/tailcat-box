@@ -2684,11 +2684,24 @@ textarea {
   flex-direction: column;
   gap: 12px;
   flex: 0 0 auto;
+  min-width: 0;
+  container-type: inline-size;
 }
 
 .miao-share-list > h3 {
   margin: 0;
   flex-shrink: 0;
+}
+
+.miao-share-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.miao-share-cards > :only-child {
+  grid-column: 1 / -1;
 }
 
 .miao-limits {
@@ -2746,6 +2759,8 @@ textarea {
 .miao-active {
   padding: 16px 18px;
   flex: 0 0 auto;
+  min-width: 0;
+  height: 100%;
   overflow: visible;
 }
 
@@ -2882,7 +2897,17 @@ textarea {
   min-height: 72px;
 }
 
+@container (max-width: 720px) {
+  .miao-share-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 720px) {
+  .miao-share-cards {
+    grid-template-columns: 1fr;
+  }
+
   .miao-active-grid {
     grid-template-columns: 1fr;
   }

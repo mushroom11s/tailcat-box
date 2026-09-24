@@ -430,9 +430,11 @@ export default function MiaoPage() {
           {shares.length ? (
             <div className="miao-share-list">
               <h3>{t("miaoActive")}</h3>
-              {shares.map((share) => (
-                <ShareCard key={share.id} share={share} now={now} onEnd={(id) => void endShare(id)} />
-              ))}
+              <div className="miao-share-cards">
+                {shares.map((share) => (
+                  <ShareCard key={share.id} share={share} now={now} onEnd={(id) => void endShare(id)} />
+                ))}
+              </div>
             </div>
           ) : null}
             <div className="miao-limits">

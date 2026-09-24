@@ -105,6 +105,11 @@ describe("Mew Share page", () => {
     expect(listRule).not.toMatch(/max-height\s*:/);
     expect(listRule).not.toMatch(/overflow\s*:/);
     expect(listRule).toContain("flex: 0 0 auto");
+    const cardsRule = cssBlock(css, ".miao-share-cards");
+    expect(cardsRule).toContain("display: grid");
+    expect(cardsRule).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+    expect(cardsRule).not.toMatch(/max-height\s*:/);
+    expect(css).toMatch(/@media \(max-width: 720px\) \{[^}]*\.miao-share-cards \{\s*grid-template-columns: 1fr;/);
 
     const ledeRule = cssBlock(css, ".miao-page .chat-lobby-head .lede");
     expect(ledeRule).toContain("max-width: none");
