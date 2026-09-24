@@ -12,23 +12,27 @@ Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on mac
 
 ## Demo
 
+The window opens at 1100×860 on Mew Share. The active sidebar item keeps its full border. Settings covers appearance, language, keys, and about this app.
+
 <table>
   <tr>
-    <td align="center" valign="top" width="25%">
-      <b>Chat — send &amp; burn</b><br />
-      <img src="docs/assets/demo/en/chat-send-and-burn.gif" alt="Chat — send and burn" width="100%" />
+    <td align="center" valign="top" width="50%">
+      <b>Mew Share — packing</b><br />
+      <img src="docs/assets/demo/en/miao-packing.png" alt="Mew Share packing a file into a share" width="100%" />
     </td>
-    <td align="center" valign="top" width="25%">
-      <b>Voice note — hold &amp; burn</b><br />
-      <img src="docs/assets/demo/en/voice-note-burn.gif" alt="Voice note — hold and burn" width="100%" />
+    <td align="center" valign="top" width="50%">
+      <b>Share QR — cut-out cat in the center</b><br />
+      <img src="docs/assets/demo/en/miao-qr.png" alt="Share card with a QR code and the cut-out cat in the center" width="100%" />
     </td>
-    <td align="center" valign="top" width="25%">
-      <b>Live voice / video</b><br />
-      <img src="docs/assets/demo/en/voice-video-call.gif" alt="Live voice and video" width="100%" />
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <b>Download — running cat</b><br />
+      <img src="docs/assets/demo/en/miao-running.png" alt="Download progress with a running cat on the bar" width="100%" />
     </td>
-    <td align="center" valign="top" width="25%">
-      <b>Tunnel — forward &amp; open browser</b><br />
-      <img src="docs/assets/demo/en/tunnel-forward.gif" alt="Tunnel — forward and open browser" width="100%" />
+    <td align="center" valign="top" width="50%">
+      <b>Scan QR — camera, image, or paste</b><br />
+      <img src="docs/assets/demo/en/qr-scan.png" alt="Scan dialog with camera, choose image, and paste" width="100%" />
     </td>
   </tr>
 </table>
@@ -37,10 +41,10 @@ Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on mac
 
 ## Features
 
-- **Mew Share (喵传)** — drop files (up to 300 MiB per share) and keep several shares going at once. Each share has its own QR code. Another Tailcat Box downloads one share over Tailcat while this device stays online
-- **Chat** — open a room, exchange a Tailcat address, and send text, files, voice notes, or a live voice, video, or screen share
+- **Mew Share (喵传)** — the screen that opens. Drop files (up to 300 MiB per share) and keep several shares going at once. Each share has its own QR code, with the cut-out packing cat in the center. A packing cat shows while the share is prepared, and a running cat follows the download. Paste a share code, or scan a QR from the camera, an image, or the clipboard. Another Tailcat Box downloads one share over Tailcat while this device stays online
+- **Chat** — open a room, exchange a Tailcat address (show a QR, or paste an image of one), and send text, files, voice notes, or a live voice, video, or screen share
 - **Tunnel** — serve TCP ports, forward them to this machine, or browse the peer’s web port
-- **Settings** — system / light / dark theme, English and 简体中文, keys and DERP, diagnostics, client and system info, launch at login
+- **Settings** — system / light / dark theme, English and 简体中文, keys and DERP, client and system info, launch at login
 - **Tray** — Open, Hide, Chat, Tunnel, Settings, and Quit on macOS and Windows. Left-click the icon to show the window. The macOS app menu has the same actions. The tray icon is the same pixel-art cat as the app icon. Closing the window hides it so sessions keep running
 - **macOS window** — The standard title bar stays visible and shows Tailcat Box. The green button, and View → Enter Full Screen / Exit Full Screen (⌃⌘F), use native fullscreen. Windows and Linux are unchanged
 
