@@ -183,6 +183,17 @@ export default function ChatPage({
     }
     setDetailsOpen(!address.trim());
   }, [address, roomError]);
+  const prevPeerConnected = useRef(peer.trim().length > 0);
+  useEffect(() => {
+    const nowConnected = peer.trim().length > 0;
+    const becameConnected = !prevPeerConnected.current && nowConnected;
+    prevPeerConnected.current = nowConnected;
+    if (!becameConnected || roomError) {
+      return;
+    }
+    detailsPin.current = "closed";
+    setDetailsOpen(false);
+  }, [peer, roomError]);
   const peerRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!detailsOpen || !focusPeerAfterOpen.current) {

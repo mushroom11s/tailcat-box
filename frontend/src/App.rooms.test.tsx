@@ -301,6 +301,7 @@ describe("phase A multi-room lobby", () => {
     expect(screen.queryByText("alpha-only")).toBeNull();
     const secondAddress = await waitRoomAddress();
     expect(secondAddress).not.toBe(firstAddress);
+    await openRoomDetails(user);
     expect(screen.getByText("Peer connected")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Settings" }));

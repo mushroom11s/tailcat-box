@@ -221,6 +221,7 @@ describe("peer remarks", () => {
     fireEvent.blur(screen.getByLabelText("Remark"));
     expect(roomButton(abbrev(first))).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Connect" }));
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     expect(screen.getByText("Peer connected")).toBeTruthy();
     expect(roomButton("Bob")).toBeTruthy();
     expect(roomButton("Alice")).toBeNull();
@@ -238,6 +239,7 @@ describe("peer remarks", () => {
     await user.type(screen.getByLabelText("Remark"), "Bob");
     fireEvent.blur(screen.getByLabelText("Remark"));
     await user.click(screen.getByRole("button", { name: "Connect" }));
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
     expect(screen.getByText("Peer connected")).toBeTruthy();
     expect(roomButton(`Bob · ${abbrev(first)}`)).toBeTruthy();
     expect(roomButton(`Bob · ${abbrev(second)}`)).toBeTruthy();
