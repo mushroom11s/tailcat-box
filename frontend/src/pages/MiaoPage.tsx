@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
 import LoadingCat from "../components/LoadingCat";
 import QrScanButton from "../components/QrScanButton";
@@ -6,10 +6,8 @@ import { useI18n, type MessageKey } from "../i18n";
 import miaoQrMark from "../assets/miao-qr-cat.png?inline";
 import runningCatGif from "../assets/running-cat.gif";
 import runningCatWebp from "../assets/running-cat.webp";
-import { clipboardHasOtherPayload, clipboardImageFile, clipboardPlainText } from "../lib/miaoPaste";
+import { useClipboardFieldPaste, type PasteFailure } from "../lib/clipboardPaste";
 import { encodeQrDataURL } from "../lib/qr";
-import { readQrPaste } from "../lib/qrClipboard";
-import { decodeQrFromFile } from "../lib/qrImage";
 import {
   acceptMiaoCode,
   extractShareCode,
@@ -307,10 +305,33 @@ export default function MiaoPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const endedRef = useRef(new Set<string>());
   const savedRef = useRef(new Set<string>());
-  const pasteSerial = useRef(0);
-  const codeRef = useRef(code);
-  codeRef.current = code;
   const ticking = shares.some((share) => !share.forever);
+
+  function sharePasteFailure(reason: PasteFailure): MessageKey {
+    if (reason === "empty") {
+      return "qrPasteEmpty";
+    }
+    if (reason === "unusable") {
+      return "miaoPasteUnusable";
+    }
+    if (reason === "denied") {
+      return "qrPasteDenied";
+    }
+    if (reason === "no-qr") {
+      return "qrNotFound";
+    }
+    return "miaoBadCode";
+  }
+
+  const onCodePasteEvent = useClipboardFieldPaste(
+    code,
+    (value) => {
+      setError("");
+      setCode(value);
+    },
+    extractShareCode,
+    (reason) => setError(t(sharePasteFailure(reason))),
+  );
 
   useEffect(() => {
     let live = true;
@@ -608,103 +629,6 @@ export default function MiaoPage() {
       setJobs((list) => list.filter((item) => item.id !== id));
     } catch (err) {
       showError(err, "miaoUnknownReceive");
-    }
-  }
-
-  function acceptCode(value: string): void {
-    codeRef.current = value;
-    setError("");
-    setCode(value);
-  }
-
-  function takeShareText(raw: string): void {
-    const value = extractShareCode(raw);
-    if (!value) {
-      setError(t(raw.trim() ? "miaoBadCode" : "qrPasteEmpty"));
-      return;
-    }
-    acceptCode(value);
-  }
-
-  async function takeShareImage(file: File, serial: number): Promise<void> {
-    setError("");
-    let text: string | null = null;
-    try {
-      text = await decodeQrFromFile(file);
-    } catch {
-      text = null;
-    }
-    if (serial !== pasteSerial.current) {
-      return;
-    }
-    if (!text) {
-      setError(t("qrNotFound"));
-      return;
-    }
-    const value = extractShareCode(text);
-    if (!value) {
-      setError(t("miaoBadCode"));
-      return;
-    }
-    acceptCode(value);
-  }
-
-  function onCodePasteEvent(ev: ClipboardEvent<HTMLTextAreaElement>): void {
-    ev.preventDefault();
-    const el = ev.currentTarget;
-    void onCodePaste(ev).finally(() => {
-      const restore = () => {
-        if (el.isConnected && el.value !== codeRef.current) {
-          el.value = codeRef.current;
-        }
-      };
-      queueMicrotask(restore);
-      requestAnimationFrame(restore);
-    });
-  }
-
-  async function onCodePaste(ev: ClipboardEvent<HTMLTextAreaElement>): Promise<void> {
-    const serial = pasteSerial.current + 1;
-    pasteSerial.current = serial;
-    const data = ev.clipboardData;
-    const file = clipboardImageFile(data);
-    if (file) {
-      await takeShareImage(file, serial);
-      return;
-    }
-    const text = clipboardPlainText(data);
-    if (text.trim()) {
-      takeShareText(text);
-      return;
-    }
-    const other = clipboardHasOtherPayload(data);
-    try {
-      const result = await readQrPaste(undefined, () => true);
-      if (serial !== pasteSerial.current) {
-        return;
-      }
-      if (result.ok && result.kind === "image") {
-        await takeShareImage(result.file, serial);
-        return;
-      }
-      if (result.ok && result.kind === "text") {
-        takeShareText(result.text);
-        return;
-      }
-      const reason = result.ok ? "unusable" : result.reason;
-      if (other || reason === "unusable") {
-        setError(t("miaoPasteUnusable"));
-        return;
-      }
-      if (reason === "denied") {
-        setError(t("qrPasteDenied"));
-        return;
-      }
-      setError(t("qrPasteEmpty"));
-    } catch {
-      if (serial === pasteSerial.current) {
-        setError(t(other ? "miaoPasteUnusable" : "qrPasteEmpty"));
-      }
     }
   }
 

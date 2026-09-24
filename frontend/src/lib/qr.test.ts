@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import iconUrl from "../assets/icon.png?inline";
 import miaoQrMark from "../assets/miao-qr-cat.png?inline";
 import roomQrMark from "../assets/room-qr-cat.png?inline";
-import { acceptScannedText, decodeQrImageData, encodeQrDataURL, shareableAddress } from "./qr";
+import { acceptScannedText, decodeQrImageData, encodeQrDataURL, extractShareableAddress, shareableAddress } from "./qr";
 import { decodePng, encodePng, type RgbaImage } from "./qrMark";
 
 function rasterize(
@@ -65,6 +65,12 @@ describe("qr helpers", () => {
     expect(shareableAddress("  ")).toBe("");
     expect(acceptScannedText("\n tc:peer \n")).toEqual({ ok: true, value: "tc:peer" });
     expect(acceptScannedText("not-a-key")).toEqual({ ok: false });
+    expect(extractShareableAddress("  tc:room\n")).toBe("tc:room");
+    expect(extractShareableAddress("tc:room extra")).toBe("tc:room extra");
+    expect(extractShareableAddress("地址 tc:peer-1 请连接")).toBe("tc:peer-1");
+    expect(extractShareableAddress("https://example")).toBe("");
+    expect(extractShareableAddress("nope")).toBe("");
+    expect(extractShareableAddress("   ")).toBe("");
   });
 
   it("round-trips a raw address through the QR matrix", () => {
