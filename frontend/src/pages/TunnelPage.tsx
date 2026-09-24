@@ -1,7 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
+import QrScanButton from "../components/QrScanButton";
+import QrShareButton from "../components/QrShareButton";
 import { statusMessageKey, useI18n } from "../i18n";
 import { draftMapping, mappingPrimary, type PortMappingRecord } from "../lib/portMappings";
+import { shareableAddress } from "../lib/qr";
 import type { Session } from "../lib/wails";
 
 type Props = {
@@ -191,13 +194,21 @@ export default function TunnelPage({ mappings, sessions, links, busy, error, onA
           {mode === "forward" ? (
             <div className="field">
               <label htmlFor="tunnel-fwd-addr">{t("address")}</label>
-              <input
-                id="tunnel-fwd-addr"
-                value={peer}
-                onChange={(ev) => setPeer(ev.target.value)}
-                placeholder="tc:…"
-                autoComplete="off"
-              />
+              <div className="qr-field">
+                <input
+                  id="tunnel-fwd-addr"
+                  value={peer}
+                  onChange={(ev) => setPeer(ev.target.value)}
+                  placeholder="tc:…"
+                  autoComplete="off"
+                />
+                <QrScanButton
+                  onAccept={(value) => {
+                    setPeer(value);
+                    setFormError("");
+                  }}
+                />
+              </div>
             </div>
           ) : null}
           <div className="field">
@@ -252,6 +263,8 @@ function MappingDetail({
   const primary = mappingPrimary(mapping, t("tunnelEphemeral"));
   const statusKey = statusMessageKey(session?.Status || "stopped");
   const kind = mapping.mode === "serve" ? t("tunnelServe") : t("tunnelForward");
+  const peerText = mapping.mode === "forward" ? mapping.peer.trim() : "";
+  const liveKey = shareableAddress(session?.Address ?? "");
   return (
     <section className="glass tunnel-detail" aria-label={primary}>
       <h3>{primary}</h3>
@@ -260,16 +273,22 @@ function MappingDetail({
         <span className={`pill ${session?.Status || "stopped"}`}>{statusKey ? t(statusKey) : session?.Status}</span>
         {mapping.openBrowser ? <span>{t("openInBrowser")}</span> : null}
       </p>
-      {mapping.mode === "forward" && mapping.peer.trim() ? (
-        <KeyLine value={mapping.peer.trim()} copyLabel={t("tunnelCopyAddress")} onCopy={onCopy} />
+      {peerText ? (
+        <>
+          <KeyLine value={peerText} copyLabel={t("tunnelCopyAddress")} onCopy={onCopy} />
+          <QrShareButton value={peerText} />
+        </>
       ) : null}
       {session?.Address ? (
-        <KeyLine
-          value={session.Address}
-          copyLabel={t(mapping.mode === "serve" ? "tunnelCopyAddress" : "tunnelCopyLocal")}
-          onCopy={onCopy}
-          className="address"
-        />
+        <>
+          <KeyLine
+            value={session.Address}
+            copyLabel={t(mapping.mode === "serve" ? "tunnelCopyAddress" : "tunnelCopyLocal")}
+            onCopy={onCopy}
+            className="address"
+          />
+          {liveKey && liveKey !== peerText ? <QrShareButton value={liveKey} /> : null}
+        </>
       ) : null}
       {session?.Err ? <p className="err">{session.Err}</p> : null}
     </section>

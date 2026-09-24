@@ -851,7 +851,10 @@ export default function App() {
               keys={keys.map((key) => ({ name: key.Name, source: key.Source }))}
               keyName={lobbyKey}
               keyDraft={lobbyKeyDraft}
-              onPeer={setLobbyPeer}
+              onPeer={(value) => {
+                setLobbyPeer(value);
+                setLobbyError("");
+              }}
               onKey={setLobbyKey}
               onKeyDraft={setLobbyKeyDraft}
               onCreate={() => void createTemporary()}

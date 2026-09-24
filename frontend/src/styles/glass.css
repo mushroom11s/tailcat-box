@@ -2493,3 +2493,86 @@ textarea {
     padding: 20px 16px;
   }
 }
+
+.qr-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.qr-field > input {
+  flex: 1;
+  min-width: 0;
+}
+
+.qr-field > .btn {
+  flex-shrink: 0;
+}
+
+.qr-share-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.qr-share-line .address,
+.qr-share-line .btn {
+  margin-top: 0;
+}
+
+.qr-share-line .address {
+  flex: 1;
+  min-width: 0;
+}
+
+.qr-modal {
+  width: min(420px, 100%);
+}
+
+.qr-modal .row {
+  margin-bottom: 0;
+}
+
+.qr-modal-figure {
+  margin: 0 auto 12px;
+  padding: 12px;
+  width: fit-content;
+  background: #fff;
+  border-radius: 16px;
+}
+
+.qr-modal-figure img {
+  display: block;
+  width: 240px;
+  height: 240px;
+}
+
+.qr-payload {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--inset-bg);
+  border: 1px solid var(--hairline);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.qr-camera {
+  width: 100%;
+  max-height: 240px;
+  margin: 0 0 12px;
+  border-radius: 12px;
+  background: #111;
+  object-fit: cover;
+}
+
+.qr-modal .chat-quiet {
+  margin: 0 0 12px;
+}

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { ClipboardSetText, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
+import QrScanButton from "../components/QrScanButton";
+import QrShareButton from "../components/QrShareButton";
 import VoiceNote from "../components/VoiceNote";
 import iconUrl from "../assets/icon.png";
 import { useI18n } from "../i18n";
@@ -9,6 +11,7 @@ import { createLiveCall, type CallMode, type CallView, type LiveCall, type LiveD
 import { startVoiceCapture, type VoiceCapture } from "../lib/voiceCapture";
 import { displayNickname } from "../lib/nickname";
 import { labelPeerAddress, remarkAddress, remarkFor, type RemarkMap } from "../lib/remark";
+import { shareableAddress } from "../lib/qr";
 import { abbreviateAddress } from "../lib/roomLabel";
 import { hasWailsBindings, selectFiles } from "../lib/wails";
 
@@ -193,6 +196,7 @@ export default function ChatPage({
   const burnRef = useRef(false);
   const [draftPeer, setDraftPeer] = useState(initialPeerDraft ?? "");
   const remarkAddr = remarkAddress(peer, draftPeer);
+  const peerKey = shareableAddress(draftPeer) || shareableAddress(peer);
   const [draft, setDraft] = useState(initialComposer ?? "");
   const [inline, setInline] = useState("");
   const [notice, setNotice] = useState("");
@@ -997,6 +1001,7 @@ export default function ChatPage({
             >
               {t("copy")}
             </button>
+            <QrShareButton value={address} disabled={!address} />
             <span
               className={`chat-identity-peer${remarkFor(remarks, peer) || peer.trim() ? "" : " is-quiet"}`}
               title={peer || t("chatNotConnected")}
@@ -1026,6 +1031,7 @@ export default function ChatPage({
           <button className="btn btn-ghost" type="button" disabled={!address} onClick={() => copyText(address)}>
             {t("copy")}
           </button>
+          <QrShareButton value={address} disabled={!address} />
           {roomError ? (
             <button className="btn" type="button" onClick={() => onRetry()}>
               {t("chatRetry")}
@@ -1056,6 +1062,13 @@ export default function ChatPage({
             onChange={(e) => setDraftPeer(e.target.value)}
             autoComplete="off"
           />
+          <QrScanButton
+            onAccept={(value) => {
+              setDraftPeer(value);
+              setInline("");
+            }}
+          />
+          {peerKey ? <QrShareButton value={peerKey} peer /> : null}
           {peer ? <span className="status-dot" aria-hidden="true" /> : null}
           <button className="btn" type="button" disabled={!address} onClick={() => connect()}>
             {t("chatConnect")}

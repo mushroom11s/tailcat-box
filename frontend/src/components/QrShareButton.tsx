@@ -1,0 +1,92 @@
+import { useRef, useState } from "react";
+import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
+import { useI18n } from "../i18n";
+import { encodeQrDataURL } from "../lib/qr";
+import QrDialog from "./QrDialog";
+
+type Props = {
+  value: string;
+  peer?: boolean;
+  disabled?: boolean;
+};
+
+async function copyText(text: string): Promise<void> {
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch {
+    // fall through to the desktop clipboard
+  }
+  try {
+    await ClipboardSetText(text);
+  } catch {
+    // ignore copy failures in environments without a clipboard
+  }
+}
+
+export default function QrShareButton({ value, peer = false, disabled = false }: Props) {
+  const { t } = useI18n();
+  const text = value.trim();
+  const [open, setOpen] = useState(false);
+  const [src, setSrc] = useState("");
+  const [failed, setFailed] = useState(false);
+  const ticket = useRef(0);
+
+  async function openDialog(): Promise<void> {
+    if (!text) {
+      return;
+    }
+    const id = ++ticket.current;
+    setOpen(true);
+    setSrc("");
+    setFailed(false);
+    try {
+      const url = await encodeQrDataURL(text);
+      if (id === ticket.current) {
+        setSrc(url);
+      }
+    } catch {
+      if (id === ticket.current) {
+        setFailed(true);
+      }
+    }
+  }
+
+  return (
+    <>
+      <button
+        className="btn btn-ghost"
+        type="button"
+        disabled={disabled || !text}
+        aria-label={peer ? t("qrShowPeerLabel") : t("qrShowLabel")}
+        onClick={(ev) => {
+          ev.stopPropagation();
+          void openDialog();
+        }}
+      >
+        {t("qrShow")}
+      </button>
+      {open ? (
+        <QrDialog titleId="qr-share-title" title={t("qrTitle")} onClose={() => setOpen(false)}>
+          {failed ? <p className="err">{t("qrEncodeFailed")}</p> : null}
+          {src ? (
+            <div className="qr-modal-figure">
+              <img src={src} alt={text} width={240} height={240} />
+            </div>
+          ) : null}
+          <code className="qr-payload">{text}</code>
+          <div className="row">
+            <button className="btn btn-ghost" type="button" onClick={() => void copyText(text)}>
+              {t("copy")}
+            </button>
+            <button className="btn" type="button" onClick={() => setOpen(false)}>
+              {t("qrClose")}
+            </button>
+          </div>
+        </QrDialog>
+      ) : null}
+    </>
+  );
+}
