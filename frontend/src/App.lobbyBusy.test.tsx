@@ -88,7 +88,7 @@ afterEach(() => {
 });
 
 describe("lobby room start loading", () => {
-  it("disables lobby actions and shows Creating… while a temporary room is starting", async () => {
+  it("disables lobby actions and keeps the temporary create label while a room is starting", async () => {
     const pending = deferred<Session>();
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     const user = userEvent.setup();
@@ -96,8 +96,11 @@ describe("lobby room start loading", () => {
 
     await user.click(button("Create temporary room"));
 
-    expect(button("Creating…").disabled).toBe(true);
-    expect(button("Creating…").querySelector("img")?.getAttribute("src")).toContain("loading-cat");
+    const create = button("Create temporary room");
+    expect(create.disabled).toBe(true);
+    expect(create.textContent).toBe("Create temporary room");
+    expect(create.querySelector(".loading-cat")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Creating…" })).toBeNull();
     const tempCat = panelCat(panelByHeading("Temporary room"), "Creating…");
     expect(tempCat.querySelector("img")?.getAttribute("src")).toContain("loading-cat");
     expect(panelByHeading("Permanent key").querySelector(".chat-lobby-busy")).toBeNull();
@@ -173,8 +176,11 @@ describe("lobby room start loading", () => {
     const user = userEvent.setup();
     await renderApp();
     await user.click(button("Create temporary room"));
-    expect(button("Creating…").disabled).toBe(true);
-    expect(button("Creating…").querySelector("img")?.getAttribute("src")).toContain("loading-cat");
+    const create = button("Create temporary room");
+    expect(create.disabled).toBe(true);
+    expect(create.textContent).toBe("Create temporary room");
+    expect(create.querySelector(".loading-cat")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Creating…" })).toBeNull();
 
     pending.reject(new Error("network down"));
 
@@ -222,7 +228,11 @@ describe("lobby room start loading", () => {
     await renderApp();
 
     await user.click(button("新建临时房间"));
-    expect(button("正在创建…").disabled).toBe(true);
+    const create = button("新建临时房间");
+    expect(create.disabled).toBe(true);
+    expect(create.textContent).toBe("新建临时房间");
+    expect(create.querySelector(".loading-cat")).toBeNull();
+    expect(screen.queryByRole("button", { name: "正在创建…" })).toBeNull();
     const tempCat = panelCat(panelByHeading("临时房间"), "正在创建…");
     expect(tempCat.querySelector("img")?.getAttribute("src")).toContain("loading-cat");
     expect(button("重启房间").disabled).toBe(true);

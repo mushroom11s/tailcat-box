@@ -80,7 +80,7 @@ export default function LobbyPage({
         <h3>{t("lobbyTempTitle")}</h3>
         {panelBusy(busy === "temp", t("lobbyCreating"))}
         <button className="btn" type="button" disabled={pending} onClick={onCreate}>
-          {busy === "temp" ? <LoadingCat size="sm" label={t("lobbyCreating")} /> : t("lobbyCreate")}
+          {t("lobbyCreate")}
         </button>
       </div>
 
