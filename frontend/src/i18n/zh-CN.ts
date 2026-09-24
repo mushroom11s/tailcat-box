@@ -305,6 +305,7 @@ export const zhCN = {
 
   chatRoomLabel: "房间",
   chatListening: "正在监听",
+  chatRoomFailed: "失败",
   chatCopyHelper: "房间开着时，拿到这个地址的人都能往这里发消息。",
   chatPeerLabel: "对方",
   chatPeerHelper: "把对方的 Tailcat 地址粘贴到这里。",
@@ -395,6 +396,7 @@ export const zhCN = {
   chatNotifyVoice: "发来一条语音",
   chatNotifyMessage: "新消息",
   chatNotifyDenied: "系统通知没开，新消息只留在聊天里。",
+  toastDismiss: "关闭",
 
   qrShow: "二维码",
   qrShowLabel: "显示二维码",

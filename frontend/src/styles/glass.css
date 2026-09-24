@@ -2890,3 +2890,67 @@ textarea {
     grid-row: auto;
   }
 }
+
+.toast-stack {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 10px 12px 14px;
+  border-radius: var(--radius-sm);
+}
+
+.toast-error {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--glass-border));
+}
+
+.toast-info {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--glass-border));
+}
+
+.toast-message {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.toast-dismiss {
+  appearance: none;
+  border: 0;
+  background: var(--icon-bg);
+  color: var(--text);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.toast-dismiss:hover {
+  background: var(--icon-bg-hover);
+}
+
+.status-pill.bad {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}

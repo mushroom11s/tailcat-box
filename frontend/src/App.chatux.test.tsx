@@ -125,7 +125,10 @@ describe("room identity bar", () => {
 
   it("expands the identity bar when the room has an error", () => {
     const view = renderChat({ address: "tc:fake-room-abcd", peer: "", roomError: "listen failed" });
-    expect(screen.getByText("listen failed")).toBeTruthy();
+    expect(screen.queryByText("listen failed")).toBeNull();
+    expect(document.querySelector(".chat-identity .err")).toBeNull();
+    expect(document.querySelector(".status-dot.bad")).toBeTruthy();
+    expect(screen.getByText("Failed")).toBeTruthy();
     expect(screen.getByLabelText("Peer")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Hide room details" })).toBeNull();
@@ -140,11 +143,15 @@ describe("room identity bar", () => {
     const view = renderChat({ address: "tc:fake-room-abcd", peer: "" });
     await user.click(screen.getByRole("button", { name: "Show room details" }));
     view.rerender(identityRoom({ roomError: "listen failed" }));
-    expect(screen.getByText("listen failed")).toBeTruthy();
+    expect(screen.queryByText("listen failed")).toBeNull();
+    expect(screen.getByText("Failed")).toBeTruthy();
+    expect(document.querySelector(".status-dot.bad")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
     expect(screen.getByLabelText("Peer")).toBeTruthy();
     view.rerender(identityRoom());
     expect(screen.getByLabelText("Peer")).toBeTruthy();
     expect(screen.queryByText("listen failed")).toBeNull();
+    expect(screen.queryByText("Failed")).toBeNull();
   });
 });
 

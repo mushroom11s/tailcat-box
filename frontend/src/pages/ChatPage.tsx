@@ -997,7 +997,23 @@ export default function ChatPage({
         {detailsOpen ? null : (
           <div className="chat-identity-compact" onClick={() => expandDetails()}>
             <span className={`status-dot${roomError ? " bad" : ""}`} aria-hidden="true" />
-            {roomError ? <span className="err">{roomError}</span> : <span className="status-pill">{t("chatListening")}</span>}
+            {roomError ? (
+              <span className="status-pill bad">{t("chatRoomFailed")}</span>
+            ) : (
+              <span className="status-pill">{t("chatListening")}</span>
+            )}
+            {roomError ? (
+              <button
+                className="btn"
+                type="button"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  onRetry();
+                }}
+              >
+                {t("chatRetry")}
+              </button>
+            ) : null}
             <span className="chat-identity-addr" title={address}>{abbreviateAddress(address)}</span>
             <button
               className="btn btn-ghost"
@@ -1035,7 +1051,11 @@ export default function ChatPage({
         <div className="chat-room-bar">
           <span className={`status-dot${roomError ? " bad" : ""}`} aria-hidden="true" />
           <span className="chat-kicker">{t("chatRoomLabel")}</span>
-          {roomError ? <span className="err">{roomError}</span> : <span className="status-pill">{t("chatListening")}</span>}
+          {roomError ? (
+            <span className="status-pill bad">{t("chatRoomFailed")}</span>
+          ) : (
+            <span className="status-pill">{t("chatListening")}</span>
+          )}
           {address ? <p className="chat-address">{address}</p> : null}
           <button className="btn btn-ghost" type="button" disabled={!address} onClick={() => copyText(address)}>
             {t("copy")}

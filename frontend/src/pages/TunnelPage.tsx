@@ -13,7 +13,6 @@ type Props = {
   sessions: Session[];
   links: Record<string, string>;
   busy: boolean;
-  error: string;
   onAdd: (record: PortMappingRecord) => void;
   onStart: (id: string) => void;
   onStop: (id: string) => void;
@@ -36,7 +35,7 @@ async function copyText(text: string): Promise<void> {
   }
 }
 
-export default function TunnelPage({ mappings, sessions, links, busy, error, onAdd, onStart, onStop, onDelete }: Props) {
+export default function TunnelPage({ mappings, sessions, links, busy, onAdd, onStart, onStop, onDelete }: Props) {
   const { t } = useI18n();
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState("");
@@ -105,11 +104,6 @@ export default function TunnelPage({ mappings, sessions, links, busy, error, onA
         <h2>{t("tunnelTitle")}</h2>
         <p className="lede">{t("tunnelLede")}</p>
       </header>
-      {error ? (
-        <p className="err" role="alert">
-          {error}
-        </p>
-      ) : null}
       {busy ? (
         <div className="glass tunnel-busy">
           <LoadingCat label={t("tunnelBusy")} />
@@ -291,7 +285,6 @@ function MappingDetail({
           {mapping.mode === "serve" && liveKey ? <QrShareButton value={liveKey} /> : null}
         </>
       ) : null}
-      {session?.Err ? <p className="err">{session.Err}</p> : null}
     </section>
   );
 }

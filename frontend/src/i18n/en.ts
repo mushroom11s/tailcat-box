@@ -304,6 +304,7 @@ export const en = {
 
   chatRoomLabel: "Room",
   chatListening: "Listening",
+  chatRoomFailed: "Failed",
   chatCopyHelper: "Anyone with this address can send to this room while it is open.",
   chatPeerLabel: "Peer",
   chatPeerHelper: "Paste the other person’s Tailcat address.",
@@ -395,6 +396,7 @@ export const en = {
   chatNotifyVoice: "Sent a voice note",
   chatNotifyMessage: "New message",
   chatNotifyDenied: "System notifications are off, so new messages stay in the chat.",
+  toastDismiss: "Dismiss",
 
   qrShow: "QR",
   qrShowLabel: "Show QR code",
