@@ -15,6 +15,8 @@ export const en = {
   lobbySaveKey: "Save key",
   lobbyKeyNameRequired: "Enter a name for the new key.",
   lobbyCreatePermanent: "Create",
+  lobbyCreating: "Creating…",
+  lobbyConnecting: "Connecting…",
   lobbyPeer: "Peer address (optional)",
   lobbyHelper: "Leave the peer empty to open a room and share your address later.",
   lobbyConnectHint: "Connecting starts a new temporary room.",

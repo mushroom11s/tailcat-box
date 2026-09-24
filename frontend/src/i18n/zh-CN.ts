@@ -21,6 +21,8 @@ export const zhCN = {
   lobbySaveKey: "保存密钥",
   lobbyKeyNameRequired: "请填写新密钥的名称。",
   lobbyCreatePermanent: "新建",
+  lobbyCreating: "正在创建…",
+  lobbyConnecting: "正在连接…",
   lobbyPeer: "对方地址（可选）",
   lobbyHelper: "对方地址可以留空，先开房间，稍后再把地址发给对方。",
   lobbyConnectHint: "连接会新建一个临时房间。",
