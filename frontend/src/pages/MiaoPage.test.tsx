@@ -173,9 +173,9 @@ describe("Mew Share page", () => {
       expect(screen.getByRole("progressbar").querySelector(".miao-progress-cat")).toBeNull();
       expect(cssBlock(css, ".miao-progress-wrap")).toContain("overflow: visible");
       expect(cssBlock(css, ".miao-progress")).toContain("overflow: hidden");
-      expect(cssBlock(css, ".miao-progress-cat")).toContain("clamp(12px, var(--miao-pct, 0%), calc(100% - 12px))");
-      expect(cssBlock(css, ".miao-progress-cat img")).toContain("width: 24px");
-      expect(cssBlock(css, ".miao-progress-cat img")).toContain("height: 32px");
+      expect(cssBlock(css, ".miao-progress-cat")).toContain("clamp(14px, var(--miao-pct, 0%), calc(100% - 14px))");
+      expect(cssBlock(css, ".miao-progress-cat img")).toContain("width: 27px");
+      expect(cssBlock(css, ".miao-progress-cat img")).toContain("height: 36px");
       expect(screen.getAllByText("notes.txt").length).toBeGreaterThan(0);
       const partial = Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"));
       await user.click(screen.getByRole("button", { name: "Cancel" }));

@@ -2900,8 +2900,8 @@ textarea {
 
 .miao-progress-wrap {
   position: relative;
-  margin: 4px 0 12px;
-  padding-top: 18px;
+  margin: 4px 0 16px;
+  padding-top: 20px;
   overflow: visible;
 }
 
@@ -2918,9 +2918,9 @@ textarea {
   position: absolute;
   z-index: 1;
   top: 0;
-  left: clamp(12px, var(--miao-pct, 0%), calc(100% - 12px));
-  width: 24px;
-  height: 32px;
+  left: clamp(14px, var(--miao-pct, 0%), calc(100% - 14px));
+  width: 27px;
+  height: 36px;
   transform: translateX(-50%);
   pointer-events: none;
   line-height: 0;
@@ -2928,8 +2928,8 @@ textarea {
 
 .miao-progress-cat img {
   display: block;
-  width: 24px;
-  height: 32px;
+  width: 27px;
+  height: 36px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
