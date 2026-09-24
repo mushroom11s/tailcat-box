@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from "react";
+import LoadingCat from "../components/LoadingCat";
 import QrScanButton from "../components/QrScanButton";
 import { useI18n } from "../i18n";
 
@@ -57,6 +58,17 @@ export default function LobbyPage({
     onSaveKey();
   }
 
+  function panelBusy(active: boolean, label: string) {
+    if (!active) {
+      return null;
+    }
+    return (
+      <div className="chat-lobby-busy">
+        <LoadingCat layout="block" label={label} />
+      </div>
+    );
+  }
+
   return (
     <section className="page chat-lobby">
       <header className="chat-lobby-head">
@@ -66,13 +78,15 @@ export default function LobbyPage({
 
       <div className="glass chat-lobby-panel">
         <h3>{t("lobbyTempTitle")}</h3>
+        {panelBusy(busy === "temp", t("lobbyCreating"))}
         <button className="btn" type="button" disabled={pending} onClick={onCreate}>
-          {busy === "temp" ? t("lobbyCreating") : t("lobbyCreate")}
+          {busy === "temp" ? <LoadingCat size="sm" label={t("lobbyCreating")} /> : t("lobbyCreate")}
         </button>
       </div>
 
       <div className="glass chat-lobby-panel">
         <h3>{t("lobbyPermanent")}</h3>
+        {panelBusy(busy === "permanent", t("lobbyCreating"))}
         <div className="field">
           <label htmlFor="lobby-key">{t("lobbyKey")}</label>
           <select id="lobby-key" value={keyName} onChange={(ev) => onKey(ev.target.value)}>
@@ -86,7 +100,7 @@ export default function LobbyPage({
         </div>
         <div className="row">
           <button className="btn btn-ghost" type="button" disabled={pending} onClick={onCreatePermanent}>
-            {busy === "permanent" ? t("lobbyCreating") : t("lobbyCreatePermanent")}
+            {busy === "permanent" ? <LoadingCat size="sm" label={t("lobbyCreating")} /> : t("lobbyCreatePermanent")}
           </button>
         </div>
         <div className="chat-lobby-key-save">
@@ -107,6 +121,7 @@ export default function LobbyPage({
       </div>
 
       <div className="glass chat-lobby-panel">
+        {panelBusy(busy === "connect", t("lobbyConnecting"))}
         <div className="field">
           <label htmlFor="lobby-peer">{t("lobbyPeer")}</label>
           <div className="qr-field">
@@ -123,7 +138,7 @@ export default function LobbyPage({
         </div>
         <p className="chat-quiet">{t("lobbyConnectHint")}</p>
         <button className="btn btn-ghost" type="button" disabled={pending} onClick={onConnect}>
-          {busy === "connect" ? t("lobbyConnecting") : t("chatConnect")}
+          {busy === "connect" ? <LoadingCat size="sm" label={t("lobbyConnecting")} /> : t("chatConnect")}
         </button>
       </div>
 

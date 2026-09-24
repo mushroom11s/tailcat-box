@@ -63,6 +63,8 @@ export function kindMessageKey(kind: string): MessageKey | null {
       return "kindExec";
     case "chat":
       return "kindChat";
+    case "miao":
+      return "kindMiao";
     default:
       return null;
   }

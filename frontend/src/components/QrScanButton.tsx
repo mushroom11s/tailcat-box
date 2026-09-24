@@ -1,17 +1,27 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { useI18n } from "../i18n";
+import { useI18n, type MessageKey } from "../i18n";
 import { readQrPaste } from "../lib/qrClipboard";
 import { acceptScannedText, decodeQrImageData } from "../lib/qr";
 import { decodeQrFromFile } from "../lib/qrImage";
 import QrDialog from "./QrDialog";
 
+type AcceptResult = { ok: true; value: string } | { ok: false };
+
 type Props = {
   onAccept: (value: string) => void;
   disabled?: boolean;
   decodeFile?: (file: File) => Promise<string | null>;
+  accept?: (raw: string) => AcceptResult;
+  invalidKey?: MessageKey;
 };
 
-export default function QrScanButton({ onAccept, disabled = false, decodeFile = decodeQrFromFile }: Props) {
+export default function QrScanButton({
+  onAccept,
+  disabled = false,
+  decodeFile = decodeQrFromFile,
+  accept = acceptScannedText,
+  invalidKey = "qrInvalid",
+}: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
@@ -80,10 +90,10 @@ export default function QrScanButton({ onAccept, disabled = false, decodeFile = 
   }
 
   function finish(raw: string) {
-    const accepted = acceptScannedText(raw);
+    const accepted = accept(raw);
     if (!accepted.ok) {
       stopCamera();
-      setError(t("qrInvalid"));
+      setError(t(invalidKey));
       return;
     }
     stopCamera();

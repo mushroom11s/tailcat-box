@@ -18,6 +18,7 @@ import (
 	"github.com/mushroom11s/tailcat-box/internal/appinfo"
 	"github.com/mushroom11s/tailcat-box/internal/autostart"
 	"github.com/mushroom11s/tailcat-box/internal/chat"
+	"github.com/mushroom11s/tailcat-box/internal/miao"
 	"github.com/mushroom11s/tailcat-box/internal/service"
 	"github.com/mushroom11s/tailcat-box/internal/session"
 	"github.com/mushroom11s/tailcat-box/internal/settings"
@@ -56,6 +57,7 @@ type App struct {
 	svc        *service.Service
 	svcAdapter adapter.TailcatAdapter
 	rooms      *chat.Manager
+	miao       *miao.Service
 	keys       *store.Store
 	tray       *tray.Controller
 	trayIcon   []byte
@@ -208,10 +210,12 @@ func NewApp() *App {
 		svc.SetNetworkOpts(adapter.NetworkOpts{Region: settings.Region, DERPMapURL: settings.DERPMapURL})
 	}
 	rooms := chat.NewManager(chatAd, chatDataDir())
+	shares := miao.New(chatAd, miaoDataDir())
 	return &App{
 		svc:        svc,
 		svcAdapter: ad,
 		rooms:      rooms,
+		miao:       shares,
 		keys:       keys,
 		settings:   newSettingsStore(),
 		trayIcon:   tray.DefaultIcon,
@@ -228,6 +232,17 @@ func chatDataDir() string {
 		return filepath.Join(".", configDirName, "chat")
 	}
 	return filepath.Join(conf, configDirName, "chat")
+}
+
+func miaoDataDir() string {
+	if dir := os.Getenv("TAILCAT_MIAO_DIR"); dir != "" {
+		return dir
+	}
+	conf, err := os.UserConfigDir()
+	if err != nil {
+		return filepath.Join(".", configDirName, "miao")
+	}
+	return filepath.Join(conf, configDirName, "miao")
 }
 
 // startup is called when the app starts. The context is saved
@@ -249,6 +264,9 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	if a.miao != nil {
+		a.miao.Close()
+	}
 	if a.rooms != nil {
 		a.rooms.StopAll()
 	}
@@ -325,6 +343,13 @@ func (a *App) forwardEvents() {
 			emit(ev)
 		}
 	}()
+	if a.miao != nil {
+		go func() {
+			for ev := range a.miao.Events() {
+				emit(ev)
+			}
+		}()
+	}
 	if a.rooms == nil {
 		return
 	}
@@ -408,6 +433,9 @@ func (a *App) ListSessions() []session.Session {
 	out := a.svc.List()
 	if a.rooms != nil {
 		out = append(out, a.rooms.Sessions()...)
+	}
+	if a.miao != nil {
+		out = append(out, a.miao.Sessions()...)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if !out[i].CreatedAt.Equal(out[j].CreatedAt) {
@@ -554,6 +582,86 @@ func (a *App) RestartChatRoom(roomID string, keyName string) (session.Session, e
 
 func (a *App) StopChatRoom(roomID string) error {
 	return a.rooms.Stop(roomID)
+}
+
+// MiaoFileInput is one file for a 喵传 share. Path is a local file. DataBase64 is used when Path is empty.
+type MiaoFileInput struct {
+	Name       string `json:"name"`
+	Path       string `json:"path"`
+	DataBase64 string `json:"dataBase64"`
+}
+
+// StartMiaoShare copies files into app temp, listens on Tailcat, and returns the join payload.
+// forever ignores ttlDays. maxDownloads 0 means unlimited.
+func (a *App) StartMiaoShare(files []MiaoFileInput, ttlDays int, forever bool, maxDownloads int) (miao.Snapshot, error) {
+	if a.miao == nil {
+		return miao.Snapshot{}, fmt.Errorf("share storage is not configured")
+	}
+	sources := make([]miao.Source, 0, len(files))
+	for _, file := range files {
+		src := miao.Source{Name: file.Name, Path: strings.TrimSpace(file.Path)}
+		if src.Path == "" && file.DataBase64 != "" {
+			raw, err := base64.StdEncoding.DecodeString(file.DataBase64)
+			if err != nil {
+				return miao.Snapshot{}, fmt.Errorf("file data is not base64")
+			}
+			src.Data = raw
+		}
+		sources = append(sources, src)
+	}
+	lim := miao.Limits{MaxDownloads: maxDownloads}
+	if forever {
+		lim.TTLDays = 0
+	} else {
+		if ttlDays < 1 || ttlDays > 3650 {
+			return miao.Snapshot{}, miao.ErrBadDays
+		}
+		lim.TTLDays = ttlDays
+		lim.TTL = time.Duration(ttlDays) * 24 * time.Hour
+	}
+	net := adapter.NetworkOpts{}
+	if a.svc != nil {
+		net = a.svc.NetworkOpts()
+	}
+	return a.miao.Start(sources, lim, net)
+}
+
+// EndMiaoShare stops the share and deletes its temp copies.
+func (a *App) EndMiaoShare(id string) error {
+	if a.miao == nil {
+		return fmt.Errorf("Unknown share.")
+	}
+	return a.miao.End(id)
+}
+
+// MiaoShareStatus returns every share that is still listening.
+func (a *App) MiaoShareStatus() []miao.Snapshot {
+	if a.miao == nil {
+		return []miao.Snapshot{}
+	}
+	list := a.miao.List()
+	if list == nil {
+		return []miao.Snapshot{}
+	}
+	return list
+}
+
+// JoinMiaoShare downloads a share into destDir. The host must stay online.
+func (a *App) JoinMiaoShare(payload string, destDir string) (miao.Receipt, error) {
+	if a.miao == nil {
+		return miao.Receipt{}, fmt.Errorf("share storage is not configured")
+	}
+	net := adapter.NetworkOpts{}
+	if a.svc != nil {
+		net = a.svc.NetworkOpts()
+	}
+	parent := a.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, 10*time.Minute)
+	defer cancel()
+	return a.miao.Join(ctx, payload, destDir, net)
 }
 
 // StartRecv starts a write-only receive inbox (CLI `recv`).

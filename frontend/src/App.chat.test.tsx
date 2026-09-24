@@ -30,7 +30,7 @@ describe("phase 1 chat shell", () => {
     renderApp();
 
     const nav = document.querySelectorAll(".nav-btn");
-    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["Chat", "+ New room", "Tunnel", "Settings"]);
+    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["Mew Share", "Chat", "+ New room", "Tunnel", "Settings"]);
     expect(document.querySelector(".sidebar-footer .nav-btn")?.textContent).toBe("Settings");
     expect(document.querySelector(".brand-mark")?.tagName).toBe("IMG");
     expect(screen.getByRole("heading", { name: "Tailcat Box" })).toBeTruthy();
@@ -110,7 +110,7 @@ describe("phase 1 chat shell", () => {
     localStorage.setItem("tailcat-locale", "zh-CN");
     renderApp();
     const nav = document.querySelectorAll(".nav-btn");
-    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["聊天", "+ 新房间", "穿透", "设置"]);
+    expect(Array.from(nav).map((node) => node.textContent)).toEqual(["喵传", "聊天", "+ 新房间", "穿透", "设置"]);
     expect(document.querySelector(".sidebar-footer .nav-btn")?.textContent).toBe("设置");
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "新建临时房间" }));
@@ -157,6 +157,6 @@ describe("phase 1 chat shell", () => {
     });
     expect(screen.queryByText("Peer connected")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Services" })).toBeNull();
-    expect(document.querySelectorAll(".nav-btn").length).toBe(5);
+    expect(document.querySelectorAll(".nav-btn").length).toBe(6);
   });
 });

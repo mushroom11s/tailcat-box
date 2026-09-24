@@ -54,6 +54,14 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function EndMiaoShare(arg1) {
+  return window['go']['main']['App']['EndMiaoShare'](arg1);
+}
+
+export function JoinMiaoShare(arg1, arg2) {
+  return window['go']['main']['App']['JoinMiaoShare'](arg1, arg2);
+}
+
 export function ListKeys() {
   return window['go']['main']['App']['ListKeys']();
 }
@@ -64,6 +72,10 @@ export function ListRemote(arg1, arg2) {
 
 export function ListSessions() {
   return window['go']['main']['App']['ListSessions']();
+}
+
+export function MiaoShareStatus() {
+  return window['go']['main']['App']['MiaoShareStatus']();
 }
 
 export function ParseAddr(arg1) {
@@ -152,6 +164,10 @@ export function StartExitNode() {
 
 export function StartFilesServe(arg1, arg2) {
   return window['go']['main']['App']['StartFilesServe'](arg1, arg2);
+}
+
+export function StartMiaoShare(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['StartMiaoShare'](arg1, arg2, arg3, arg4);
 }
 
 export function StartForward(arg1, arg2, arg3) {

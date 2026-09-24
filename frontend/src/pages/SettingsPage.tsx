@@ -3,6 +3,7 @@ import DiagnosticsSection from "../components/DiagnosticsSection";
 import KeysDERPSection from "../components/KeysDERPSection";
 import ReleaseNotes from "../components/ReleaseNotes";
 import iconUrl from "../assets/icon.png";
+import LoadingCat from "../components/LoadingCat";
 import { useI18n, type Locale, type MessageKey } from "../i18n";
 import { displayNickname, sanitizeNickname } from "../lib/nickname";
 import {
@@ -433,6 +434,9 @@ export default function SettingsPage({
               <span className="info-card-label">{t("releaseNotes")}</span>
               <ReleaseNotes markdown={update.Notes} />
             </div>
+          ) : null}
+          {downloading ? (
+            <LoadingCat size="sm" label={t("downloadingUpdate")} />
           ) : null}
           {downloading ? (
             <div
