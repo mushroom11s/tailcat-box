@@ -100,7 +100,7 @@ describe("lobby room start loading", () => {
     expect(tempCat.querySelector("img")?.getAttribute("src")).toContain("loading-cat");
     expect(panelByHeading("Permanent key").querySelector(".chat-lobby-busy")).toBeNull();
     expect(connectPanel("Peer address (optional)").querySelector(".chat-lobby-busy")).toBeNull();
-    expect(button("Create").disabled).toBe(true);
+    expect(button("Restart room").disabled).toBe(true);
     expect(button("Save key").disabled).toBe(true);
     expect(button("Connect").disabled).toBe(true);
     expect(startChatRoom).toHaveBeenCalledTimes(1);
@@ -121,7 +121,7 @@ describe("lobby room start loading", () => {
     await user.click(button("Save key"));
     expect(await screen.findByRole("option", { name: "home-busy" })).toBeTruthy();
 
-    await user.click(button("Create"));
+    await user.click(button("Restart room"));
 
     expect(button("Creating…").disabled).toBe(true);
     expect(button("Creating…").querySelector("img")?.getAttribute("src")).toContain("loading-cat");
@@ -155,7 +155,7 @@ describe("lobby room start loading", () => {
     expect(panelByHeading("Temporary room").querySelector(".chat-lobby-busy")).toBeNull();
     expect(panelByHeading("Permanent key").querySelector(".chat-lobby-busy")).toBeNull();
     expect(button("Create temporary room").disabled).toBe(true);
-    expect(button("Create").disabled).toBe(true);
+    expect(button("Restart room").disabled).toBe(true);
     expect(button("Save key").disabled).toBe(true);
     expect(startChatRoom).toHaveBeenCalledTimes(1);
 
@@ -182,7 +182,7 @@ describe("lobby room start loading", () => {
     expect(document.querySelector(".chat-lobby .err")).toBeNull();
     expect(panelByHeading("Temporary room").querySelector(".chat-lobby-busy")).toBeNull();
     expect(button("Create temporary room").disabled).toBe(false);
-    expect(button("Create").disabled).toBe(false);
+    expect(button("Restart room").disabled).toBe(false);
     expect(button("Save key").disabled).toBe(false);
     expect(button("Connect").disabled).toBe(false);
     expect(document.querySelector(".chat-lobby")).toBeTruthy();
@@ -193,11 +193,11 @@ describe("lobby room start loading", () => {
     const user = userEvent.setup();
     renderApp();
 
-    await user.click(button("Create"));
+    await user.click(button("Restart room"));
     const keyAlert = screen.getByText("Choose a saved key.");
     expect(keyAlert.closest(".chat-lobby")).toBeTruthy();
     expect(keyAlert.closest(".toast-stack")).toBeNull();
-    expect(button("Create").disabled).toBe(false);
+    expect(button("Restart room").disabled).toBe(false);
     expect(screen.queryByRole("button", { name: "Creating…" })).toBeNull();
     expect(document.querySelector(".chat-lobby-busy")).toBeNull();
 
@@ -223,7 +223,7 @@ describe("lobby room start loading", () => {
     expect(button("正在创建…").disabled).toBe(true);
     const tempCat = panelCat(panelByHeading("临时房间"), "正在创建…");
     expect(tempCat.querySelector("img")?.getAttribute("src")).toContain("loading-cat");
-    expect(button("新建").disabled).toBe(true);
+    expect(button("重启房间").disabled).toBe(true);
     expect(button("保存密钥").disabled).toBe(true);
     expect(button("连接").disabled).toBe(true);
 

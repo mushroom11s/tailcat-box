@@ -110,9 +110,6 @@ function AppShell() {
   const [links, setLinks] = useState<Record<string, string>>({});
   const [tunnelBusy, setTunnelBusy] = useState(false);
   const [liveSignal, setLiveSignal] = useState<{ seq: number; data: string } | null>(null);
-  const [roomKey, setRoomKey] = useState("");
-  const roomKeyRef = useRef("");
-  const netRef = useRef({ region: "", derp: "" });
   const roomsRef = useRef(rooms);
   const mappingsRef = useRef(mappings);
   const linksRef = useRef(links);
@@ -129,7 +126,6 @@ function AppShell() {
   const [notifyDenied, setNotifyDenied] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [updateFocus, setUpdateFocus] = useState(0);
-  netRef.current = { region, derp: derpMapURL };
   mappingsRef.current = mappings;
   linksRef.current = links;
   pageRef.current = page;
@@ -189,18 +185,6 @@ function AppShell() {
     return queued;
   }
 
-  function stampApplied(room: RoomSlice): RoomSlice {
-    if (!room.address) {
-      return room;
-    }
-    return {
-      ...room,
-      appliedKey: room.keyName,
-      appliedRegion: netRef.current.region,
-      appliedDERP: netRef.current.derp,
-    };
-  }
-
   function noteInbound(room: RoomSlice, ev: TailcatEvent): void {
     if (ev.Kind !== "message" || !ev.Data) {
       return;
@@ -242,7 +226,6 @@ function AppShell() {
     for (const ev of queued) {
       room = applyRoomEvent(room, ev);
     }
-    room = stampApplied(room);
     commitRooms({ ...roomsRef.current, [sess.ID]: room });
     commitOrder([sess.ID, ...orderRef.current.filter((item) => item !== sess.ID)]);
     commitFocus(sess.ID);
@@ -250,18 +233,10 @@ function AppShell() {
     for (const ev of queued) {
       noteInbound(room, ev);
     }
-    roomKeyRef.current = keyName;
-    setRoomKey(keyName);
     setLiveSignal(null);
     if (room.error) {
       pushError(room.error);
     }
-  }
-
-  function syncKey(id: string): void {
-    const key = roomsRef.current[id]?.keyName ?? "";
-    roomKeyRef.current = key;
-    setRoomKey(key);
   }
 
   function openLobby(): void {
@@ -274,7 +249,6 @@ function AppShell() {
     setPage("chat");
     commitLobby(false);
     commitFocus(id);
-    syncKey(id);
     setLiveSignal(null);
   }
 
@@ -291,7 +265,6 @@ function AppShell() {
       id = orderRef.current[0];
       commitFocus(id);
     }
-    syncKey(id);
   }
 
   const refresh = useCallback(async () => {
@@ -394,10 +367,7 @@ function AppShell() {
         void refresh();
         return;
       }
-      let room = applyRoomEvent(roomsRef.current[id], ev);
-      if (ev.Kind === "room-ready") {
-        room = stampApplied(room);
-      }
+      const room = applyRoomEvent(roomsRef.current[id], ev);
       commitRooms({ ...roomsRef.current, [id]: room });
       noteInbound(room, ev);
       void refresh();
@@ -456,24 +426,6 @@ function AppShell() {
       setRooms(nextRooms);
     }
   }, [sessions]);
-
-  useEffect(() => {
-    if (!region && !derpMapURL) {
-      return;
-    }
-    const prev = roomsRef.current;
-    let changed = false;
-    const next = { ...prev };
-    for (const [id, room] of Object.entries(prev)) {
-      if (room.address && room.appliedRegion === "" && room.appliedDERP === "" && (region !== "" || derpMapURL !== "")) {
-        next[id] = { ...room, appliedRegion: region, appliedDERP: derpMapURL };
-        changed = true;
-      }
-    }
-    if (changed) {
-      commitRooms(next);
-    }
-  }, [region, derpMapURL]);
 
   function claimLobby(action: "temp" | "permanent" | "connect"): boolean {
     if (lobbyBusyRef.current) {
@@ -589,12 +541,9 @@ function AppShell() {
       if (remaining.length === 0) {
         commitFocus("");
         commitLobby(true);
-        roomKeyRef.current = "";
-        setRoomKey("");
       } else {
         const nextID = remaining[0];
         commitFocus(nextID);
-        syncKey(nextID);
       }
     }
     setLiveSignal(null);
@@ -720,8 +669,6 @@ function AppShell() {
     if (!id || lobbyRef.current || !roomsRef.current[id]) {
       return;
     }
-    roomKeyRef.current = keyName;
-    setRoomKey(keyName);
     setLiveSignal(null);
     try {
       const sess = await restartChatRoom(id, keyName);
@@ -751,7 +698,6 @@ function AppShell() {
       for (const ev of drain(sess.ID)) {
         room = applyRoomEvent(room, ev);
       }
-      room = stampApplied(room);
       const next = { ...roomsRef.current };
       if (sess.ID !== id) {
         delete next[id];
@@ -800,9 +746,6 @@ function AppShell() {
 
   const chatRoom = !lobby && focus && rooms[focus] ? rooms[focus] : undefined;
   const showLobby = page === "chat" && !chatRoom;
-  const restartLabel = chatRoom
-    ? [chatRoom.address || t("roomStarting"), chatRoom.keyName].filter(Boolean).join(" · ")
-    : "";
   void version;
 
   return (
@@ -997,23 +940,12 @@ function AppShell() {
             error=""
             region={region}
             derpMapURL={derpMapURL}
-            roomKey={roomKey}
-            appliedKey={chatRoom?.appliedKey ?? ""}
-            appliedRegion={chatRoom?.appliedRegion ?? ""}
-            appliedDERP={chatRoom?.appliedDERP ?? ""}
-            onRoomKey={(name) => {
-              roomKeyRef.current = name;
-              setRoomKey(name);
-            }}
             sessions={sessions}
             events={events}
             peer={chatRoom?.peer ?? ""}
-            canRestart={Boolean(chatRoom)}
-            restartLabel={restartLabel}
             onCreate={(name, client, keyRegion) => run(() => createKey(name, client, keyRegion))}
             onDelete={(name) => run(() => deleteKey(name))}
             onSaveNetwork={(nextRegion, nextDERP) => run(() => setNetworkSettings(nextRegion, nextDERP))}
-            onRestart={(keyName) => onRestart(keyName)}
             onPing={(addr, untilDirect) => run(() => startPing(addr, untilDirect))}
             onStop={(id) => run(() => stopSession(id))}
           />
