@@ -4,6 +4,7 @@ import { Component, type ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { LocaleProvider } from "../i18n";
 import { encodeJoin, MAX_SHARE_BYTES, parseJoin } from "../lib/miao";
+import { decodePng } from "../lib/qrMark";
 import { releaseBrowserReceiveHolds, resetBrowserMiao, setBrowserReceiveHold } from "../lib/miaoBrowser";
 import { listMiaoReceives, startMiaoReceive } from "../lib/wails";
 import css from "../styles/glass.css?inline";
@@ -146,6 +147,13 @@ describe("Mew Share page", () => {
     expect(qr.getAttribute("src") ?? "").toMatch(/^data:image\/png/);
     expect(document.querySelector(".miao-qr-mark")).toBeNull();
     expect(document.querySelectorAll(".miao-qr img")).toHaveLength(1);
+    const baked = await decodePng(pngBytes(qr.getAttribute("src") ?? ""));
+    const art = colorBounds(baked);
+    expect(art).not.toBeNull();
+    const box = art as { minX: number; minY: number; maxX: number; maxY: number };
+    const aspect = (box.maxY - box.minY + 1) / (box.maxX - box.minX + 1);
+    expect(aspect).toBeGreaterThan(1.12);
+    expect(aspect).toBeLessThan(1.35);
   });
 
   it("rejects an oversize drop before staging", async () => {
@@ -411,4 +419,37 @@ function cssBlock(source: string, selector: string): string {
     throw new Error(`missing ${selector}`);
   }
   return match[0];
+}
+
+function pngBytes(url: string): Uint8Array {
+  const body = url.slice(url.indexOf(",") + 1);
+  const binary = atob(body);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    out[i] = binary.charCodeAt(i);
+  }
+  return out;
+}
+
+function colorBounds(image: { width: number; height: number; rgba: Uint8Array }): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  let minX = image.width;
+  let minY = image.height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < image.height; y++) {
+    for (let x = 0; x < image.width; x++) {
+      const i = (y * image.width + x) * 4;
+      const r = image.rgba[i];
+      const g = image.rgba[i + 1];
+      const b = image.rgba[i + 2];
+      if (!(r !== g || g !== b || (r !== 0 && r !== 255))) {
+        continue;
+      }
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+  }
+  return maxX < 0 ? null : { minX, minY, maxX, maxY };
 }

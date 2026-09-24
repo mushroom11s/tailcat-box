@@ -1,6 +1,7 @@
 import * as QRCode from "qrcode";
 import { describe, expect, it } from "vitest";
 import iconUrl from "../assets/icon.png?inline";
+import miaoQrMark from "../assets/miao-qr-cat.png?inline";
 import roomQrMark from "../assets/room-qr-cat.png?inline";
 import { acceptScannedText, decodeQrImageData, encodeQrDataURL, shareableAddress } from "./qr";
 import { decodePng, encodePng, type RgbaImage } from "./qrMark";
@@ -256,6 +257,87 @@ describe("qr helpers", () => {
     }
     expect(blackInBox).toBeGreaterThan(20);
     expect(mostlyBlackModules(image, box)).toBeGreaterThan(0);
+
+    const plain = QRCode.create(text, { errorCorrectionLevel: "H" });
+    const modulePx = 8;
+    const margin = 2;
+    for (const [row, col] of [
+      [0, 0],
+      [0, plain.modules.size - 1],
+      [plain.modules.size - 1, 0],
+    ]) {
+      const x = (col + margin) * modulePx;
+      const y = (row + margin) * modulePx;
+      const [r, g, b] = pixel(image, x, y);
+      expect(r === 0 && g === 0 && b === 0).toBe(plain.modules.get(row, col) === 1);
+    }
+  });
+
+  it("bakes the miao share cat on a clear background and still scans", async () => {
+    const logo = await decodePng(dataUrlBytes(miaoQrMark));
+    expect(transparentFraction(logo)).toBeGreaterThan(0.15);
+    expect(logo.height / logo.width).toBeGreaterThan(1.12);
+    expect(logo.height / logo.width).toBeLessThan(1.35);
+    for (const [x, y] of [
+      [0, 0],
+      [logo.width - 1, 0],
+      [0, logo.height - 1],
+      [logo.width - 1, logo.height - 1],
+    ]) {
+      expect(logo.rgba[(y * logo.width + x) * 4 + 3]).toBe(0);
+    }
+
+    let pink = 0;
+    const earBottom = Math.round(logo.height * 0.42);
+    for (let y = 0; y < earBottom; y++) {
+      for (let x = 0; x < logo.width; x++) {
+        const i = (y * logo.width + x) * 4;
+        const r = logo.rgba[i];
+        const g = logo.rgba[i + 1];
+        const b = logo.rgba[i + 2];
+        const a = logo.rgba[i + 3];
+        if (a >= 128 && r > 200 && r - g > 25 && r - b > 40) {
+          pink += 1;
+        }
+      }
+    }
+    expect(pink).toBeGreaterThan(2000);
+
+    // The tray is a solid edge. Watermark glyphs would be a sparse gray row under it.
+    for (let y = logo.height - 6; y < logo.height; y++) {
+      let opaque = 0;
+      for (let x = 0; x < logo.width; x++) {
+        if (logo.rgba[(y * logo.width + x) * 4 + 3] >= 128) {
+          opaque += 1;
+        }
+      }
+      expect(opaque).toBeGreaterThan(logo.width * 0.5);
+    }
+
+    const text = "mw1.AAAVdGM6ZmFrZS1taWFvLWFiY2QxMjM0ACBhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ";
+    const url = await encodeQrDataURL(text, { errorCorrectionLevel: "H", centerMark: miaoQrMark });
+    expect(url.startsWith("data:image/png")).toBe(true);
+    const image = await decodePng(dataUrlBytes(url));
+    expect(decodeQrImageData(toClamped(image), image.width, image.height)).toBe(text);
+
+    const painted = boundsWhere(image, (r, g, b) => r !== g || g !== b || (r !== 0 && r !== 255));
+    expect(painted).not.toBeNull();
+    const box = painted as Box;
+    const widthFraction = (box.maxX - box.minX + 1) / image.width;
+    const heightFraction = (box.maxY - box.minY + 1) / image.height;
+    expect(widthFraction).toBeGreaterThan(0.16);
+    expect(widthFraction).toBeLessThan(0.26);
+    expect(heightFraction).toBeLessThan(0.32);
+    let blackInside = 0;
+    for (let y = box.minY; y <= box.maxY; y++) {
+      for (let x = box.minX; x <= box.maxX; x++) {
+        const [r, g, b] = pixel(image, x, y);
+        if (r === 0 && g === 0 && b === 0) {
+          blackInside += 1;
+        }
+      }
+    }
+    expect(blackInside).toBeGreaterThan(20);
 
     const plain = QRCode.create(text, { errorCorrectionLevel: "H" });
     const modulePx = 8;

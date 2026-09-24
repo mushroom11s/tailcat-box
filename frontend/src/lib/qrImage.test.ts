@@ -1,6 +1,6 @@
 import * as QRCode from "qrcode";
 import { describe, expect, it } from "vitest";
-import iconUrl from "../assets/icon.png?inline";
+import miaoQrMark from "../assets/miao-qr-cat.png?inline";
 import roomQrMark from "../assets/room-qr-cat.png?inline";
 import navyCardFixture from "./fixtures/room-cat-navy-card.png?inline";
 import { decodeQrImageData, encodeQrDataURL } from "./qr";
@@ -196,7 +196,7 @@ describe("decodeQrFromFile", () => {
 
   it("reads a center-logo QR at the Mew Share display size", async () => {
     const text = `mw1.${"A".repeat(200)}`;
-    const image = await rasterPng(await encodeQrDataURL(text, { centerMark: iconUrl }));
+    const image = await rasterPng(await encodeQrDataURL(text, { centerMark: miaoQrMark }));
     const displayed = scaleNearest(image, 172, 172);
     expect(decodeQrImageData(toClamped(displayed), displayed.width, displayed.height)).toBeNull();
     await expect(decodeQrFromFile(await pngFile(displayed))).resolves.toBe(text);
@@ -211,11 +211,11 @@ describe("decodeQrFromFile", () => {
     await expect(decodeQrFromFile(await pngFile(roomImage))).resolves.toBe(room);
 
     const text = `mw1.${"A".repeat(200)}`;
-    const displayed = scaleNearest(await rasterPng(await encodeQrDataURL(text, { centerMark: iconUrl })), 172, 172);
+    const displayed = scaleNearest(await rasterPng(await encodeQrDataURL(text, { centerMark: miaoQrMark })), 172, 172);
     const shot = placeOnDark(displayed);
     await expect(decodeQrFromFile(await pngFile(shot))).resolves.toBe(text);
 
-    const retina = scaleNearest(await rasterPng(await encodeQrDataURL(text, { centerMark: iconUrl })), 344, 344);
+    const retina = scaleNearest(await rasterPng(await encodeQrDataURL(text, { centerMark: miaoQrMark })), 344, 344);
     const desktop = placeOnDark(retina, 2560, 1440);
     await expect(decodeQrFromFile(await pngFile(desktop))).resolves.toBe(text);
   });
@@ -232,6 +232,15 @@ describe("decodeQrFromFile", () => {
     const image = transparentLightModules(await rasterPng(await encodeQrDataURL(text, { centerMark: roomQrMark })));
     expect(decodeQrImageData(toClamped(image), image.width, image.height)).toBeNull();
     await expect(decodeQrFromFile(await pngFile(image))).resolves.toBe(text);
+  });
+
+  it("reads a miao-cat QR on a white card inside a large navy screenshot", async () => {
+    const text = `mw1.${"A".repeat(160)}`;
+    const native = await rasterPng(await encodeQrDataURL(text, { centerMark: miaoQrMark }));
+    const card = roundedCard(bilinear(native, 172, 172));
+    const shot = placeOnNavy(card, 1440, 900, Math.round(1440 * 0.62), Math.round(900 * 0.18));
+    expect(decodeQrImageData(toClamped(shot), shot.width, shot.height)).toBeNull();
+    await expect(decodeQrFromFile(await pngFile(shot, "miao-navy-card.png"))).resolves.toBe(text);
   });
 
   it("reads a room-cat QR on a white card inside a large navy screenshot", async () => {
