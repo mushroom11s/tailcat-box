@@ -1,5 +1,6 @@
 import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
 import { kindMessageKey, statusMessageKey, useI18n } from "../i18n";
+import roomQrMark from "../assets/room-qr-cat.png?inline";
 import { shareableAddress } from "../lib/qr";
 import type { Session } from "../lib/wails";
 import QrShareButton from "./QrShareButton";
@@ -60,7 +61,7 @@ export default function SessionCard({ session, onStop }: Props) {
               {t("copy")}
             </button>
           ) : null}
-          {key ? <QrShareButton value={key} /> : null}
+          {key ? <QrShareButton value={key} centerMark={session.Kind === "chat" ? roomQrMark : undefined} /> : null}
           {onStop && !stopped ? (
             <button className="btn btn-danger" type="button" onClick={() => onStop(session.ID)}>
               {t("stop")}

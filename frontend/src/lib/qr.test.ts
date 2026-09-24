@@ -1,6 +1,7 @@
 import * as QRCode from "qrcode";
 import { describe, expect, it } from "vitest";
 import iconUrl from "../assets/icon.png?inline";
+import roomQrMark from "../assets/room-qr-cat.png?inline";
 import { acceptScannedText, decodeQrImageData, encodeQrDataURL, shareableAddress } from "./qr";
 import { decodePng, encodePng, type RgbaImage } from "./qrMark";
 
@@ -162,6 +163,63 @@ describe("qr helpers", () => {
     expect(widthFraction).toBeGreaterThan(0.16);
     expect(widthFraction).toBeLessThan(0.26);
   });
+
+  it("keeps the warm door on the left of the room mark and still scans", async () => {
+    const logo = await decodePng(dataUrlBytes(roomQrMark));
+    const opaque = boundsWhere(logo, (_r, _g, _b, a) => a >= 128);
+    expect(opaque).not.toBeNull();
+    const art = opaque as Box;
+    let warmDoor = 0;
+    let darkLeft = 0;
+    let clear = 0;
+    const leftEdge = art.minX + Math.max(1, Math.round((art.maxX - art.minX + 1) * 0.18));
+    for (let y = 0; y < logo.height; y++) {
+      for (let x = 0; x < logo.width; x++) {
+        const i = (y * logo.width + x) * 4;
+        const a = logo.rgba[i + 3];
+        if (a < 128) {
+          clear += 1;
+          continue;
+        }
+        if (x > leftEdge || y < art.minY || y > art.maxY) {
+          continue;
+        }
+        const r = logo.rgba[i];
+        const g = logo.rgba[i + 1];
+        const b = logo.rgba[i + 2];
+        const lum = (r + g + b) / 3;
+        if (r > 220 && r - b >= 6 && lum > 200) {
+          warmDoor += 1;
+        }
+        if (lum <= 40) {
+          darkLeft += 1;
+        }
+      }
+    }
+    expect(clear).toBeGreaterThan(0);
+    expect(warmDoor).toBeGreaterThan(darkLeft);
+    expect(warmDoor).toBeGreaterThan(200);
+
+    const text = "tc:fake-room-abc";
+    const url = await encodeQrDataURL(text, { centerMark: roomQrMark });
+    expect(url.startsWith("data:image/png")).toBe(true);
+    const image = await decodePng(dataUrlBytes(url));
+    expect(decodeQrImageData(toClamped(image), image.width, image.height)).toBe(text);
+    const painted = boundsWhere(image, (r, g, b) => r !== g || g !== b || (r !== 0 && r !== 255));
+    expect(painted).not.toBeNull();
+    const box = painted as Box;
+    let light = 0;
+    const doorX = box.minX + Math.max(1, Math.round((box.maxX - box.minX + 1) * 0.22));
+    for (let y = box.minY; y <= box.maxY; y++) {
+      for (let x = box.minX; x <= doorX; x++) {
+        const [r, g, b] = pixel(image, x, y);
+        if ((r + g + b) / 3 > 180 && r - b >= 4) {
+          light += 1;
+        }
+      }
+    }
+    expect(light).toBeGreaterThan(10);
+  });
 });
 
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
@@ -211,15 +269,19 @@ function pixel(image: RgbaImage, x: number, y: number): [number, number, number]
   return [image.rgba[i], image.rgba[i + 1], image.rgba[i + 2]];
 }
 
-function boundsWhere(image: RgbaImage, match: (r: number, g: number, b: number) => boolean): Box | null {
+function boundsWhere(image: RgbaImage, match: (r: number, g: number, b: number, a: number) => boolean): Box | null {
   let minX = image.width;
   let minY = image.height;
   let maxX = -1;
   let maxY = -1;
   for (let y = 0; y < image.height; y++) {
     for (let x = 0; x < image.width; x++) {
-      const [r, g, b] = pixel(image, x, y);
-      if (!match(r, g, b)) {
+      const i = (y * image.width + x) * 4;
+      const r = image.rgba[i];
+      const g = image.rgba[i + 1];
+      const b = image.rgba[i + 2];
+      const a = image.rgba[i + 3];
+      if (!match(r, g, b, a)) {
         continue;
       }
       if (x < minX) minX = x;
