@@ -58,12 +58,14 @@ function RemarkChat({
   );
 }
 
-function renderApp() {
-  return render(
+async function renderApp() {
+  const view = render(
     <LocaleProvider>
       <App />
     </LocaleProvider>,
   );
+  fireEvent.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
+  return view;
 }
 
 function abbrev(address: string): string {
@@ -159,7 +161,7 @@ describe("peer remarks", () => {
   it("persists a remark across reload and leaves You / the nickname on outgoing bubbles", async () => {
     const user = userEvent.setup();
     localStorage.setItem(NICKNAME_KEY, "Mochi");
-    const first = renderApp();
+    const first = await renderApp();
     await user.type(screen.getByLabelText("Peer address (optional)"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.click(await screen.findByRole("button", { name: "Show room details" }));
@@ -182,7 +184,7 @@ describe("peer remarks", () => {
     expect(screen.getByText("echo").textContent).toBe("echo");
     first.unmount();
 
-    renderApp();
+    await renderApp();
     await user.type(screen.getByLabelText("Peer address (optional)"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     await user.click(await screen.findByRole("button", { name: "Show room details" }));
@@ -206,7 +208,7 @@ describe("peer remarks", () => {
   it("uses the peer remark as the room label and suffixes it when two rooms share it", async () => {
     localStorage.setItem(NICKNAME_KEY, "Alice");
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     let first = "";
     await waitFor(() => {

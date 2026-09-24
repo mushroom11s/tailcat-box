@@ -29,11 +29,11 @@ The room list uses your local remark for that room’s current peer when you hav
 
 It depends on where the address came from.
 
-- **Ephemeral address.** With the room key set to New room key, the address belongs to a temporary key minted in the process. When the process exits, or that key is discarded, the address is gone for good and cannot be connected to again.
-- **Saved genkey.** A named key created and saved under Keys & DERP in Settings keeps the same address until you delete that key.
+- **Ephemeral address.** A room opened with Create temporary room uses a temporary key minted in the process. When the process exits, the address is gone for good and cannot be connected to again.
+- **Saved genkey.** A named key saved under Keys & DERP in Settings, or from the lobby’s permanent-key panel, keeps the same address until you delete that key. Restart room in that panel opens another sidebar room on the chosen saved key.
 - **Delete, then create again.** After you delete the key, a new genkey is a different address. It is not the old one.
 
-Closing the window only hides the app, so the temporary address is still live. To retire an ephemeral address, quit the process, or discard that key (for example, restart the room on New room key).
+Closing the window only hides the app, so the temporary address is still live. To retire an ephemeral address, quit the process.
 
 ## Can I set a nickname? Can the other person see it?
 

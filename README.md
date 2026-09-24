@@ -1,4 +1,4 @@
-# Tailcat Box
+# Tailcat Box <img src="docs/assets/loading-cat.gif" alt="" height="28" />
 
 [中文说明](README.zh-CN.md)
 
@@ -7,7 +7,7 @@ Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on mac
 [![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/mushroom11s/tailcat-box)](https://github.com/mushroom11s/tailcat-box/releases) [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey)
 
 <p align="center">
-  <img src="docs/assets/loading-cat.gif" alt="Tailcat Box" width="180" />
+  <img src="docs/assets/icon.png" alt="Tailcat Box" width="160" />
 </p>
 
 ## Demo

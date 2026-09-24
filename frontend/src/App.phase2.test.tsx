@@ -14,12 +14,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function renderApp() {
-  return render(
+async function renderApp() {
+  const view = render(
     <LocaleProvider>
       <App />
     </LocaleProvider>,
   );
+  fireEvent.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
+  return view;
 }
 
 const burnedText: ChatMessage = {
@@ -35,7 +37,7 @@ const burnedText: ChatMessage = {
 describe("phase 2 files and burn", () => {
   it("sends a dropped image to an official peer as a full transfer", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.click(screen.getByRole("button", { name: "Show room details" }));
@@ -54,7 +56,7 @@ describe("phase 2 files and burn", () => {
 
   it("uses the burn badge when the peer advertises burn", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.click(screen.getByRole("button", { name: "Show room details" }));
