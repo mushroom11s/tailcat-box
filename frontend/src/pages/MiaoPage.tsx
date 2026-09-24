@@ -3,7 +3,7 @@ import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
 import LoadingCat from "../components/LoadingCat";
 import QrScanButton from "../components/QrScanButton";
 import { useI18n, type MessageKey } from "../i18n";
-import iconUrl from "../assets/icon.png";
+import iconUrl from "../assets/icon.png?inline";
 import { encodeQrDataURL } from "../lib/qr";
 import {
   acceptMiaoCode,
@@ -90,7 +90,7 @@ function ShareCard({
     }
     let live = true;
     setQrFailed(false);
-    void encodeQrDataURL(payload, "H")
+    void encodeQrDataURL(payload, { errorCorrectionLevel: "H", centerMark: iconUrl })
       .then((url) => {
         if (live) {
           setQrSrc(url);
@@ -143,14 +143,7 @@ function ShareCard({
         </div>
         <div className="miao-qr">
           {qrFailed ? <p className="err">{t("qrEncodeFailed")}</p> : null}
-          {qrSrc ? (
-            <div className="miao-qr-frame">
-              <img src={qrSrc} alt={t("miaoToken")} width={172} height={172} />
-              <span className="miao-qr-mark">
-                <img src={iconUrl} alt="" />
-              </span>
-            </div>
-          ) : (
+          {qrSrc ? <img src={qrSrc} alt={t("miaoToken")} width={172} height={172} /> : (
             <LoadingCat size="lg" layout="block" label={t("miaoPacking")} />
           )}
         </div>

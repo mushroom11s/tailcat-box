@@ -41,11 +41,12 @@ describe("Mew Share page", () => {
     expect(parsed?.addr.startsWith("tc:fake-miao-")).toBe(true);
     expect(parsed?.token).toBeTruthy();
     await waitFor(() => {
-      expect(document.querySelector(".miao-qr-frame > img")).toBeTruthy();
+      expect(document.querySelector(".miao-qr > img")).toBeTruthy();
     });
-    const mark = document.querySelector(".miao-qr-mark img") as HTMLImageElement;
-    expect(mark.getAttribute("alt")).toBe("");
-    expect(mark.getAttribute("src") ?? "").toContain("icon");
+    const qr = document.querySelector(".miao-qr > img") as HTMLImageElement;
+    expect(qr.getAttribute("src") ?? "").toMatch(/^data:image\/png/);
+    expect(document.querySelector(".miao-qr-mark")).toBeNull();
+    expect(document.querySelectorAll(".miao-qr img")).toHaveLength(1);
   });
 
   it("rejects an oversize drop before staging", async () => {
@@ -127,9 +128,10 @@ describe("Mew Share page", () => {
     expect(qrPlace).toContain("grid-row: 2 / span 2");
     expect(qrPlace).toContain("align-self: start");
 
-    const qrRule = cssBlock(css, ".miao-qr-frame > img");
+    const qrRule = cssBlock(css, ".miao-qr > img");
     const qrWidth = Number(qrRule.match(/width:\s*(\d+)px/)?.[1]);
-    expect(cssBlock(css, ".miao-qr-mark")).toContain("width: 22%");
+    expect(qrRule).toContain("image-rendering: pixelated");
+    expect(css).not.toContain(".miao-qr-mark");
     expect(cssBlock(css, ".loading-cat.lg img")).toContain("width: 88px");
     expect(cssBlock(css, ".loading-cat.sm img,\n.btn .loading-cat img")).toContain("width: 32px");
     expect(qrWidth).toBeGreaterThanOrEqual(160);
@@ -174,9 +176,12 @@ describe("Mew Share page", () => {
         expect(cardStyle.overflowY === "visible" || cardStyle.overflowY === "").toBe(true);
         expect(card.scrollHeight).toBeLessThanOrEqual(card.clientHeight + 1);
       }
-      const qr = document.querySelector(".miao-qr img") as HTMLImageElement | null;
-      expect(qr?.width).toBe(qrWidth);
-      expect(qr?.height).toBe(qrWidth);
+      await waitFor(() => {
+        expect(document.querySelectorAll(".miao-qr > img").length).toBeGreaterThan(0);
+      });
+      const qr = document.querySelector(".miao-qr > img") as HTMLImageElement;
+      expect(qr.width).toBe(qrWidth);
+      expect(qr.height).toBe(qrWidth);
     } finally {
       style.remove();
     }
