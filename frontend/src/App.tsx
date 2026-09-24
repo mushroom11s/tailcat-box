@@ -3,7 +3,7 @@ import ChatPage, { type ChatMessage } from "./pages/ChatPage";
 import LobbyPage from "./pages/LobbyPage";
 import SettingsPage from "./pages/SettingsPage";
 import TunnelPage from "./pages/TunnelPage";
-import { forwardPortMappings, parsePortMappings } from "./lib/ports";
+import { readMappings, toPortMapping, writeMappings, type PortMappingRecord } from "./lib/portMappings";
 import { sameKeys, sameSessions } from "./lib/snapshot";
 import { translate, useI18n } from "./i18n";
 import iconUrl from "./assets/icon.png";
@@ -100,12 +100,18 @@ export default function App() {
   const [lobbyKey, setLobbyKey] = useState("");
   const [lobbyKeyDraft, setLobbyKeyDraft] = useState("");
   const [closeAsk, setCloseAsk] = useState("");
+  const [mappings, setMappings] = useState<PortMappingRecord[]>(() => readMappings());
+  const [links, setLinks] = useState<Record<string, string>>({});
+  const [tunnelBusy, setTunnelBusy] = useState(false);
   const [tunnelError, setTunnelError] = useState("");
   const [liveSignal, setLiveSignal] = useState<{ seq: number; data: string } | null>(null);
   const [roomKey, setRoomKey] = useState("");
   const roomKeyRef = useRef("");
   const netRef = useRef({ region: "", derp: "" });
   const roomsRef = useRef(rooms);
+  const mappingsRef = useRef(mappings);
+  const linksRef = useRef(links);
+  const tunnelBusyRef = useRef(false);
   const orderRef = useRef(order);
   const focusRef = useRef(focus);
   const lobbyRef = useRef(lobby);
@@ -117,6 +123,8 @@ export default function App() {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [updateFocus, setUpdateFocus] = useState(0);
   netRef.current = { region, derp: derpMapURL };
+  mappingsRef.current = mappings;
+  linksRef.current = links;
   pageRef.current = page;
   localeRef.current = locale;
   const fallback = !hasWailsBindings();
@@ -299,6 +307,10 @@ export default function App() {
   useEffect(() => {
     writeRemarks(remarks);
   }, [remarks]);
+
+  useEffect(() => {
+    writeMappings(mappings);
+  }, [mappings]);
 
   useEffect(() => {
     const node = mainRef.current;
@@ -557,13 +569,75 @@ export default function App() {
   }
 
   async function runTunnel(action: () => Promise<unknown>): Promise<void> {
+    if (tunnelBusyRef.current) {
+      return;
+    }
+    tunnelBusyRef.current = true;
+    setTunnelBusy(true);
     setTunnelError("");
     try {
       await action();
       await refresh();
     } catch (err) {
       setTunnelError(err instanceof Error ? err.message : String(err));
+    } finally {
+      tunnelBusyRef.current = false;
+      setTunnelBusy(false);
     }
+  }
+
+  function addMapping(record: PortMappingRecord): void {
+    const next = [record, ...mappingsRef.current.filter((item) => item.id !== record.id)];
+    mappingsRef.current = next;
+    setMappings(next);
+  }
+
+  async function startMapping(id: string): Promise<void> {
+    const mapping = mappingsRef.current.find((item) => item.id === id);
+    if (!mapping) {
+      return;
+    }
+    await runTunnel(async () => {
+      const port = toPortMapping(mapping);
+      const started =
+        mapping.mode === "serve"
+          ? await startPortServe([port])
+          : await startForward(mapping.peer, [port], mapping.openBrowser);
+      const next = { ...linksRef.current, [id]: started.ID };
+      linksRef.current = next;
+      setLinks(next);
+    });
+  }
+
+  async function stopMapping(id: string): Promise<void> {
+    const sessionID = linksRef.current[id];
+    if (!sessionID) {
+      return;
+    }
+    await runTunnel(() => stopSession(sessionID));
+  }
+
+  async function deleteMapping(id: string): Promise<void> {
+    const sessionID = linksRef.current[id];
+    await runTunnel(async () => {
+      if (sessionID) {
+        try {
+          await stopSession(sessionID);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (!/unknown session/i.test(message)) {
+            throw err;
+          }
+        }
+      }
+      const nextLinks = { ...linksRef.current };
+      delete nextLinks[id];
+      linksRef.current = nextLinks;
+      setLinks(nextLinks);
+      const next = mappingsRef.current.filter((item) => item.id !== id);
+      mappingsRef.current = next;
+      setMappings(next);
+    });
   }
 
   async function run(action: () => Promise<unknown>): Promise<void> {
@@ -820,14 +894,15 @@ export default function App() {
           )
         ) : page === "tunnel" ? (
           <TunnelPage
+            mappings={mappings}
             sessions={sessions}
-            busy={false}
+            links={links}
+            busy={tunnelBusy}
             error={tunnelError}
-            onStartPorts={(spec) => void runTunnel(() => startPortServe(parsePortMappings(spec)))}
-            onForward={(addr, spec, openBrowser) =>
-              void runTunnel(() => startForward(addr, forwardPortMappings(spec, openBrowser), openBrowser))
-            }
-            onStop={(id) => void runTunnel(() => stopSession(id))}
+            onAdd={addMapping}
+            onStart={(id) => void startMapping(id)}
+            onStop={(id) => void stopMapping(id)}
+            onDelete={(id) => void deleteMapping(id)}
           />
         ) : (
           <SettingsPage

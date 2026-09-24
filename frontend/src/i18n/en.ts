@@ -48,7 +48,17 @@ export const en = {
   off: "Off",
 
   tunnelTitle: "Tunnel",
-  tunnelLede: "Serve TCP ports on a Tailcat address and forward them onto this machine. You can open a forwarded HTTP port in the browser.",
+  tunnelLede:
+    "Saved port mappings you can start and stop anytime. Serve a local TCP port on a Tailcat address, or forward a peer port onto this machine.",
+  tunnelNew: "+ New mapping",
+  tunnelEmpty: "No saved mappings yet.",
+  tunnelList: "Saved mappings",
+  tunnelSave: "Save mapping",
+  tunnelStart: "Start",
+  tunnelKind: "Kind",
+  tunnelOneMapping: "Save one port mapping at a time.",
+  tunnelPeerRequired: "Enter a Tailcat address.",
+  tunnelEphemeral: "browser",
   tunnelServe: "Port serve",
   tunnelForward: "Local forward",
   openInBrowser: "Open in browser",
