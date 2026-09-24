@@ -2653,8 +2653,9 @@ textarea {
   gap: 12px;
 }
 
-.miao-page .lede {
+.miao-page .chat-lobby-head .lede {
   margin-bottom: 0;
+  max-width: none;
 }
 
 .miao-modes {

@@ -103,6 +103,10 @@ describe("Mew Share page", () => {
     expect(listRule).not.toMatch(/overflow\s*:/);
     expect(listRule).toContain("flex: 0 0 auto");
 
+    const ledeRule = cssBlock(css, ".miao-page .chat-lobby-head .lede");
+    expect(ledeRule).toContain("max-width: none");
+    expect(cssBlock(css, ".chat-lobby-head .lede")).toContain("max-width: 62ch");
+
     const sendRule = cssBlock(css, ".miao-send");
     expect(sendRule).toContain("min-height: 0");
     expect(sendRule).toContain("overflow-y: auto");
