@@ -62,7 +62,9 @@ describe("toast stack", () => {
     const stackRule = rule.slice(rule.indexOf(".toast-stack"));
     expect(stackRule.startsWith(".toast-stack")).toBe(true);
     expect(stackRule).toContain("width: min(372px, calc(100vw - 32px))");
-    expect(stackRule).toContain("border-radius: 14px");
+    expect(stackRule).toContain("padding: 12px");
+    expect(stackRule).toContain("border-radius: 20px");
+    expect(stackRule).toContain("border-radius: 8px");
     expect(stackRule).toContain("background: var(--glass-bg-strong)");
     expect(stackRule).toContain("right: 16px");
     expect(getComputedStyle(alert).pointerEvents).toBe("auto");

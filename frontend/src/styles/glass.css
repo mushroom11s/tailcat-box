@@ -2909,8 +2909,9 @@ textarea {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 12px 10px 12px 12px;
-  border-radius: 14px;
+  /* Concentric corners: R_toast = close-button radius + padding (8px + 12px). */
+  padding: 12px;
+  border-radius: 20px;
   background: var(--glass-bg-strong);
   border: 1px solid color-mix(in srgb, var(--danger) 46%, var(--glass-border));
   box-shadow: var(--shadow), var(--glass-highlight);
@@ -2965,9 +2966,9 @@ textarea {
   color: var(--muted);
   width: 28px;
   height: 28px;
-  margin: -2px -2px 0 0;
+  margin: 0;
   padding: 0;
-  border-radius: 999px;
+  border-radius: 8px;
   cursor: pointer;
   flex-shrink: 0;
   font-size: 18px;
