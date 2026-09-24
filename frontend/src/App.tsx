@@ -95,6 +95,8 @@ export default function App() {
   const [lobby, setLobby] = useState(true);
   const [lobbyPeer, setLobbyPeer] = useState("");
   const [lobbyError, setLobbyError] = useState("");
+  const [lobbyBusy, setLobbyBusy] = useState<"" | "temp" | "permanent" | "connect">("");
+  const lobbyBusyRef = useRef<"" | "temp" | "permanent" | "connect">("");
   const [lobbyKey, setLobbyKey] = useState("");
   const [lobbyKeyDraft, setLobbyKeyDraft] = useState("");
   const [closeAsk, setCloseAsk] = useState("");
@@ -398,8 +400,25 @@ export default function App() {
     }
   }, [region, derpMapURL]);
 
-  async function createTemporary(): Promise<void> {
+  function claimLobby(action: "temp" | "permanent" | "connect"): boolean {
+    if (lobbyBusyRef.current) {
+      return false;
+    }
+    lobbyBusyRef.current = action;
+    setLobbyBusy(action);
     setLobbyError("");
+    return true;
+  }
+
+  function releaseLobby(): void {
+    lobbyBusyRef.current = "";
+    setLobbyBusy("");
+  }
+
+  async function createTemporary(): Promise<void> {
+    if (!claimLobby("temp")) {
+      return;
+    }
     const draft = lobbyPeer;
     try {
       const sess = await startChatRoom("");
@@ -408,16 +427,23 @@ export default function App() {
       setPage("chat");
     } catch (err) {
       setLobbyError(showError(err));
+    } finally {
+      releaseLobby();
     }
   }
 
   async function createPermanent(): Promise<void> {
+    if (lobbyBusyRef.current) {
+      return;
+    }
     const name = lobbyKey.trim();
     if (!name) {
       setLobbyError(t("lobbyKeyRequired"));
       return;
     }
-    setLobbyError("");
+    if (!claimLobby("permanent")) {
+      return;
+    }
     const draft = lobbyPeer;
     try {
       const sess = await startChatRoom(name);
@@ -426,6 +452,8 @@ export default function App() {
       setPage("chat");
     } catch (err) {
       setLobbyError(showError(err));
+    } finally {
+      releaseLobby();
     }
   }
 
@@ -496,12 +524,17 @@ export default function App() {
   }
 
   async function connectLobby(): Promise<void> {
+    if (lobbyBusyRef.current) {
+      return;
+    }
     const addr = lobbyPeer.trim();
     if (!addr.startsWith("tc")) {
       setLobbyError(t("chatAddrError"));
       return;
     }
-    setLobbyError("");
+    if (!claimLobby("connect")) {
+      return;
+    }
     const draft = lobbyPeer;
     try {
       const sess = await startChatRoom("");
@@ -518,6 +551,8 @@ export default function App() {
       }
     } catch (err) {
       setLobbyError(showError(err));
+    } finally {
+      releaseLobby();
     }
   }
 
@@ -747,6 +782,7 @@ export default function App() {
               onCreatePermanent={() => void createPermanent()}
               onSaveKey={() => void saveLobbyKey()}
               onConnect={() => void connectLobby()}
+              busy={lobbyBusy}
             />
           ) : (
             <ChatPage

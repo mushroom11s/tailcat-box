@@ -19,6 +19,7 @@ type Props = {
   onCreatePermanent: () => void;
   onSaveKey: () => void;
   onConnect: () => void;
+  busy: "" | "temp" | "permanent" | "connect";
 };
 
 export default function LobbyPage({
@@ -34,11 +35,13 @@ export default function LobbyPage({
   onCreatePermanent,
   onSaveKey,
   onConnect,
+  busy,
 }: Props) {
   const { t } = useI18n();
+  const pending = busy !== "";
 
   function onKeyDown(ev: KeyboardEvent<HTMLInputElement>): void {
-    if (ev.key !== "Enter") {
+    if (ev.key !== "Enter" || pending) {
       return;
     }
     ev.preventDefault();
@@ -46,7 +49,7 @@ export default function LobbyPage({
   }
 
   function onKeyDraftKey(ev: KeyboardEvent<HTMLInputElement>): void {
-    if (ev.key !== "Enter") {
+    if (ev.key !== "Enter" || pending) {
       return;
     }
     ev.preventDefault();
@@ -62,8 +65,8 @@ export default function LobbyPage({
 
       <div className="glass chat-lobby-panel">
         <h3>{t("lobbyTempTitle")}</h3>
-        <button className="btn" type="button" onClick={onCreate}>
-          {t("lobbyCreate")}
+        <button className="btn" type="button" disabled={pending} onClick={onCreate}>
+          {busy === "temp" ? t("lobbyCreating") : t("lobbyCreate")}
         </button>
       </div>
 
@@ -81,8 +84,8 @@ export default function LobbyPage({
           </select>
         </div>
         <div className="row">
-          <button className="btn btn-ghost" type="button" onClick={onCreatePermanent}>
-            {t("lobbyCreatePermanent")}
+          <button className="btn btn-ghost" type="button" disabled={pending} onClick={onCreatePermanent}>
+            {busy === "permanent" ? t("lobbyCreating") : t("lobbyCreatePermanent")}
           </button>
         </div>
         <div className="chat-lobby-key-save">
@@ -96,7 +99,7 @@ export default function LobbyPage({
               autoComplete="off"
             />
           </div>
-          <button className="btn btn-ghost" type="button" onClick={onSaveKey}>
+          <button className="btn btn-ghost" type="button" disabled={pending} onClick={onSaveKey}>
             {t("lobbySaveKey")}
           </button>
         </div>
@@ -115,8 +118,8 @@ export default function LobbyPage({
           />
         </div>
         <p className="chat-quiet">{t("lobbyConnectHint")}</p>
-        <button className="btn btn-ghost" type="button" onClick={onConnect}>
-          {t("chatConnect")}
+        <button className="btn btn-ghost" type="button" disabled={pending} onClick={onConnect}>
+          {busy === "connect" ? t("lobbyConnecting") : t("chatConnect")}
         </button>
       </div>
 
