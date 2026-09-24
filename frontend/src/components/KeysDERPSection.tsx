@@ -177,7 +177,15 @@ export default function KeysDERPSection({
           ))}
         </select>
       </div>
-      {canRestart && restartLabel ? <p>{t("chatRestartTarget").replaceAll("{label}", restartLabel)}</p> : null}
+      {canRestart && restartLabel ? (
+        <div className="restart-target">
+          <p>{t("chatRestartTargetLead")}</p>
+          <p className="restart-target-label" title={restartLabel}>
+            {restartLabel}
+          </p>
+          <p>{t("chatRestartTargetTrail")}</p>
+        </div>
+      ) : null}
       {canRestart && dirty ? <p>{t("chatRestartHint")}</p> : null}
       {!canRestart ? <p>{t("chatNoRoomRestart")}</p> : null}
       <div className="row">

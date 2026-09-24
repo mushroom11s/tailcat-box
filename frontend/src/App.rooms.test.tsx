@@ -304,7 +304,11 @@ describe("phase A multi-room lobby", () => {
     expect(screen.getByText("Peer connected")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText(`Restarts this room only: ${secondAddress}. Other rooms stay connected.`)).toBeTruthy();
+    expect(screen.getByText("Restarts this room only:")).toBeTruthy();
+    const restartTarget = document.querySelector(".restart-target-label");
+    expect(restartTarget?.textContent).toBe(secondAddress);
+    expect(restartTarget?.getAttribute("title")).toBe(secondAddress);
+    expect(screen.getByText("Other rooms stay connected.")).toBeTruthy();
     await user.type(screen.getByLabelText("Name"), "home");
     await user.click(screen.getByRole("button", { name: "Create key" }));
     await user.selectOptions(screen.getByLabelText("Room key"), "home");
