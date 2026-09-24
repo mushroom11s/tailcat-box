@@ -273,12 +273,7 @@ function MappingDetail({
         <span className={`pill ${session?.Status || "stopped"}`}>{statusKey ? t(statusKey) : session?.Status}</span>
         {mapping.openBrowser ? <span>{t("openInBrowser")}</span> : null}
       </p>
-      {peerText ? (
-        <>
-          <KeyLine value={peerText} copyLabel={t("tunnelCopyAddress")} onCopy={onCopy} />
-          <QrShareButton value={peerText} />
-        </>
-      ) : null}
+      {peerText ? <KeyLine value={peerText} copyLabel={t("tunnelCopyAddress")} onCopy={onCopy} /> : null}
       {session?.Address ? (
         <>
           <KeyLine
@@ -287,7 +282,7 @@ function MappingDetail({
             onCopy={onCopy}
             className="address"
           />
-          {liveKey && liveKey !== peerText ? <QrShareButton value={liveKey} /> : null}
+          {mapping.mode === "serve" && liveKey ? <QrShareButton value={liveKey} /> : null}
         </>
       ) : null}
       {session?.Err ? <p className="err">{session.Err}</p> : null}

@@ -20,6 +20,21 @@ async function copyText(text: string): Promise<void> {
   }
 }
 
+const ownAddressKinds = new Set([
+  "chat",
+  "pipe_serve",
+  "port_serve",
+  "recv",
+  "files_serve",
+  "ssh_serve",
+  "exit_node",
+  "exec",
+]);
+
+function ownsShareableAddress(kind: string): boolean {
+  return ownAddressKinds.has(kind);
+}
+
 type Props = {
   session: Session;
   onStop?: (id: string) => void;
@@ -30,7 +45,7 @@ export default function SessionCard({ session, onStop }: Props) {
   const stopped = session.Status === "stopped";
   const kindKey = kindMessageKey(session.Kind);
   const statusKey = statusMessageKey(session.Status);
-  const key = shareableAddress(session.Address);
+  const key = ownsShareableAddress(session.Kind) ? shareableAddress(session.Address) : "";
   return (
     <article className="glass card">
       <div className="card-head">
