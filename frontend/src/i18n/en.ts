@@ -398,7 +398,6 @@ export const en = {
 
   qrShow: "QR",
   qrShowLabel: "Show QR code",
-  qrShowPeerLabel: "Show peer QR code",
   qrTitle: "QR code",
   qrScan: "Scan QR",
   qrScanTitle: "Scan QR code",

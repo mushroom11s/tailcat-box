@@ -398,7 +398,6 @@ export const zhCN = {
 
   qrShow: "二维码",
   qrShowLabel: "显示二维码",
-  qrShowPeerLabel: "显示对方的二维码",
   qrTitle: "二维码",
   qrScan: "扫码",
   qrScanTitle: "扫描二维码",

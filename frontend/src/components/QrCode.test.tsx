@@ -5,6 +5,7 @@ import App from "../App";
 import { LocaleProvider } from "../i18n";
 import { MAPPINGS_KEY } from "../lib/portMappings";
 import { decodeQrFromFile } from "../lib/qrImage";
+import SessionCard from "./SessionCard";
 import ChatPage from "../pages/ChatPage";
 import TunnelPage from "../pages/TunnelPage";
 
@@ -66,7 +67,8 @@ describe("qr share and scan", () => {
       expect((screen.getByLabelText("Peer") as HTMLInputElement).value).toBe("tc:from-qr");
     });
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByRole("button", { name: "Show peer QR code" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Show peer QR code" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Show QR code" })).toBeTruthy();
   });
 
   it("reports a missing camera, a missing code, and an invalid code", async () => {
@@ -102,7 +104,7 @@ describe("qr share and scan", () => {
     }
   });
 
-  it("scans a forward address and shows QR codes for a served port and a saved remote key", async () => {
+  it("scans a forward address and shows a QR code only for the served port", async () => {
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByRole("button", { name: "Tunnel" }));
@@ -131,8 +133,7 @@ describe("qr share and scan", () => {
     await user.click(screen.getByRole("button", { name: "Save mapping" }));
     const detail = screen.getByRole("region", { name: "18080 → :8080" });
     expect(within(detail).getByText(addr)).toBeTruthy();
-    await user.click(within(detail).getByRole("button", { name: "Show QR code" }));
-    expect((await screen.findByRole("dialog")).querySelector(".qr-payload")?.textContent).toBe(addr);
+    expect(within(detail).queryByRole("button", { name: "Show QR code" })).toBeNull();
   });
 
   it("uses 扫码 and 显示二维码 in zh-CN", async () => {
@@ -143,6 +144,15 @@ describe("qr share and scan", () => {
         <TunnelPage
           mappings={[
             {
+              id: "serve",
+              mode: "serve",
+              localPort: 8080,
+              remoteHost: "",
+              remotePort: 0,
+              peer: "",
+              openBrowser: false,
+            },
+            {
               id: "fwd",
               mode: "forward",
               localPort: 18080,
@@ -152,8 +162,19 @@ describe("qr share and scan", () => {
               openBrowser: false,
             },
           ]}
-          sessions={[]}
-          links={{}}
+          sessions={[
+            {
+              ID: "port",
+              Kind: "port_serve",
+              Status: "running",
+              Address: "tc:mine",
+              CreatedAt: "",
+              Err: "",
+              Progress: "",
+              Dangerous: false,
+            },
+          ]}
+          links={{ serve: "port" }}
           busy={false}
           error=""
           onAdd={vi.fn()}
@@ -163,10 +184,50 @@ describe("qr share and scan", () => {
         />
       </LocaleProvider>,
     );
+    await user.click(screen.getByRole("button", { name: /^8080/ }));
+    expect(within(screen.getByRole("region", { name: "8080" })).getByRole("button", { name: "显示二维码" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: /tc:peer/ }));
-    expect(screen.getByRole("button", { name: "显示二维码" })).toBeTruthy();
+    const peerDetail = screen.getByRole("region", { name: "18080 → :8080" });
+    expect(within(peerDetail).queryByRole("button", { name: "显示二维码" })).toBeNull();
+    expect(within(peerDetail).queryByRole("button", { name: "显示对方的二维码" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "+ 新映射" }));
     await user.click(screen.getByRole("radio", { name: "本地转发" }));
     expect(screen.getByRole("button", { name: "扫码" })).toBeTruthy();
+  });
+
+  it("offers QR for an owned listen address and not for a dialed peer", () => {
+    render(
+      <LocaleProvider>
+        <>
+          <SessionCard
+            session={{
+              ID: "mine",
+              Kind: "port_serve",
+              Status: "running",
+              Address: "tc:mine",
+              CreatedAt: "",
+              Err: "",
+              Progress: "",
+              Dangerous: false,
+            }}
+          />
+          <SessionCard
+            session={{
+              ID: "theirs",
+              Kind: "pipe_dial",
+              Status: "running",
+              Address: "tc:theirs",
+              CreatedAt: "",
+              Err: "",
+              Progress: "",
+              Dangerous: false,
+            }}
+          />
+        </>
+      </LocaleProvider>,
+    );
+    const buttons = screen.getAllByRole("button", { name: "Show QR code" });
+    expect(buttons).toHaveLength(1);
+    expect(screen.getByText("tc:theirs")).toBeTruthy();
   });
 });

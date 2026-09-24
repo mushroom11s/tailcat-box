@@ -6,7 +6,6 @@ import QrDialog from "./QrDialog";
 
 type Props = {
   value: string;
-  peer?: boolean;
   disabled?: boolean;
 };
 
@@ -26,7 +25,7 @@ async function copyText(text: string): Promise<void> {
   }
 }
 
-export default function QrShareButton({ value, peer = false, disabled = false }: Props) {
+export default function QrShareButton({ value, disabled = false }: Props) {
   const { t } = useI18n();
   const text = value.trim();
   const [open, setOpen] = useState(false);
@@ -60,7 +59,7 @@ export default function QrShareButton({ value, peer = false, disabled = false }:
         className="btn btn-ghost"
         type="button"
         disabled={disabled || !text}
-        aria-label={peer ? t("qrShowPeerLabel") : t("qrShowLabel")}
+        aria-label={t("qrShowLabel")}
         onClick={(ev) => {
           ev.stopPropagation();
           void openDialog();

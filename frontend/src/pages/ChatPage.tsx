@@ -11,7 +11,6 @@ import { createLiveCall, type CallMode, type CallView, type LiveCall, type LiveD
 import { startVoiceCapture, type VoiceCapture } from "../lib/voiceCapture";
 import { displayNickname } from "../lib/nickname";
 import { labelPeerAddress, remarkAddress, remarkFor, type RemarkMap } from "../lib/remark";
-import { shareableAddress } from "../lib/qr";
 import { abbreviateAddress } from "../lib/roomLabel";
 import { hasWailsBindings, selectFiles } from "../lib/wails";
 
@@ -196,7 +195,6 @@ export default function ChatPage({
   const burnRef = useRef(false);
   const [draftPeer, setDraftPeer] = useState(initialPeerDraft ?? "");
   const remarkAddr = remarkAddress(peer, draftPeer);
-  const peerKey = shareableAddress(draftPeer) || shareableAddress(peer);
   const [draft, setDraft] = useState(initialComposer ?? "");
   const [inline, setInline] = useState("");
   const [notice, setNotice] = useState("");
@@ -1068,7 +1066,6 @@ export default function ChatPage({
               setInline("");
             }}
           />
-          {peerKey ? <QrShareButton value={peerKey} peer /> : null}
           {peer ? <span className="status-dot" aria-hidden="true" /> : null}
           <button className="btn" type="button" disabled={!address} onClick={() => connect()}>
             {t("chatConnect")}
