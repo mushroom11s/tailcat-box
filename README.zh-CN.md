@@ -4,7 +4,7 @@
 
 macOS 和 Windows 上的 [Tailscale Tailcat](https://github.com/tailscale/tailcat) 桌面客户端，用 [Wails](https://wails.io) v2 写的（Go + React + TypeScript）。
 
-[![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml)
+[![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/mushroom11s/tailcat-box)](https://github.com/mushroom11s/tailcat-box/releases) [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE)
 
 <p align="center">
   <img src="docs/assets/icon.png" alt="猫砂盆" width="256" />
@@ -183,3 +183,9 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 ## 致谢
 
 猫砂盆是 [Tailscale Tailcat](https://github.com/tailscale/tailcat) 的桌面客户端。
+
+## 协议
+
+本仓库中猫砂盆自身的代码采用 [PolyForm Noncommercial License 1.0.0](LICENSE)：允许非商用，商用需另行获得版权方授权。
+
+嵌入的第三方（尤其是 `github.com/tailscale/tailcat` 及其他依赖）仍遵循各自原有协议。本协议只覆盖猫砂盆自身的代码，不重新授权这些依赖。

@@ -4,7 +4,7 @@
 
 Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on macOS and Windows, built with [Wails](https://wails.io) v2 (Go + React + TypeScript).
 
-[![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml)
+[![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/mushroom11s/tailcat-box)](https://github.com/mushroom11s/tailcat-box/releases) [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE)
 
 <p align="center">
   <img src="docs/assets/icon.png" alt="Tailcat Box" width="256" />
@@ -183,3 +183,9 @@ Several rooms at once, several people on one room address, whether a closed addr
 ## Credits
 
 Tailcat Box is a desktop client for [Tailscale Tailcat](https://github.com/tailscale/tailcat).
+
+## License
+
+Tailcat Box source in this repository is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). Non-commercial use is allowed; commercial use requires a separate license from the copyright holder.
+
+Embedded and vendored third-party code (notably `github.com/tailscale/tailcat` and other dependencies) remains under its own licenses. This PolyForm Noncommercial license applies to Tailcat Box's own code and does not relicense those dependencies.
