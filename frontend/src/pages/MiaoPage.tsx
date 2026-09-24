@@ -13,6 +13,7 @@ import {
   formatBytes,
   miaoErrorKey,
   parseReceiveJob,
+  parseShare,
   receivePercent,
   receiveTerminal,
   remainingTTL,
@@ -20,7 +21,6 @@ import {
   upsertReceiveJob,
   type MiaoShare,
   type ReceiveJob,
-  type ReceiveStatus,
   type Remaining,
 } from "../lib/miao";
 import { cancelMiaoReceive, discardMiaoReceive, endMiaoShare, hasWailsBindings, listMiaoReceives, miaoShareStatus, onTailcatEvent, selectDirectory, selectFiles, setMiaoReceiveDest, startMiaoReceive, startMiaoShare } from "../lib/wails";
@@ -60,7 +60,7 @@ function baseName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-function receiveStatusLabel(status: ReceiveStatus, t: (key: MessageKey) => string): string {
+function receiveStatusLabel(status: string, t: (key: MessageKey) => string): string {
   switch (status) {
     case "connecting":
       return t("miaoStatusConnecting");
@@ -76,6 +76,8 @@ function receiveStatusLabel(status: ReceiveStatus, t: (key: MessageKey) => strin
       return t("miaoStatusCancelled");
     case "interrupted":
       return t("miaoStatusInterrupted");
+    default:
+      return t("miaoReceiveJob");
   }
 }
 
@@ -88,12 +90,13 @@ function receiveErrorText(job: ReceiveJob, t: (key: MessageKey) => string): stri
 }
 
 function upsertShare(list: MiaoShare[], snap: MiaoShare): MiaoShare[] {
-  const index = list.findIndex((item) => item.id === snap.id);
+  const nextSnap = parseShare(snap) ?? { ...snap, files: Array.isArray(snap.files) ? snap.files : [] };
+  const index = list.findIndex((item) => item.id === nextSnap.id);
   if (index < 0) {
-    return [snap, ...list];
+    return [nextSnap, ...list];
   }
   const next = list.slice();
-  next[index] = snap;
+  next[index] = nextSnap;
   return next;
 }
 
@@ -111,7 +114,8 @@ function ShareCard({
   const [qrFailed, setQrFailed] = useState(false);
   const left = downloadsLeft(share.maxDownloads, share.downloads);
   const ttl = remainingTTL(share.expiresAt, share.forever, now);
-  const label = share.files.map((file) => file.name).join(", ") || share.id;
+  const files = share.files ?? [];
+  const label = files.map((file) => file.name).join(", ") || share.id;
 
   useEffect(() => {
     const payload = share.payload;
@@ -143,7 +147,7 @@ function ShareCard({
       <div className="miao-active-grid">
         <h3>{t("miaoFiles")}</h3>
         <ul className="miao-files">
-          {share.files.map((file) => (
+          {files.map((file) => (
             <li key={`${file.name}:${file.size}`}>
               <span>{file.name}</span>
               <span className="miao-size">{formatBytes(file.size)}</span>
@@ -198,7 +202,8 @@ function ReceiveCard({
   onDiscard: (id: string) => void;
 }) {
   const { t } = useI18n();
-  const names = job.files.map((file) => file.name).join(", ");
+  const files = job.files ?? [];
+  const names = files.map((file) => file.name).join(", ");
   const label = names || t("miaoReceiveJob");
   const status = receiveStatusLabel(job.status, t);
   const pct = receivePercent(job);
@@ -210,9 +215,9 @@ function ReceiveCard({
     <article className="glass miao-active miao-receive-card" aria-label={label}>
       <h3>{names || t("miaoFiles")}</h3>
       <p className="miao-receive-status">{status}</p>
-      {job.files.length ? (
+      {files.length ? (
         <ul className="miao-files">
-          {job.files.map((file) => (
+          {files.map((file) => (
             <li key={`${file.name}:${file.size}`}>
               <span>{file.name}</span>
               <span className="miao-size">{formatBytes(file.size)}</span>
@@ -341,10 +346,8 @@ export default function MiaoPage() {
       if (ev.Kind !== "miao" || !ev.Data) {
         return;
       }
-      let snap: MiaoShare;
-      try {
-        snap = JSON.parse(ev.Data) as MiaoShare;
-      } catch {
+      const snap = parseShare(ev.Data);
+      if (!snap) {
         return;
       }
       if (snap.status === "ended") {

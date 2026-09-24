@@ -1,22 +1,52 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Component, type ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { LocaleProvider } from "../i18n";
+import { encodeJoin, MAX_SHARE_BYTES, parseJoin } from "../lib/miao";
 import { releaseBrowserReceiveHolds, resetBrowserMiao, setBrowserReceiveHold } from "../lib/miaoBrowser";
-import { MAX_SHARE_BYTES, parseJoin } from "../lib/miao";
+import { listMiaoReceives, startMiaoReceive } from "../lib/wails";
 import css from "../styles/glass.css?inline";
 import MiaoPage from "./MiaoPage";
 
+type GoApp = Record<string, (...args: unknown[]) => unknown>;
+
+class PageBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) {
+      return <div role="alert">page blank</div>;
+    }
+    return this.props.children;
+  }
+}
+
+function installGoApp(app: GoApp): void {
+  Object.assign(window, { go: { main: { App: app } } });
+}
+
+function clearGoApp(): void {
+  delete (window as { go?: unknown }).go;
+}
+
 afterEach(() => {
+  clearGoApp();
   resetBrowserMiao();
   cleanup();
 });
 
 function renderPage() {
   return render(
-    <LocaleProvider>
-      <MiaoPage />
-    </LocaleProvider>,
+    <PageBoundary>
+      <LocaleProvider>
+        <MiaoPage />
+      </LocaleProvider>
+    </PageBoundary>,
   );
 }
 
@@ -151,6 +181,46 @@ describe("Mew Share page", () => {
       setBrowserReceiveHold(false);
       releaseBrowserReceiveHolds();
     }
+  });
+
+  it("stays on screen when a download job has null or missing files", async () => {
+    const user = userEvent.setup();
+    const code = encodeJoin("tc:room", "token");
+    if (!code) {
+      throw new Error("missing code");
+    }
+    installGoApp({
+      StartChatRoom: () => Promise.resolve({}),
+      SetUILocale: () => Promise.resolve(),
+      ListMiaoReceives: () => Promise.resolve([{ id: "listed", status: "queued", files: null, dest: "/tmp/listed" }]),
+      MiaoShareStatus: () => Promise.resolve([{ id: "share-1", status: "active", files: null, payload: "", forever: true, total: 0, maxDownloads: 0, downloads: 0 }]),
+      SelectDirectory: () => Promise.resolve("/tmp/in"),
+      StartMiaoReceive: () => Promise.resolve({ id: "started", status: "connecting", bytesDone: 0, bytesTotal: 0, files: null, saved: null, dest: "/tmp/in" }),
+    });
+
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "Mew Share" })).toBeTruthy();
+    expect(screen.queryByText("page blank")).toBeNull();
+    await user.click(screen.getByRole("tab", { name: "Receive" }));
+    expect(await screen.findByText("Queued")).toBeTruthy();
+    expect(document.querySelector(".miao-receive-card .miao-files")).toBeNull();
+
+    await user.click(screen.getByRole("tab", { name: "Send" }));
+    expect(await screen.findByRole("article", { name: "share-1" })).toBeTruthy();
+    expect(document.querySelector(".miao-active .miao-files")?.children.length ?? 0).toBe(0);
+
+    await user.click(screen.getByRole("tab", { name: "Receive" }));
+    const join = screen.getByRole("textbox", { name: "Share code" });
+    await user.click(join);
+    await user.paste(code);
+    await user.click(screen.getByRole("button", { name: "Download" }));
+
+    expect(await screen.findByText("Connecting…")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Mew Share" })).toBeTruthy();
+    expect(screen.queryByText("page blank")).toBeNull();
+    expect(document.querySelectorAll(".miao-receive-card .miao-files")).toHaveLength(0);
+    expect((await startMiaoReceive(code, "/tmp/in")).files).toEqual([]);
+    expect((await listMiaoReceives())[0]?.files).toEqual([]);
   });
 
   it("scrolls the send column so active cards stay whole", async () => {

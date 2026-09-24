@@ -60,7 +60,7 @@ import { BrowserOpenURL, EventsOn } from "../../wailsjs/runtime/runtime";
 import { adapter, main, session, store } from "../../wailsjs/go/models";
 import { createBrowserHub } from "./chatBrowser";
 import { browserCancelReceive, browserDiscardReceive, browserEndMiao, browserJoinMiao, browserListMiao, browserListReceives, browserSetReceiveDest, browserStartMiao, browserStartReceive, setMiaoBrowserEmit } from "./miaoBrowser";
-import type { MiaoFileInput, MiaoReceipt, MiaoShare, ReceiveJob } from "./miao";
+import { parseReceiveJob, parseShare, type MiaoFileInput, type MiaoReceipt, type MiaoShare, type ReceiveJob } from "./miao";
 
 export type Session = {
   ID: string;
@@ -1348,10 +1348,14 @@ export async function startMiaoShare(
   forever: boolean,
   maxDownloads: number,
 ): Promise<MiaoShare> {
-  if (hasWailsBindings()) {
-    return (await bindStartMiaoShare(files, ttlDays, forever, maxDownloads)) as MiaoShare;
+  const raw = hasWailsBindings()
+    ? await bindStartMiaoShare(files, ttlDays, forever, maxDownloads)
+    : await browserStartMiao(files, ttlDays, forever, maxDownloads);
+  const share = parseShare(raw);
+  if (!share) {
+    throw new Error("Choose at least one file.");
   }
-  return browserStartMiao(files, ttlDays, forever, maxDownloads);
+  return share;
 }
 
 export async function endMiaoShare(id: string): Promise<void> {
@@ -1363,11 +1367,8 @@ export async function endMiaoShare(id: string): Promise<void> {
 }
 
 export async function miaoShareStatus(): Promise<MiaoShare[]> {
-  if (hasWailsBindings()) {
-    const raw = await bindMiaoShareStatus();
-    return Array.isArray(raw) ? (raw as MiaoShare[]) : [];
-  }
-  return browserListMiao();
+  const raw = hasWailsBindings() ? await bindMiaoShareStatus() : browserListMiao();
+  return sharesFrom(raw);
 }
 
 export async function joinMiaoShare(payload: string, destDir: string): Promise<MiaoReceipt> {
@@ -1378,10 +1379,12 @@ export async function joinMiaoShare(payload: string, destDir: string): Promise<M
 }
 
 export async function startMiaoReceive(payload: string, destDir: string): Promise<ReceiveJob> {
-  if (hasWailsBindings()) {
-    return (await bindStartMiaoReceive(payload, destDir)) as ReceiveJob;
+  const raw = hasWailsBindings() ? await bindStartMiaoReceive(payload, destDir) : browserStartReceive(payload, destDir);
+  const job = parseReceiveJob(raw);
+  if (!job) {
+    throw new Error("Unknown download.");
   }
-  return browserStartReceive(payload, destDir);
+  return job;
 }
 
 export async function cancelMiaoReceive(id: string): Promise<void> {
@@ -1401,11 +1404,32 @@ export async function setMiaoReceiveDest(id: string, destDir: string): Promise<v
 }
 
 export async function listMiaoReceives(): Promise<ReceiveJob[]> {
-  if (hasWailsBindings()) {
-    const raw = await bindListMiaoReceives();
-    return Array.isArray(raw) ? (raw as ReceiveJob[]) : [];
+  const raw = hasWailsBindings() ? await bindListMiaoReceives() : browserListReceives();
+  if (!Array.isArray(raw)) {
+    return [];
   }
-  return browserListReceives();
+  const jobs: ReceiveJob[] = [];
+  for (const item of raw) {
+    const job = parseReceiveJob(item);
+    if (job) {
+      jobs.push(job);
+    }
+  }
+  return jobs;
+}
+
+function sharesFrom(raw: unknown): MiaoShare[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const shares: MiaoShare[] = [];
+  for (const item of raw) {
+    const share = parseShare(item);
+    if (share) {
+      shares.push(share);
+    }
+  }
+  return shares;
 }
 
 export async function discardMiaoReceive(id: string): Promise<void> {
