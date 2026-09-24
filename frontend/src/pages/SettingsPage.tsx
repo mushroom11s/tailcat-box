@@ -39,20 +39,12 @@ type Props = {
   error: string;
   region: string;
   derpMapURL: string;
-  roomKey: string;
-  appliedKey: string;
-  appliedRegion: string;
-  appliedDERP: string;
-  onRoomKey: (name: string) => void;
   sessions: Session[];
   events: TailcatEvent[];
   peer: string;
   onCreate: (name: string, client: boolean, region: string) => void | Promise<void>;
   onDelete: (name: string) => void | Promise<void>;
   onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
-  onRestart: (keyName: string) => void | Promise<void>;
-  canRestart: boolean;
-  restartLabel: string;
   onPing: (addr: string, untilDirect: boolean) => void | Promise<void>;
   onStop: (id: string) => void | Promise<void>;
 };
@@ -181,20 +173,12 @@ export default function SettingsPage({
   error,
   region,
   derpMapURL,
-  roomKey,
-  appliedKey,
-  appliedRegion,
-  appliedDERP,
-  onRoomKey,
   sessions,
   events,
   peer,
   onCreate,
   onDelete,
   onSaveNetwork,
-  onRestart,
-  canRestart,
-  restartLabel,
   onPing,
   onStop,
 }: Props) {
@@ -483,7 +467,7 @@ export default function SettingsPage({
           {downloaded ? (
             <div className="update-install">
               <h4>{t("updateInstallTitle")}</h4>
-              <p>{installSteps(update?.Platform ?? "", t)}</p>
+              <p>{installSteps(update?.Platform ?? "", update?.AssetName ?? "", t)}</p>
             </div>
           ) : null}
         </InfoCard>
@@ -513,17 +497,9 @@ export default function SettingsPage({
         error={error}
         region={region}
         derpMapURL={derpMapURL}
-        roomKey={roomKey}
-        appliedKey={appliedKey}
-        appliedRegion={appliedRegion}
-        appliedDERP={appliedDERP}
-        onRoomKey={onRoomKey}
         onCreate={onCreate}
         onDelete={onDelete}
         onSaveNetwork={onSaveNetwork}
-        onRestart={onRestart}
-        canRestart={canRestart}
-        restartLabel={restartLabel}
       />
       <DiagnosticsSection
         sessions={sessions}
@@ -584,12 +560,13 @@ function revealLabel(platform: string, t: (key: MessageKey) => string): string {
   return t("revealUpdate");
 }
 
-function installSteps(platform: string, t: (key: MessageKey) => string): string {
+function installSteps(platform: string, assetName: string, t: (key: MessageKey) => string): string {
+  const zip = assetName.toLowerCase().endsWith(".zip");
   if (platform === "darwin") {
-    return t("updateInstallMac");
+    return t(zip ? "updateInstallMacZip" : "updateInstallMac");
   }
   if (platform === "windows") {
-    return t("updateInstallWin");
+    return t(zip ? "updateInstallWinZip" : "updateInstallWin");
   }
   return t("updateInstallOther");
 }

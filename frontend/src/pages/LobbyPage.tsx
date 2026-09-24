@@ -100,7 +100,7 @@ export default function LobbyPage({
         </div>
         <div className="row">
           <button className="btn btn-ghost" type="button" disabled={pending} onClick={onCreatePermanent}>
-            {busy === "permanent" ? <LoadingCat size="sm" label={t("lobbyCreating")} /> : t("lobbyCreatePermanent")}
+            {busy === "permanent" ? <LoadingCat size="sm" label={t("lobbyCreating")} /> : t("chatRestartRoom")}
           </button>
         </div>
         <div className="chat-lobby-key-save">

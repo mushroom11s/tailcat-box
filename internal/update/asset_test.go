@@ -64,6 +64,30 @@ func TestSelectAsset(t *testing.T) {
 		},
 		{name: "linux", assets: published, goos: "linux", goarch: "amd64", tag: "v0.1.0", wantErr: ErrUnsupportedPlatform},
 		{name: "386", assets: published, goos: "windows", goarch: "386", tag: "v0.1.0", wantErr: ErrUnsupportedPlatform},
+		{
+			name: "prefers dmg over zip",
+			assets: assetsFor(
+				"tailcat-box-macos-arm64-v0.4.0.zip",
+				"tailcat-box-macos-arm64-v0.4.0.dmg",
+			),
+			goos: "darwin", goarch: "arm64", tag: "v0.4.0",
+			want: "tailcat-box-macos-arm64-v0.4.0.dmg",
+		},
+		{
+			name: "prefers exe over zip",
+			assets: assetsFor(
+				"tailcat-box-windows-amd64-v0.4.0.zip",
+				"tailcat-box-windows-amd64-v0.4.0.exe",
+			),
+			goos: "windows", goarch: "amd64", tag: "v0.4.0",
+			want: "tailcat-box-windows-amd64-v0.4.0.exe",
+		},
+		{
+			name:   "dmg only",
+			assets: assetsFor("tailcat-box-macos-amd64-v0.4.0.dmg"),
+			goos:   "darwin", goarch: "amd64", tag: "v0.4.0",
+			want: "tailcat-box-macos-amd64-v0.4.0.dmg",
+		},
 		{name: "missing", assets: assetsFor("tailcat-box-windows-amd64-v0.1.0.zip"), goos: "darwin", goarch: "arm64", tag: "v0.1.0", wantErr: ErrNoAsset},
 		{
 			name: "ambiguous",
@@ -104,11 +128,17 @@ func TestSelectAsset(t *testing.T) {
 
 func TestSafeAssetName(t *testing.T) {
 	t.Parallel()
-	got, err := SafeAssetName("tailcat-box-macos-arm64-v0.1.0.zip")
-	if err != nil || got != "tailcat-box-macos-arm64-v0.1.0.zip" {
-		t.Fatalf("got %q %v", got, err)
+	for _, name := range []string{
+		"tailcat-box-macos-arm64-v0.1.0.zip",
+		"tailcat-box-macos-arm64-v0.4.0.dmg",
+		"tailcat-box-windows-amd64-v0.4.0.exe",
+	} {
+		got, err := SafeAssetName(name)
+		if err != nil || got != name {
+			t.Fatalf("SafeAssetName(%q)=%q %v", name, got, err)
+		}
 	}
-	for _, name := range []string{"../evil.zip", "foo.txt", "a/b.zip", "zip", "..", "tail cat.zip"} {
+	for _, name := range []string{"../evil.zip", "foo.txt", "a/b.zip", "zip", "..", "tail cat.zip", "setup.msi"} {
 		if _, err := SafeAssetName(name); err == nil {
 			t.Fatalf("SafeAssetName(%q) succeeded", name)
 		}

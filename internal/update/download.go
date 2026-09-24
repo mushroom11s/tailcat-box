@@ -11,7 +11,7 @@ import (
 
 const maxDownloadBytes int64 = 1 << 30
 
-// Progress is emitted while a zip is written.
+// Progress is emitted while an installer is written.
 type Progress struct {
 	Received int64
 	Total    int64

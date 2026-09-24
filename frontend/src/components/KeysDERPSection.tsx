@@ -25,17 +25,9 @@ type Props = {
   error: string;
   region: string;
   derpMapURL: string;
-  roomKey: string;
-  appliedKey: string;
-  appliedRegion: string;
-  appliedDERP: string;
-  onRoomKey: (name: string) => void;
   onCreate: (name: string, client: boolean, region: string) => void | Promise<void>;
   onDelete: (name: string) => void | Promise<void>;
   onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
-  onRestart: (keyName: string) => void | Promise<void>;
-  canRestart: boolean;
-  restartLabel: string;
 };
 
 export default function KeysDERPSection({
@@ -44,17 +36,9 @@ export default function KeysDERPSection({
   error,
   region,
   derpMapURL,
-  roomKey,
-  appliedKey,
-  appliedRegion,
-  appliedDERP,
-  onRoomKey,
   onCreate,
   onDelete,
   onSaveNetwork,
-  onRestart,
-  canRestart,
-  restartLabel,
 }: Props) {
   const { t } = useI18n();
   const [name, setName] = useState("");
@@ -62,7 +46,6 @@ export default function KeysDERPSection({
   const [keyRegion, setKeyRegion] = useState("");
   const [netRegion, setNetRegion] = useState(region);
   const [netDERP, setNetDERP] = useState(derpMapURL);
-  const dirty = roomKey !== appliedKey || region !== appliedRegion || derpMapURL !== appliedDERP;
 
   useEffect(() => {
     setNetRegion(region);
@@ -164,34 +147,6 @@ export default function KeysDERPSection({
             </div>
           </article>
         ))}
-      </div>
-
-      <div className="field">
-        <label htmlFor="room-key">{t("chatRoomKey")}</label>
-        <select id="room-key" value={roomKey} onChange={(e) => onRoomKey(e.target.value)}>
-          <option value="">{t("chatNewRoomKey")}</option>
-          {keys.map((key) => (
-            <option key={key.Name + key.Source} value={key.Name}>
-              {key.Name}
-            </option>
-          ))}
-        </select>
-      </div>
-      {canRestart && restartLabel ? (
-        <div className="restart-target">
-          <p>{t("chatRestartTargetLead")}</p>
-          <p className="restart-target-label" title={restartLabel}>
-            {restartLabel}
-          </p>
-          <p>{t("chatRestartTargetTrail")}</p>
-        </div>
-      ) : null}
-      {canRestart && dirty ? <p>{t("chatRestartHint")}</p> : null}
-      {!canRestart ? <p>{t("chatNoRoomRestart")}</p> : null}
-      <div className="row">
-        <button className="btn" type="button" disabled={busy || !canRestart} onClick={() => onRestart(roomKey)}>
-          {t("chatRestartRoom")}
-        </button>
       </div>
       {error ? <p className="err">{error}</p> : null}
     </section>
