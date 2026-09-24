@@ -62,10 +62,9 @@ describe("shell scroll", () => {
       const marginLeft = parseFloat(metrics.marginLeft);
       const marginRight = parseFloat(metrics.marginRight);
       const marginTop = parseFloat(metrics.marginTop);
-      expect(marginLeft).toBeGreaterThanOrEqual(16);
-      expect(marginLeft).toBeLessThanOrEqual(20);
-      expect(marginRight).toBeGreaterThanOrEqual(8);
-      expect(marginRight).toBeLessThanOrEqual(12);
+      // Horizontal nest is the list's shadow padding, not an extra margin that clips names.
+      expect(marginLeft).toBe(0);
+      expect(marginRight).toBe(0);
       expect(marginTop).toBe(12);
       expect(rooms.contains(chat)).toBe(false);
 
@@ -238,6 +237,21 @@ describe("shell scroll", () => {
     }
   });
 
+  it("gives sidebar menu buttons and room rows vertical breathing room", () => {
+    const navRule = cssBlock(css, ".nav");
+    expect(navRule).toContain("gap: 8px");
+    expect(navRule).toContain("padding-left: 8px");
+    expect(navRule).toContain("padding-right: 8px");
+    expect(cssBlock(css, ".nav-rooms")).toContain("gap: 0");
+    expect(cssBlock(css, ".nav-room-list")).toContain("gap: 8px");
+    expect(cssBlock(css, ".nav-room-list")).toContain("padding: 8px 8px 16px");
+    const active = cssBlock(css, ".nav-btn.active");
+    expect(active).toContain("0 0 0 1px");
+    expect(active).toContain("0 4px 10px");
+    expect(active).not.toContain("0 10px 24px");
+    expect(cssBlock(css, ":root")).toContain("--sidebar-w: 260px");
+  });
+
   it("widens the sidebar and insets the active pill inside the clip", () => {
     expect(cssBlock(css, ":root")).toContain("--sidebar-w: 260px");
     expect(cssBlock(css, ".shell")).toContain("grid-template-columns: var(--sidebar-w) minmax(0, 1fr)");
@@ -246,11 +260,27 @@ describe("shell scroll", () => {
     expect(navRule).toContain("padding-right: 8px");
     expect(navRule).toContain("overflow: hidden");
     const chatRule = cssBlock(css, ".nav-chat");
+    expect(chatRule).toContain("padding-top: 8px");
     expect(chatRule).toContain("padding-left: 8px");
     expect(chatRule).toContain("padding-right: 8px");
+    expect(chatRule).toContain("margin-top: -8px");
     expect(chatRule).toContain("margin-left: -8px");
     expect(chatRule).toContain("margin-right: -8px");
     expect(chatRule).toContain("overflow: hidden");
+    expect(navRule).toContain("padding-top: 8px");
+    expect(navRule).toContain("padding-bottom: 8px");
+    const listRule = cssBlock(css, ".nav-room-list");
+    expect(listRule).toContain("padding: 8px 8px 16px");
+    expect(listRule).toContain("min-width: 0");
+    expect(listRule).toContain("overflow-x: hidden");
+    expect(cssBlock(css, ".nav-room-label")).toContain("min-width: 0");
+    expect(cssBlock(css, ".nav-room-label")).toContain("flex: 1 1 0%");
+    expect(cssBlock(css, ".nav-room-label")).toContain("width: 100%");
+    const nameRule = css.match(/\.nav-room-primary,\s*\.nav-room-key\s*\{[^}]*\}/);
+    expect(nameRule?.[0]).toContain("min-width: 0");
+    expect(nameRule?.[0]).toContain("max-width: 100%");
+    expect(nameRule?.[0]).toContain("text-overflow: ellipsis");
+    expect(nameRule?.[0]).toContain("white-space: nowrap");
     const footerRule = cssBlock(css, ".sidebar-footer");
     expect(footerRule).toContain("padding-left: 8px");
     expect(footerRule).toContain("padding-right: 8px");
@@ -269,12 +299,17 @@ describe("shell scroll", () => {
       const nav = document.querySelector(".nav") as HTMLElement;
       const chat = document.querySelector(".nav-chat") as HTMLElement;
       const footer = document.querySelector(".sidebar-footer") as HTMLElement;
+      expect(getComputedStyle(nav).paddingTop).toBe("8px");
+      expect(getComputedStyle(nav).paddingBottom).toBe("8px");
       expect(getComputedStyle(nav).paddingLeft).toBe("8px");
       expect(getComputedStyle(nav).paddingRight).toBe("8px");
+      expect(getComputedStyle(chat).paddingTop).toBe("8px");
       expect(getComputedStyle(chat).paddingLeft).toBe("8px");
       expect(getComputedStyle(chat).paddingRight).toBe("8px");
+      expect(getComputedStyle(chat).marginTop).toBe("-8px");
       expect(getComputedStyle(chat).marginLeft).toBe("-8px");
       expect(getComputedStyle(chat).marginRight).toBe("-8px");
+      expect(getComputedStyle(footer).paddingTop).toBe("8px");
       expect(getComputedStyle(footer).paddingLeft).toBe("8px");
       expect(getComputedStyle(footer).paddingRight).toBe("8px");
       expect(screen.getByRole("button", { name: "喵传" }).classList.contains("active")).toBe(true);

@@ -79,9 +79,11 @@ export default function LobbyPage({
       <div className="glass chat-lobby-panel">
         <h3>{t("lobbyTempTitle")}</h3>
         {panelBusy(busy === "temp", t("lobbyCreating"))}
-        <button className="btn" type="button" disabled={pending} onClick={onCreate}>
-          {busy === "temp" ? <LoadingCat size="sm" label={t("lobbyCreating")} /> : t("lobbyCreate")}
-        </button>
+        {busy === "temp" ? null : (
+          <button className="btn" type="button" disabled={pending} onClick={onCreate}>
+            {t("lobbyCreate")}
+          </button>
+        )}
       </div>
 
       <div className="glass chat-lobby-panel">
@@ -98,11 +100,13 @@ export default function LobbyPage({
             ))}
           </select>
         </div>
-        <div className="row">
-          <button className="btn btn-ghost" type="button" disabled={pending} onClick={onCreatePermanent}>
-            {busy === "permanent" ? <LoadingCat size="sm" label={t("lobbyCreating")} /> : t("chatRestartRoom")}
-          </button>
-        </div>
+        {busy === "permanent" ? null : (
+          <div className="row">
+            <button className="btn btn-ghost" type="button" disabled={pending} onClick={onCreatePermanent}>
+              {t("chatRestartRoom")}
+            </button>
+          </div>
+        )}
         <div className="chat-lobby-key-save">
           <div className="field">
             <label htmlFor="lobby-key-name">{t("lobbyNewKey")}</label>
@@ -137,9 +141,11 @@ export default function LobbyPage({
           </div>
         </div>
         <p className="chat-quiet">{t("lobbyConnectHint")}</p>
-        <button className="btn btn-ghost" type="button" disabled={pending} onClick={onConnect}>
-          {busy === "connect" ? <LoadingCat size="sm" label={t("lobbyConnecting")} /> : t("chatConnect")}
-        </button>
+        {busy === "connect" ? null : (
+          <button className="btn btn-ghost" type="button" disabled={pending} onClick={onConnect}>
+            {t("chatConnect")}
+          </button>
+        )}
       </div>
 
       {error ? (

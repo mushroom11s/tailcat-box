@@ -197,7 +197,8 @@ textarea {
   text-align: center;
   flex-shrink: 0;
   gap: 8px;
-  padding: 6px 10px 22px;
+  /* 14px + .nav padding-top keeps the mark where it was while the active ring paints inside .nav. */
+  padding: 6px 10px 14px;
 }
 
 .brand-logo-row {
@@ -282,8 +283,11 @@ textarea {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  gap: 4px;
+  gap: 8px;
   min-height: 0;
+  /* Active ring is 1px; glow extends ~7px up and ~11px sideways. Padding keeps 喵传 inside the clip. */
+  padding-top: 8px;
+  padding-bottom: 8px;
   padding-left: 8px;
   padding-right: 8px;
   overflow: hidden;
@@ -346,7 +350,7 @@ textarea {
   font-weight: 600;
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--glow) 55%, white),
-    0 10px 24px color-mix(in srgb, var(--glow) 42%, transparent),
+    0 4px 10px color-mix(in srgb, var(--glow) 42%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
@@ -364,11 +368,15 @@ textarea {
   flex-direction: column;
   flex: 0 1 auto;
   gap: 4px;
+  /* Cancel the nav gap so padding-top is the same 8px of air, now inside this clip (聊天's top ring). */
+  margin-top: -8px;
   margin-left: -8px;
   margin-right: -8px;
+  padding-top: 8px;
   padding-left: 8px;
   padding-right: 8px;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -376,9 +384,10 @@ textarea {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  gap: 4px;
-  margin: 12px 12px 4px 20px;
+  gap: 0;
+  margin: 12px 0 4px;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -386,8 +395,12 @@ textarea {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  gap: 4px;
+  gap: 8px;
+  width: 100%;
   min-height: 0;
+  min-width: 0;
+  /* Inside the scroll clip: 1px ring plus glow (top ~7px, sides ~11px, bottom ~15px). */
+  padding: 8px 8px 16px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -423,6 +436,8 @@ textarea {
 
 .nav-room-row {
   position: relative;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -479,13 +494,18 @@ textarea {
 
 .nav-room-label {
   display: flex;
+  flex: 1 1 0%;
   flex-direction: column;
+  width: 100%;
   min-width: 0;
+  overflow: hidden;
   gap: 1px;
 }
 
 .nav-room-primary,
 .nav-room-key {
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -510,7 +530,8 @@ textarea {
   flex-direction: column;
   flex-shrink: 0;
   gap: 10px;
-  padding-top: 16px;
+  /* 8px here + .nav padding-bottom keeps the old 16px gap, with 穿透's ring inside .nav. */
+  padding-top: 8px;
   padding-left: 8px;
   padding-right: 8px;
 }
@@ -2898,14 +2919,40 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.miao-progress-wrap {
+  position: relative;
+  margin: 4px 0 22px;
+  padding-top: 30px;
+  overflow: visible;
+}
+
 .miao-progress {
   height: 8px;
-  margin: 4px 0 8px;
   border-radius: 999px;
   overflow: hidden;
   background: color-mix(in srgb, var(--text) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--glow) 42%, var(--hairline));
   box-shadow: inset 0 1px 2px color-mix(in srgb, black 35%, transparent);
+}
+
+.miao-progress-cat {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: clamp(20px, var(--miao-pct, 0%), calc(100% - 20px));
+  width: 40px;
+  height: 53px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  line-height: 0;
+}
+
+.miao-progress-cat img {
+  display: block;
+  width: 40px;
+  height: 53px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .miao-progress > span {
