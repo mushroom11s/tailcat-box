@@ -6,6 +6,7 @@ import VoiceNote from "../components/VoiceNote";
 import iconUrl from "../assets/icon.png";
 import roomQrMark from "../assets/room-qr-cat.png?inline";
 import { useI18n } from "../i18n";
+import { highlightParts, matchesQuery } from "../lib/chatSearch";
 import { localizeChatError, systemText } from "../lib/chatText";
 import { purgeDiscardIds } from "../lib/chatPurge";
 import { createLiveCall, type CallMode, type CallView, type LiveCall, type LiveDevices } from "../lib/liveCall";
@@ -164,6 +165,7 @@ export default function ChatPage({
   onRemark,
 }: Props) {
   const { t } = useI18n();
+  const [chatQuery, setChatQuery] = useState("");
   const ownLabel = displayNickname(nickname) || t("chatYou");
   const connected = peer.trim().length > 0;
   const detailsPin = useRef<"open" | "closed" | null>(null);
@@ -913,6 +915,18 @@ export default function ChatPage({
     ...messages,
     ...pending.filter((item) => !pendingLanded(item, messages)).map((item) => item.msg),
   ];
+  const query = chatQuery.trim();
+  function searchableText(msg: ChatMessage): string {
+    if (msg.direction === "system") {
+      return systemText(msg.code, msg.body ?? "", t);
+    }
+    const sealed = Boolean(msg.burn && msg.direction === "in" && openMessage?.id !== msg.id);
+    if (sealed) {
+      return "";
+    }
+    return [msg.body, msg.name].filter((part) => Boolean(part && part.trim())).join("\n");
+  }
+  const shown = query ? transcript.filter((msg) => matchesQuery(searchableText(msg), query)) : transcript;
 
   function sideActions(msg: ChatMessage): ReactNode {
     const inboundBurn = Boolean(msg.burn && msg.direction === "in");
@@ -1136,6 +1150,15 @@ export default function ChatPage({
       </div>
       <div className="chat-stage">
       <div className="chat-transcript-column">
+      <label className="chat-search">
+        <input
+          type="search"
+          value={chatQuery}
+          placeholder={t("chatSearchPlaceholder")}
+          aria-label={t("chatSearch")}
+          onChange={(ev) => setChatQuery(ev.target.value)}
+        />
+      </label>
       {selectedIds.size >= 1 ? (
         <div
           className="chat-select-bar"
@@ -1165,7 +1188,8 @@ export default function ChatPage({
       >
         <div ref={dragRectEl} className="chat-drag-rect" hidden />
         {transcript.length === 0 ? <p className="lede">{t("chatEmptyLede")}</p> : null}
-        {transcript.map((msg) =>
+        {transcript.length > 0 && shown.length === 0 ? <p className="lede">{t("chatSearchEmpty")}</p> : null}
+        {shown.map((msg) =>
           msg.direction === "system" ? (
             <p key={msg.id} className="chat-system">
               {systemText(msg.code, msg.body ?? "", t)}
@@ -1215,6 +1239,7 @@ export default function ChatPage({
                 caps={caps}
                 open={openMessage?.id === msg.id}
                 left={viewer?.id === msg.id ? viewer.left : null}
+                query={query}
                 onClose={() => finishBurn(msg.id)}
                 canPlayMime={canPlayMime}
                 decodeVoice={decodeVoice}
@@ -1454,11 +1479,32 @@ function MediaPreview({ label, stream, muted }: { label: string; stream: MediaSt
   );
 }
 
+function HighlightText({ text, query }: { text: string; query: string }) {
+  const parts = highlightParts(text, query);
+  if (parts.length === 0 || (parts.length === 1 && !parts[0].match)) {
+    return <>{text}</>;
+  }
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.match ? (
+          <mark key={`${index}:${part.text}`} className="chat-hit">
+            {part.text}
+          </mark>
+        ) : (
+          <span key={`${index}:${part.text}`}>{part.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 function BubbleBody({
   msg,
   caps,
   open,
   left,
+  query,
   onClose,
   canPlayMime,
   decodeVoice,
@@ -1467,6 +1513,7 @@ function BubbleBody({
   caps: string[];
   open: boolean;
   left: number | null;
+  query: string;
   onClose: () => Promise<void>;
   canPlayMime?: (mime: string) => boolean;
   decodeVoice?: (mime: string, audio: string) => Promise<string | null>;
@@ -1503,7 +1550,9 @@ function BubbleBody({
   if (msg.type === "text" && !inboundBurn) {
     return (
       <>
-        <p>{msg.body}</p>
+        <p>
+          <HighlightText text={msg.body ?? ""} query={query} />
+        </p>
         {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} /> : null}
       </>
     );
@@ -1511,11 +1560,15 @@ function BubbleBody({
   if (inboundBurn && open) {
     return (
       <div className="chat-viewer">
-        {msg.type === "text" ? <p>{msg.body}</p> : null}
+        {msg.type === "text" ? (
+          <p>
+            <HighlightText text={msg.body ?? ""} query={query} />
+          </p>
+        ) : null}
         {msg.type === "file" && image && msg.preview ? <img alt={msg.name || ""} src={msg.preview} /> : null}
         {msg.type === "file" ? (
           <p className="chat-file-meta">
-            {msg.name} · {msg.size ?? 0}
+            <HighlightText text={msg.name ?? ""} query={query} /> · {msg.size ?? 0}
           </p>
         ) : null}
         <BurnCountdown left={left} />
@@ -1526,13 +1579,17 @@ function BubbleBody({
     return (
       <div className="chat-file">
         <p className="chat-file-meta">
-          {msg.name} · {msg.size ?? 0}
+          <HighlightText text={msg.name ?? ""} query={query} /> · {msg.size ?? 0}
         </p>
         {msg.burn && msg.direction === "out" ? <BurnBadge caps={caps} /> : null}
       </div>
     );
   }
-  return <p>{msg.body}</p>;
+  return (
+    <p>
+      <HighlightText text={msg.body ?? ""} query={query} />
+    </p>
+  );
 }
 
 function IconButton({
