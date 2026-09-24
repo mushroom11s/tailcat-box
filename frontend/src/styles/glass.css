@@ -2625,8 +2625,9 @@ textarea {
 }
 
 .loading-cat.lg img {
-  width: 88px;
-  height: 88px;
+  /* 1:1 with the cleaned asset so pixelated scaling does not grow a fringe. */
+  width: 94px;
+  height: 121px;
 }
 
 .loading-cat.block {
@@ -2737,6 +2738,13 @@ textarea {
   padding: 16px 20px;
 }
 
+.miao-send .miao-drop:has(.loading-cat.lg) {
+  flex: 0 0 auto;
+  min-height: 180px;
+  padding: 20px 24px;
+  overflow: visible;
+}
+
 .miao-drop strong,
 .miao-drop .chat-quiet {
   display: block;
@@ -2821,10 +2829,11 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 172px;
+  min-height: 200px;
   padding: 8px;
   border-radius: var(--radius-sm);
   background: white;
+  overflow: visible;
 }
 
 .miao-qr > img {

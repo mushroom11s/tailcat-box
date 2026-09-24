@@ -132,7 +132,9 @@ describe("Mew Share page", () => {
     const qrWidth = Number(qrRule.match(/width:\s*(\d+)px/)?.[1]);
     expect(qrRule).toContain("image-rendering: pixelated");
     expect(css).not.toContain(".miao-qr-mark");
-    expect(cssBlock(css, ".loading-cat.lg img")).toContain("width: 88px");
+    const catRule = cssBlock(css, ".loading-cat.lg img");
+    expect(catRule).toContain("width: 94px");
+    expect(catRule).toContain("height: 121px");
     expect(cssBlock(css, ".loading-cat.sm img,\n.btn .loading-cat img")).toContain("width: 32px");
     expect(qrWidth).toBeGreaterThanOrEqual(160);
     expect(qrWidth).toBeLessThanOrEqual(180);
