@@ -2588,11 +2588,17 @@ textarea {
   vertical-align: middle;
 }
 
+.loading-cat picture {
+  display: inline-flex;
+  line-height: 0;
+}
+
 .loading-cat img {
   width: 48px;
   height: 48px;
   object-fit: contain;
   image-rendering: pixelated;
+  background: transparent;
 }
 
 .loading-cat.sm img,

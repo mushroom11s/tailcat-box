@@ -1,5 +1,6 @@
-import catUrl from "../assets/loading-cat.gif";
-import catSmUrl from "../assets/loading-cat-sm.gif";
+import catGif from "../assets/loading-cat.gif";
+import catSmGif from "../assets/loading-cat-sm.gif";
+import catWebp from "../assets/loading-cat.webp";
 
 type Props = {
   label?: string;
@@ -8,10 +9,13 @@ type Props = {
 };
 
 export default function LoadingCat({ label, size = "md", layout = "inline" }: Props) {
-  const src = size === "sm" ? catSmUrl : catUrl;
+  const gif = size === "sm" ? catSmGif : catGif;
   return (
     <span className={`loading-cat${size === "sm" ? " sm" : ""}${layout === "block" ? " block" : ""}`} role="status">
-      <img src={src} alt="" />
+      <picture>
+        <source srcSet={catWebp} type="image/webp" />
+        <img src={gif} alt="" />
+      </picture>
       {label ? <span className="loading-cat-label">{label}</span> : null}
     </span>
   );

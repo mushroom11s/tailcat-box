@@ -46,7 +46,7 @@ The peer listens on its own room, dials the host, and sends a `miao-pull` TCH1 e
 
 ### Loading mascot
 
-`frontend/src/assets/loading-cat.gif` (and `loading-cat-sm.gif`) is the shared busy indicator: lobby create/connect, tunnel actions, update download, and 喵传 packing or joining.
+`LoadingCat` prefers `frontend/src/assets/loading-cat.webp` (keyed alpha). `loading-cat.gif` and `loading-cat-sm.gif` are the fallbacks. It is the shared busy indicator for lobby create/connect, tunnel actions, update download, and 喵传 packing or joining.
 
 ## Non-goals (v1)
 
