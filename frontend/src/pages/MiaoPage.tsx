@@ -3,7 +3,7 @@ import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
 import LoadingCat from "../components/LoadingCat";
 import QrScanButton from "../components/QrScanButton";
 import { useI18n, type MessageKey } from "../i18n";
-import iconUrl from "../assets/icon.png?inline";
+import miaoQrMark from "../assets/miao-qr-cat.png?inline";
 import runningCatGif from "../assets/running-cat.gif";
 import runningCatWebp from "../assets/running-cat.webp";
 import { encodeQrDataURL } from "../lib/qr";
@@ -132,7 +132,7 @@ function ShareCard({
     }
     let live = true;
     setQrFailed(false);
-    void encodeQrDataURL(payload, { errorCorrectionLevel: "H", centerMark: iconUrl })
+    void encodeQrDataURL(payload, { errorCorrectionLevel: "H", centerMark: miaoQrMark })
       .then((url) => {
         if (live) {
           setQrSrc(url);
