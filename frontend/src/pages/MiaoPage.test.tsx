@@ -76,6 +76,36 @@ describe("Mew Share page", () => {
     expect(screen.queryByRole("tab", { name: "接收" })).toBeNull();
   });
 
+  it("restores the share list on the Share tab after restart", async () => {
+    localStorage.setItem("tailcat-locale", "zh-CN");
+    installGoApp({
+      StartChatRoom: () => Promise.resolve({}),
+      SetUILocale: () => Promise.resolve(),
+      ListMiaoReceives: () => Promise.resolve([]),
+      MiaoRestoreNotes: () => Promise.resolve([]),
+      MiaoShareStatus: () =>
+        Promise.resolve([
+          {
+            id: "share-restored",
+            status: "active",
+            payload: "mw1.restored-code",
+            forever: true,
+            total: 4,
+            maxDownloads: 3,
+            downloads: 1,
+            files: [{ name: "笔记.txt", size: 4 }],
+          },
+        ]),
+    });
+    renderPage();
+    expect(screen.getByRole("tab", { name: "共享" }).getAttribute("aria-selected")).toBe("true");
+    expect(await screen.findByRole("heading", { name: "进行中的分享" })).toBeTruthy();
+    expect(screen.getByRole("article", { name: "笔记.txt" })).toBeTruthy();
+    expect(screen.getByText("笔记.txt")).toBeTruthy();
+    expect((screen.getByLabelText("分享口令") as HTMLTextAreaElement).value).toBe("mw1.restored-code");
+    expect(screen.getByText("还可下载 2")).toBeTruthy();
+  });
+
   it("explains when a shared file could not be restored", async () => {
     localStorage.setItem("tailcat-locale", "zh-CN");
     installGoApp({

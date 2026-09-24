@@ -3,9 +3,11 @@ package miao
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -208,6 +210,99 @@ func TestEndedShareIsNotRestored(t *testing.T) {
 	again := New(adapter.NewFake(), root)
 	if len(again.List()) != 0 {
 		t.Fatalf("ended share returned: %+v", again.List())
+	}
+}
+
+type denyRooms struct {
+	adapter.ChatAdapter
+}
+
+func (denyRooms) StartRoom(context.Context, adapter.RoomOpts) (adapter.Room, error) {
+	return nil, fmt.Errorf("room down")
+}
+
+func TestShareRecordStaysListedWhenListenFails(t *testing.T) {
+	root := t.TempDir()
+	first := New(adapter.NewFake(), root)
+	snap, err := first.Start([]Source{{Name: "笔记.txt", Data: []byte("purr")}}, Limits{TTL: 48 * time.Hour, TTLDays: 2, MaxDownloads: 3}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	if _, err := first.Join(context.Background(), snap.Payload, dest, adapter.NetworkOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	first.Close()
+
+	again := New(denyRooms{ChatAdapter: adapter.NewFake()}, root)
+	t.Cleanup(again.Close)
+	listed := again.List()
+	if len(listed) != 1 {
+		t.Fatalf("restored=%d notes=%v", len(listed), again.RestoreNotes())
+	}
+	got := listed[0]
+	if got.ID != snap.ID || got.Payload != snap.Payload || got.Token != snap.Token || got.Status != "active" {
+		t.Fatalf("record=%+v want id/payload/token from %+v", got, snap)
+	}
+	if got.Downloads != 1 || got.MaxDownloads != 3 {
+		t.Fatalf("downloads=%d/%d", got.Downloads, got.MaxDownloads)
+	}
+	if len(got.Files) != 1 || got.Files[0].Name != "笔记.txt" {
+		t.Fatalf("files=%+v", got.Files)
+	}
+	if notes := again.RestoreNotes(); len(notes) != 0 {
+		t.Fatalf("listed record reported as unrestored: %v", notes)
+	}
+	if _, err := os.Stat(filepath.Join(root, snap.ID, "share.json")); err != nil {
+		t.Fatalf("share record removed: %v", err)
+	}
+}
+
+type failOnceRooms struct {
+	adapter.ChatAdapter
+	mu sync.Mutex
+	n  int
+}
+
+func (f *failOnceRooms) StartRoom(ctx context.Context, opts adapter.RoomOpts) (adapter.Room, error) {
+	f.mu.Lock()
+	f.n++
+	n := f.n
+	f.mu.Unlock()
+	if n == 1 {
+		return nil, fmt.Errorf("room down")
+	}
+	return f.ChatAdapter.StartRoom(ctx, opts)
+}
+
+func TestShareListensAgainAfterAFailedRestore(t *testing.T) {
+	root := t.TempDir()
+	first := New(adapter.NewFake(), root)
+	snap, err := first.Start([]Source{{Name: "笔记.txt", Data: []byte("purr")}}, Limits{MaxDownloads: 3}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Close()
+
+	again := New(&failOnceRooms{ChatAdapter: adapter.NewFake()}, root)
+	t.Cleanup(again.Close)
+	if listed := again.List(); len(listed) != 1 || listed[0].Payload != snap.Payload {
+		t.Fatalf("listed=%+v", listed)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	var joined error
+	for {
+		_, joined = again.Join(context.Background(), snap.Payload, t.TempDir(), adapter.NetworkOpts{})
+		if joined == nil || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if joined != nil {
+		t.Fatal(joined)
+	}
+	if listed := again.List(); len(listed) != 1 || listed[0].Downloads != 1 || listed[0].Payload != snap.Payload {
+		t.Fatalf("after download=%+v", listed)
 	}
 }
 

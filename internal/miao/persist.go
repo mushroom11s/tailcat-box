@@ -249,29 +249,13 @@ func (s *Service) resume(rec *shareRecord, dir string) error {
 		_ = os.RemoveAll(dir)
 		return nil
 	}
-	sess := &session.Session{
-		ID:        rec.ID,
-		Kind:      session.KindMiao,
-		Status:    session.StatusStarting,
-		CreatedAt: created,
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	room, err := s.ad.StartRoom(ctx, adapter.RoomOpts{
-		SessionID:      rec.ID,
-		PrivateKeyJSON: rec.KeyJSON,
-		Region:         rec.Region,
-		DERPMapURL:     rec.DERPMapURL,
-	})
-	if err != nil {
-		cancel()
-		return errShareUnready
-	}
 	total := rec.Total
 	if total <= 0 {
 		for _, file := range files {
 			total += file.Size
 		}
 	}
+	life, stopLife := context.WithCancel(context.Background())
 	h := &host{
 		svc:       s,
 		id:        rec.ID,
@@ -282,22 +266,25 @@ func (s *Service) resume(rec *shareRecord, dir string) error {
 		dir:       dir,
 		files:     files,
 		total:     total,
-		lim:       Limits{TTLDays: rec.TTLDays, MaxDownloads: rec.MaxDownloads, TTL: 0},
+		lim:       Limits{TTLDays: rec.TTLDays, MaxDownloads: rec.MaxDownloads},
 		forever:   rec.Forever,
 		expires:   expires,
 		downloads: rec.Downloads,
-		sess:      sess,
-		room:      room,
-		cancel:    cancel,
-		ctx:       ctx,
-		ready:     make(chan struct{}),
+		sess: &session.Session{
+			ID:        rec.ID,
+			Kind:      session.KindMiao,
+			Status:    session.StatusStarting,
+			CreatedAt: created,
+		},
+		ctx:       life,
+		life:      life,
+		stopLife:  stopLife,
 		createdAt: created,
 		region:    rec.Region,
 		derpURL:   rec.DERPMapURL,
 	}
 	if rec.Forever {
 		h.expires = time.Time{}
-		h.lim.TTL = 0
 	} else {
 		h.lim.TTL = time.Until(expires)
 	}
@@ -308,52 +295,176 @@ func (s *Service) resume(rec *shareRecord, dir string) error {
 	s.hosts[h.id] = h
 	s.order = append(s.order, h.id)
 	s.mu.Unlock()
-	go h.readLoop()
-	select {
-	case <-h.ready:
-	case <-time.After(20 * time.Second):
-		h.end("unready")
+	h.armExpiry()
+	h.mu.Lock()
+	ended := h.ended
+	h.mu.Unlock()
+	if ended {
+		return nil
+	}
+	// The share card is already listed. A room that is still down does not
+	// remove that record; listening retries until the share ends.
+	if err := h.listen(); err != nil {
+		go h.retryListen()
+	}
+	return nil
+}
+
+func (h *host) armExpiry() {
+	h.mu.Lock()
+	if h.ended || h.forever || h.expires.IsZero() || h.timer != nil {
+		h.mu.Unlock()
+		return
+	}
+	wait := time.Until(h.expires)
+	if wait <= 0 {
+		h.mu.Unlock()
+		h.end("ttl")
+		return
+	}
+	h.lim.TTL = wait
+	h.timer = time.AfterFunc(wait, func() { h.end("ttl") })
+	h.mu.Unlock()
+}
+
+func (h *host) listen() error {
+	h.mu.Lock()
+	if h.ended || h.room != nil {
+		h.mu.Unlock()
+		return nil
+	}
+	id, key, region, derp := h.id, h.keyJSON, h.region, h.derpURL
+	life := h.life
+	h.mu.Unlock()
+	if life == nil {
 		return errShareUnready
 	}
-	h.mu.Lock()
-	addr := h.address
-	if addr == "" {
-		addr = rec.Address
-		h.address = addr
+	ctx, cancel := context.WithCancel(life)
+	room, err := h.svc.ad.StartRoom(ctx, adapter.RoomOpts{
+		SessionID:      id,
+		PrivateKeyJSON: key,
+		Region:         region,
+		DERPMapURL:     derp,
+	})
+	if err != nil {
+		cancel()
+		return errShareUnready
 	}
-	if addr != "" && (h.payload == "" || addr != rec.Address) {
-		payload, encErr := EncodeJoin(addr, rec.Token)
-		if encErr != nil {
-			h.mu.Unlock()
-			h.end("unready")
-			return encErr
+	sig := &readySignal{ch: make(chan struct{})}
+	h.mu.Lock()
+	if h.ended || h.room != nil {
+		h.mu.Unlock()
+		cancel()
+		_ = room.Close()
+		return nil
+	}
+	h.room = room
+	h.cancel = cancel
+	h.ctx = ctx
+	h.ready = sig.ch
+	h.readySig = sig
+	h.mu.Unlock()
+	go h.readLoop()
+	timer := time.NewTimer(20 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-sig.ch:
+		h.mu.Lock()
+		ok := !h.ended && h.room == room && h.address != ""
+		h.mu.Unlock()
+		if !ok {
+			h.abandonRoom(room)
+			return errShareUnready
 		}
-		h.payload = payload
+		return h.finishListen()
+	case <-timer.C:
+		h.abandonRoom(room)
+		return errShareUnready
+	case <-life.Done():
+		h.abandonRoom(room)
+		return errShareUnready
+	}
+}
+
+func (h *host) finishListen() error {
+	h.mu.Lock()
+	if h.ended {
+		h.mu.Unlock()
+		return errShareUnready
+	}
+	if h.address != "" {
+		if payload, err := EncodeJoin(h.address, h.token); err == nil {
+			h.payload = payload
+		}
 	}
 	if h.payload == "" || h.address == "" {
 		h.mu.Unlock()
-		h.end("unready")
 		return errShareUnready
-	}
-	if !h.forever && !h.expires.IsZero() {
-		wait := time.Until(h.expires)
-		if wait <= 0 {
-			h.mu.Unlock()
-			h.end("ttl")
-			return nil
-		}
-		h.lim.TTL = wait
-		h.timer = time.AfterFunc(wait, func() { h.end("ttl") })
 	}
 	if err := h.writeStateLocked(); err != nil {
 		h.mu.Unlock()
-		h.end("unready")
 		return err
 	}
 	snap := h.snapshotLocked()
 	h.mu.Unlock()
 	h.publish(snap)
 	return nil
+}
+
+func (h *host) abandonRoom(room adapter.Room) {
+	if room == nil {
+		return
+	}
+	h.mu.Lock()
+	if h.room != room {
+		h.mu.Unlock()
+		return
+	}
+	cancel := h.cancel
+	sig := h.readySig
+	h.room = nil
+	h.cancel = nil
+	h.ready = nil
+	h.readySig = nil
+	if h.life != nil {
+		h.ctx = h.life
+	}
+	h.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	_ = room.Close()
+	sig.close()
+}
+
+func (h *host) retryListen() {
+	backoff := time.Second
+	for {
+		timer := time.NewTimer(backoff)
+		select {
+		case <-h.life.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+		h.mu.Lock()
+		ended := h.ended
+		up := h.room != nil
+		life := h.life
+		h.mu.Unlock()
+		if ended || up || life == nil {
+			return
+		}
+		if err := h.listen(); err == nil {
+			return
+		}
+		if backoff < 15*time.Second {
+			backoff *= 2
+			if backoff > 15*time.Second {
+				backoff = 15 * time.Second
+			}
+		}
+	}
 }
 
 func stagedPath(dir, name string) (string, bool) {
