@@ -4,6 +4,7 @@ import {
   acceptMiaoCode,
   downloadsLeft,
   encodeJoin,
+  extractShareCode,
   MAX_SHARE_BYTES,
   parseJoin,
   parseReceiveJob,
@@ -51,6 +52,20 @@ describe("miao share helpers", () => {
       expect(parseJoin(bad)).toBeNull();
       expect(acceptMiaoCode(bad)).toEqual({ ok: false });
     }
+  });
+
+  it("extracts a share code from pasted text the same way join accepts it", () => {
+    const code = "mw1.AAAHdGM6cm9vbQADYWJj";
+    const json = JSON.stringify({ v: 1, kind: "miao", addr: "tc:room", token: "abc" });
+    expect(extractShareCode(`  ${code}\n`)).toBe(code);
+    expect(extractShareCode(`口令：${code}`)).toBe(code);
+    expect(extractShareCode(`https://example.test/s?code=${code}&x=1`)).toBe(code);
+    expect(extractShareCode(`mw1.YQ ${code}`)).toBe(code);
+    expect(extractShareCode(`  ${json}  `)).toBe(json);
+    expect(extractShareCode(`see ${json} thanks`)).toBe(json);
+    expect(extractShareCode("tc:room")).toBe("");
+    expect(extractShareCode("   ")).toBe("");
+    expect(extractShareCode("nope")).toBe("");
   });
 
   it("joins a legacy JSON code and a compact code", async () => {
