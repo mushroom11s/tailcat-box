@@ -140,22 +140,10 @@ describe("phase 1 chat shell", () => {
     await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("heading", { name: "Keys & DERP" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Diagnostics" })).toBeTruthy();
-    expect(screen.getByLabelText("Room key")).toBeTruthy();
+    expect(screen.queryByLabelText("Room key")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Restart room" })).toBeNull();
     expect((screen.getByLabelText("Address") as HTMLInputElement).value).toBe("tc:fake-echo");
-    await user.type(screen.getByLabelText("Name"), "home");
-    await user.click(screen.getByRole("button", { name: "Create key" }));
-    await user.selectOptions(screen.getByLabelText("Room key"), "home");
-    expect(screen.getByText("Restart room to apply")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Restart room" }));
     await user.click(screen.getByRole("button", { name: "Chat" }));
-    await waitFor(() => {
-      const shown =
-        document.querySelector(".chat-address")?.textContent ||
-        document.querySelector(".chat-identity-addr")?.getAttribute("title") ||
-        "";
-      expect(shown.startsWith("tc:fake-room-key-")).toBe(true);
-    });
-    expect(screen.queryByText("Peer connected")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Services" })).toBeNull();
     expect(document.querySelectorAll(".nav-btn").length).toBe(6);
   });
