@@ -480,6 +480,35 @@ export function acceptMiaoCode(raw: string): { ok: true; value: string } | { ok:
   return parseJoin(value) ? { ok: true, value } : { ok: false };
 }
 
+const SHARE_CODE_IN_TEXT = /mw1\.[A-Za-z0-9_-]+/g;
+
+/** Pull a join payload out of pasted text. Trims, then accepts a code or legacy JSON embedded in other text. */
+export function extractShareCode(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "";
+  }
+  const direct = acceptMiaoCode(trimmed);
+  if (direct.ok) {
+    return direct.value;
+  }
+  for (const match of trimmed.matchAll(SHARE_CODE_IN_TEXT)) {
+    const accepted = acceptMiaoCode(match[0]);
+    if (accepted.ok) {
+      return accepted.value;
+    }
+  }
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    const accepted = acceptMiaoCode(trimmed.slice(start, end + 1));
+    if (accepted.ok) {
+      return accepted.value;
+    }
+  }
+  return "";
+}
+
 export function miaoErrorKey(err: unknown): MiaoErrorKey | "" {
   const message = err instanceof Error ? err.message : String(err ?? "");
   return KNOWN_ERRORS[message] ?? "";

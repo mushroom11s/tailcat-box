@@ -13,6 +13,21 @@ export function acceptScannedText(raw: string): { ok: true; value: string } | { 
   return value ? { ok: true, value } : { ok: false };
 }
 
+/** A pasted Tailcat address: the trimmed string, or the first tc token inside it. */
+export function extractShareableAddress(raw: string): string {
+  const direct = shareableAddress(raw);
+  if (direct) {
+    return direct;
+  }
+  for (const part of raw.split(/\s+/)) {
+    const value = shareableAddress(part);
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
 export type QrErrorCorrection = "L" | "M" | "Q" | "H";
 
 export type QrCenterMark = string | HTMLImageElement;

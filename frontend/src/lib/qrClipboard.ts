@@ -61,11 +61,11 @@ async function plainText(items: readonly ClipboardEntry[]): Promise<string | nul
   return null;
 }
 
-function classifyText(text: string): PasteResult {
+function classifyText(text: string, acceptText: (text: string) => boolean): PasteResult {
   if (!text.trim()) {
     return { ok: false, reason: "empty" };
   }
-  if (!shareableAddress(text)) {
+  if (!acceptText(text)) {
     return { ok: false, reason: "unusable" };
   }
   return { ok: true, kind: "text", text };
@@ -73,12 +73,13 @@ function classifyText(text: string): PasteResult {
 
 async function readTextSource(
   read: (() => Promise<string>) | undefined,
+  acceptText: (text: string) => boolean,
 ): Promise<PasteResult | "skip" | "denied" | "error"> {
   if (!read) {
     return "skip";
   }
   try {
-    return classifyText(await read());
+    return classifyText(await read(), acceptText);
   } catch (err) {
     return isDenied(err) ? "denied" : "error";
   }
@@ -93,8 +94,11 @@ function defaultSource(): PasteSource {
   };
 }
 
-/** Read a QR image or Tailcat address from the system clipboard. */
-export async function readQrPaste(source: PasteSource = defaultSource()): Promise<PasteResult> {
+/** Read a QR image or clipboard text. Text must pass acceptText; the default accepts a Tailcat address. */
+export async function readQrPaste(
+  source: PasteSource = defaultSource(),
+  acceptText: (text: string) => boolean = (text) => Boolean(shareableAddress(text)),
+): Promise<PasteResult> {
   if (source.readItems) {
     try {
       const items = await source.readItems();
@@ -104,7 +108,7 @@ export async function readQrPaste(source: PasteSource = defaultSource()): Promis
       }
       const text = await plainText(items);
       if (text !== null) {
-        return classifyText(text);
+        return classifyText(text, acceptText);
       }
       return { ok: false, reason: items.length === 0 ? "empty" : "unusable" };
     } catch {
@@ -112,12 +116,12 @@ export async function readQrPaste(source: PasteSource = defaultSource()): Promis
     }
   }
 
-  const fromText = await readTextSource(source.readText);
+  const fromText = await readTextSource(source.readText, acceptText);
   if (fromText !== "skip" && fromText !== "denied" && fromText !== "error") {
     return fromText;
   }
 
-  const fromDesktop = await readTextSource(source.readDesktopText);
+  const fromDesktop = await readTextSource(source.readDesktopText, acceptText);
   if (fromDesktop !== "skip" && fromDesktop !== "denied" && fromDesktop !== "error") {
     return fromDesktop;
   }

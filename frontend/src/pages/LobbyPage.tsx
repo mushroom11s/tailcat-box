@@ -1,7 +1,9 @@
-import type { KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 import LoadingCat from "../components/LoadingCat";
 import QrScanButton from "../components/QrScanButton";
-import { useI18n } from "../i18n";
+import { useI18n, type MessageKey } from "../i18n";
+import { useClipboardFieldPaste, type PasteFailure } from "../lib/clipboardPaste";
+import { extractShareableAddress } from "../lib/qr";
 
 export type LobbyKey = {
   name: string;
@@ -40,7 +42,39 @@ export default function LobbyPage({
   busy,
 }: Props) {
   const { t } = useI18n();
+  const [pasteError, setPasteError] = useState("");
   const pending = busy !== "";
+
+  function peerPasteFailure(reason: PasteFailure): MessageKey {
+    if (reason === "empty") {
+      return "qrPasteEmpty";
+    }
+    if (reason === "unusable") {
+      return "qrPasteUnusable";
+    }
+    if (reason === "denied") {
+      return "qrPasteDenied";
+    }
+    if (reason === "no-qr") {
+      return "qrNotFound";
+    }
+    return "chatAddrError";
+  }
+
+  const onPeerPaste = useClipboardFieldPaste(
+    peer,
+    (value) => {
+      setPasteError("");
+      onPeer(value);
+    },
+    extractShareableAddress,
+    (reason) => setPasteError(t(peerPasteFailure(reason))),
+  );
+
+  function acceptPeer(raw: string): { ok: true; value: string } | { ok: false } {
+    const value = extractShareableAddress(raw);
+    return value ? { ok: true, value } : { ok: false };
+  }
 
   function onKeyDown(ev: KeyboardEvent<HTMLInputElement>): void {
     if (ev.key !== "Enter" || pending) {
@@ -132,13 +166,31 @@ export default function LobbyPage({
             <input
               id="lobby-peer"
               value={peer}
-              onChange={(ev) => onPeer(ev.target.value)}
+              onChange={(ev) => {
+                setPasteError("");
+                onPeer(ev.target.value);
+              }}
+              onPaste={onPeerPaste}
               onKeyDown={onKeyDown}
               placeholder="tc…"
               autoComplete="off"
             />
-            <QrScanButton disabled={pending} onAccept={onPeer} />
+            <QrScanButton
+              disabled={pending}
+              accept={acceptPeer}
+              invalidKey="chatAddrError"
+              normalizePastedText={extractShareableAddress}
+              onAccept={(value) => {
+                setPasteError("");
+                onPeer(value);
+              }}
+            />
           </div>
+          {pasteError ? (
+            <p className="err" role="alert">
+              {pasteError}
+            </p>
+          ) : null}
         </div>
         <p className="chat-quiet">{t("lobbyConnectHint")}</p>
         {busy === "connect" ? null : (

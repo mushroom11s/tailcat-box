@@ -65,6 +65,16 @@ describe("readQrPaste", () => {
     ).resolves.toEqual({ ok: true, kind: "text", text: "tc:from-desktop" });
   });
 
+  it("lets a caller accept text that is not a Tailcat address", async () => {
+    const result = await readQrPaste(
+      {
+        readItems: async () => [item(["text/plain"], { "text/plain": textBlob("  mw1.from-clip  ") })],
+      },
+      () => true,
+    );
+    expect(result).toEqual({ ok: true, kind: "text", text: "  mw1.from-clip  " });
+  });
+
   it("reports an empty clipboard, unusable contents, and denied access", async () => {
     await expect(readQrPaste({ readItems: async () => [] })).resolves.toEqual({ ok: false, reason: "empty" });
     await expect(

@@ -6,9 +6,11 @@ import { useI18n, type MessageKey } from "../i18n";
 import miaoQrMark from "../assets/miao-qr-cat.png?inline";
 import runningCatGif from "../assets/running-cat.gif";
 import runningCatWebp from "../assets/running-cat.webp";
+import { useClipboardFieldPaste, type PasteFailure } from "../lib/clipboardPaste";
 import { encodeQrDataURL } from "../lib/qr";
 import {
   acceptMiaoCode,
+  extractShareCode,
   base64ToBlob,
   downloadsLeft,
   fileToBase64,
@@ -304,6 +306,32 @@ export default function MiaoPage() {
   const endedRef = useRef(new Set<string>());
   const savedRef = useRef(new Set<string>());
   const ticking = shares.some((share) => !share.forever);
+
+  function sharePasteFailure(reason: PasteFailure): MessageKey {
+    if (reason === "empty") {
+      return "qrPasteEmpty";
+    }
+    if (reason === "unusable") {
+      return "miaoPasteUnusable";
+    }
+    if (reason === "denied") {
+      return "qrPasteDenied";
+    }
+    if (reason === "no-qr") {
+      return "qrNotFound";
+    }
+    return "miaoBadCode";
+  }
+
+  const onCodePasteEvent = useClipboardFieldPaste(
+    code,
+    (value) => {
+      setError("");
+      setCode(value);
+    },
+    extractShareCode,
+    (reason) => setError(t(sharePasteFailure(reason))),
+  );
 
   useEffect(() => {
     let live = true;
@@ -605,8 +633,8 @@ export default function MiaoPage() {
   }
 
   async function join(): Promise<void> {
-    const raw = code.trim();
-    if (!acceptMiaoCode(raw).ok) {
+    const raw = extractShareCode(code);
+    if (!raw) {
       setError(t("miaoBadCode"));
       return;
     }
@@ -770,8 +798,14 @@ export default function MiaoPage() {
                   value={code}
                   placeholder={t("miaoJoinPlaceholder")}
                   onChange={(ev) => setCode(ev.target.value)}
+                  onPaste={onCodePasteEvent}
                 />
-                <QrScanButton accept={acceptMiaoCode} invalidKey="miaoBadCode" onAccept={setCode} />
+                <QrScanButton
+                  accept={acceptMiaoCode}
+                  invalidKey="miaoBadCode"
+                  normalizePastedText={extractShareCode}
+                  onAccept={setCode}
+                />
               </div>
             </div>
             <p className="chat-quiet miao-dest-line">{lastDest ? `${t("miaoSaveTo")} ${lastDest}` : t("miaoFolderLater")}</p>

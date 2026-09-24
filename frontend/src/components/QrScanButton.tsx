@@ -13,6 +13,8 @@ type Props = {
   decodeFile?: (file: File) => Promise<string | null>;
   accept?: (raw: string) => AcceptResult;
   invalidKey?: MessageKey;
+  /** Turns clipboard text into the value accept() expects. Empty means the text is not usable. */
+  normalizePastedText?: (text: string) => string;
 };
 
 export default function QrScanButton({
@@ -21,6 +23,7 @@ export default function QrScanButton({
   decodeFile = decodeQrFromFile,
   accept = acceptScannedText,
   invalidKey = "qrInvalid",
+  normalizePastedText,
 }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -175,7 +178,7 @@ export default function QrScanButton({
     stopCamera();
     const token = tokenRef.current;
     try {
-      const result = await readQrPaste();
+      const result = await readQrPaste(undefined, normalizePastedText ? () => true : undefined);
       if (token !== tokenRef.current) {
         return;
       }
@@ -186,7 +189,12 @@ export default function QrScanButton({
         return;
       }
       if (result.kind === "text") {
-        finish(result.text);
+        const text = normalizePastedText ? normalizePastedText(result.text) : result.text;
+        if (normalizePastedText && !text) {
+          setError(t(invalidKey));
+          return;
+        }
+        finish(text);
         return;
       }
       let text: string | null = null;

@@ -1,14 +1,33 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Component, type ReactNode } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../i18n";
 import { encodeJoin, MAX_SHARE_BYTES, parseJoin } from "../lib/miao";
+import { decodeQrFromFile } from "../lib/qrImage";
 import { decodePng } from "../lib/qrMark";
 import { releaseBrowserReceiveHolds, resetBrowserMiao, setBrowserReceiveHold } from "../lib/miaoBrowser";
 import { listMiaoReceives, startMiaoReceive } from "../lib/wails";
 import css from "../styles/glass.css?inline";
 import MiaoPage from "./MiaoPage";
+
+vi.mock("../lib/qrImage", () => ({
+  decodeQrFromFile: vi.fn(),
+}));
+
+const originalClipboard = navigator.clipboard;
+
+function setClipboard(value: Partial<Clipboard>) {
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value });
+}
+
+function pasteOn(target: HTMLElement, fill: (data: DataTransfer) => void) {
+  const data = new DataTransfer();
+  fill(data);
+  const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "clipboardData", { value: data });
+  target.dispatchEvent(event);
+}
 
 type GoApp = Record<string, (...args: unknown[]) => unknown>;
 
@@ -39,6 +58,8 @@ afterEach(() => {
   clearGoApp();
   resetBrowserMiao();
   localStorage.removeItem("tailcat-locale");
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: originalClipboard });
+  vi.mocked(decodeQrFromFile).mockReset();
   cleanup();
 });
 
@@ -409,6 +430,111 @@ describe("Mew Share page", () => {
     } finally {
       style.remove();
     }
+  });
+
+  it("fills the share field from a pasted code or QR image without a file picker", async () => {
+    const user = userEvent.setup();
+    const code = encodeJoin("tc:room", "abc");
+    if (!code) {
+      throw new Error("missing code");
+    }
+    renderPage();
+    await user.click(screen.getByRole("tab", { name: "Download" }));
+    expect(screen.getByText("Paste a share code or a QR image, or scan the code.")).toBeTruthy();
+    const join = screen.getByRole("textbox", { name: "Share code" }) as HTMLTextAreaElement;
+    await user.click(join);
+
+    await user.paste(`  ${code}\n`);
+    expect(join.value).toBe(code);
+
+    await user.paste(`口令 https://example.test/s?code=${code}`);
+    expect(join.value).toBe(code);
+
+    await user.paste("not-a-share-code");
+    expect(join.value).toBe(code);
+    expect(screen.getByRole("alert").textContent).toBe("That share code is not valid.");
+
+    vi.mocked(decodeQrFromFile).mockResolvedValueOnce(`  ${code}  `);
+    const image = new File([new Uint8Array([1, 2, 3])], "share.png", { type: "image/png" });
+    pasteOn(join, (data) => {
+      data.items.add(image);
+    });
+    await waitFor(() => {
+      expect(join.value).toBe(code);
+    });
+    expect(decodeQrFromFile).toHaveBeenCalledTimes(1);
+    const decoded = vi.mocked(decodeQrFromFile).mock.calls[0][0];
+    expect(decoded).toBeInstanceOf(File);
+    expect(decoded.type).toBe("image/png");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect((screen.getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(false);
+
+    vi.mocked(decodeQrFromFile).mockResolvedValueOnce(null);
+    pasteOn(join, (data) => {
+      data.items.add(image);
+    });
+    expect((await screen.findByRole("alert")).textContent).toBe("No QR code found in that image.");
+    expect(join.value).toBe(code);
+
+    vi.mocked(decodeQrFromFile).mockResolvedValueOnce("https://example.invalid");
+    pasteOn(join, (data) => {
+      data.items.add(image);
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toBe("That share code is not valid.");
+    });
+  });
+
+  it("reports an empty clipboard and a clipboard that is neither text nor an image", async () => {
+    localStorage.setItem("tailcat-locale", "zh-CN");
+    const user = userEvent.setup();
+    setClipboard({
+      read: async () => [],
+      readText: async () => "",
+    });
+    renderPage();
+    await user.click(screen.getByRole("tab", { name: "下载" }));
+    const join = screen.getByRole("textbox", { name: "分享口令" });
+    await user.click(join);
+    pasteOn(join, () => undefined);
+    expect((await screen.findByRole("alert")).textContent).toBe("剪贴板是空的。");
+
+    pasteOn(join, (data) => {
+      data.setData("text/html", "<b>hi</b>");
+    });
+    expect((await screen.findByRole("alert")).textContent).toBe("剪贴板里既没有图片，也没有分享口令。");
+  });
+
+  it("accepts a share code pasted from the scan dialog", async () => {
+    const user = userEvent.setup();
+    const code = encodeJoin("tc:room", "token");
+    if (!code) {
+      throw new Error("missing code");
+    }
+    setClipboard({
+      read: async () =>
+        [
+          {
+            types: ["text/plain"],
+            getType: async () => new Blob([`see ${code}`], { type: "text/plain" }),
+          },
+        ] as unknown as ClipboardItems,
+    });
+    renderPage();
+    await user.click(screen.getByRole("tab", { name: "Download" }));
+    await user.click(screen.getByRole("button", { name: "Scan QR" }));
+    await user.keyboard("{Control>}v{/Control}");
+    await waitFor(() => {
+      expect((screen.getByRole("textbox", { name: "Share code" }) as HTMLTextAreaElement).value).toBe(code);
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await user.clear(screen.getByRole("textbox", { name: "Share code" }));
+    await user.click(screen.getByRole("button", { name: "Scan QR" }));
+    await user.keyboard("{Meta>}v{/Meta}");
+    await waitFor(() => {
+      expect((screen.getByRole("textbox", { name: "Share code" }) as HTMLTextAreaElement).value).toBe(code);
+    });
   });
 });
 
