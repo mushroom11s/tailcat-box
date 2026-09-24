@@ -634,6 +634,102 @@ textarea {
   min-width: 180px;
 }
 
+.tunnel-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+}
+
+.tunnel-page > .lede {
+  margin: 0;
+}
+
+.tunnel-list.nav-rooms {
+  margin: 0;
+  padding: 8px;
+  gap: 4px;
+}
+
+.tunnel-list .empty {
+  margin: 6px 10px 8px;
+}
+
+.tunnel-row .nav-btn.nav-child {
+  padding-right: 118px;
+}
+
+.tunnel-row-action {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 30px;
+  transform: translateY(-50%);
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.tunnel-row:has(.nav-btn.active) .tunnel-row-action {
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+}
+
+.tunnel-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 22px;
+}
+
+.tunnel-detail h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.tunnel-detail .field,
+.tunnel-detail .row {
+  width: 100%;
+  margin: 0;
+}
+
+.tunnel-detail .address {
+  margin: 0;
+}
+
+.tunnel-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tunnel-mode legend {
+  width: 100%;
+  padding: 0;
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tunnel-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .lede {
   margin: 0 0 16px;
   color: var(--muted);
