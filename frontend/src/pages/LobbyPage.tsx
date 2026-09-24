@@ -58,6 +58,17 @@ export default function LobbyPage({
     onSaveKey();
   }
 
+  function panelBusy(active: boolean, label: string) {
+    if (!active) {
+      return null;
+    }
+    return (
+      <div className="chat-lobby-busy">
+        <LoadingCat layout="block" label={label} />
+      </div>
+    );
+  }
+
   return (
     <section className="page chat-lobby">
       <header className="chat-lobby-head">
@@ -67,6 +78,7 @@ export default function LobbyPage({
 
       <div className="glass chat-lobby-panel">
         <h3>{t("lobbyTempTitle")}</h3>
+        {panelBusy(busy === "temp", t("lobbyCreating"))}
         <button className="btn" type="button" disabled={pending} onClick={onCreate}>
           {busy === "temp" ? <LoadingCat size="sm" label={t("lobbyCreating")} /> : t("lobbyCreate")}
         </button>
@@ -74,6 +86,7 @@ export default function LobbyPage({
 
       <div className="glass chat-lobby-panel">
         <h3>{t("lobbyPermanent")}</h3>
+        {panelBusy(busy === "permanent", t("lobbyCreating"))}
         <div className="field">
           <label htmlFor="lobby-key">{t("lobbyKey")}</label>
           <select id="lobby-key" value={keyName} onChange={(ev) => onKey(ev.target.value)}>
@@ -108,6 +121,7 @@ export default function LobbyPage({
       </div>
 
       <div className="glass chat-lobby-panel">
+        {panelBusy(busy === "connect", t("lobbyConnecting"))}
         <div className="field">
           <label htmlFor="lobby-peer">{t("lobbyPeer")}</label>
           <div className="qr-field">
