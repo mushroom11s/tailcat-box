@@ -5,6 +5,7 @@ import App from "./App";
 import { LocaleProvider } from "./i18n";
 import { MAPPINGS_KEY } from "./lib/portMappings";
 import { startForward } from "./lib/wails";
+import css from "./styles/glass.css?inline";
 
 vi.mock("./lib/wails", async () => {
   const actual = await vi.importActual<typeof import("./lib/wails")>("./lib/wails");
@@ -59,6 +60,9 @@ describe("tunnel page", () => {
     await addServe(user);
     await user.click(screen.getByRole("button", { name: "Start 8080" }));
     const serve = await screen.findByText(/tc:fake-port-/, { selector: ".address" });
+    expect(serve.tagName).toBe("CODE");
+    expect(serve.classList.contains("tunnel-key")).toBe(true);
+    expect(serve.closest(".tunnel-keyline")?.querySelector("button")?.getAttribute("aria-label")).toBe("Copy address");
     const addr = (serve.textContent ?? "").trim();
 
     await user.click(screen.getByRole("button", { name: "+ New mapping" }));
@@ -76,6 +80,13 @@ describe("tunnel page", () => {
     await waitFor(() => {
       expect(screen.getByText("127.0.0.1:18080", { selector: ".address" })).toBeTruthy();
     });
+    const listen = screen.getByText("127.0.0.1:18080", { selector: ".address" });
+    expect(listen.tagName).toBe("CODE");
+    expect(listen.closest(".tunnel-keyline")?.querySelector("button")?.getAttribute("aria-label")).toBe(
+      "Copy local address",
+    );
+    const peer = document.querySelector(".tunnel-detail code.tunnel-key:not(.address)");
+    expect(peer?.textContent).toBe(addr);
   });
 
   it("opens the browser from a saved forward mapping with a bare remote port", async () => {
@@ -167,5 +178,76 @@ describe("tunnel page", () => {
     expect(screen.queryByRole("heading", { name: "浏览" })).toBeNull();
     expect(screen.queryByRole("button", { name: "打开对方 80 端口" })).toBeNull();
     expect(screen.queryByRole("button", { name: "开始 SSH 服务" })).toBeNull();
+    await user.type(screen.getByLabelText("地址"), "tc:zh-key");
+    await user.click(screen.getByRole("button", { name: "保存映射" }));
+    const key = document.querySelector(".tunnel-detail code.tunnel-key");
+    expect(key?.textContent).toBe("tc:zh-key");
+    expect(screen.getByRole("button", { name: "复制地址" }).getAttribute("title")).toBe("复制地址");
+  });
+
+  it("keeps a long forward key inside the card and copies it", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const style = document.createElement("style");
+    style.textContent = [
+      ":root { --mono: ui-monospace, Menlo, monospace; }",
+      cssBlock(css, ".tunnel-detail"),
+      cssBlock(css, ".tunnel-keyline"),
+      cssBlock(css, ".tunnel-key"),
+      cssBlock(css, ".tunnel-keyline .btn"),
+    ].join("\n");
+    document.head.appendChild(style);
+    try {
+      renderApp();
+      await user.click(screen.getByRole("button", { name: "Tunnel" }));
+      await user.click(screen.getByRole("button", { name: "+ New mapping" }));
+      await user.click(screen.getByRole("radio", { name: "Local forward" }));
+      const long = `tc:${"k".repeat(160)}`;
+      const field = screen.getByLabelText("Address");
+      await user.click(field);
+      await user.paste(long);
+      await user.click(screen.getByRole("button", { name: "Save mapping" }));
+
+      const code = document.querySelector(".tunnel-detail code.tunnel-key") as HTMLElement;
+      expect(code.tagName).toBe("CODE");
+      expect(code.textContent).toBe(long);
+      expect(code.getAttribute("title")).toBe(long);
+      const line = code.parentElement as HTMLElement;
+      expect(line.classList.contains("tunnel-keyline")).toBe(true);
+      expect(line.closest(".tunnel-detail")).toBeTruthy();
+
+      const valueStyle = getComputedStyle(code);
+      expect(valueStyle.minWidth).toBe("0");
+      expect(valueStyle.maxWidth).toBe("100%");
+      expect(valueStyle.wordBreak).toBe("break-all");
+      expect(valueStyle.overflowWrap).toBe("anywhere");
+      expect(valueStyle.fontFamily.toLowerCase()).toContain("monospace");
+
+      const lineStyle = getComputedStyle(line);
+      expect(lineStyle.display).toBe("flex");
+      expect(lineStyle.minWidth).toBe("0");
+      expect(lineStyle.maxWidth).toBe("100%");
+      expect(getComputedStyle(line.querySelector("button") as HTMLElement).flexShrink).toBe("0");
+
+      const cardStyle = getComputedStyle(line.parentElement as HTMLElement);
+      expect(cardStyle.display).toBe("flex");
+      expect(cardStyle.minWidth).toBe("0");
+      expect(cardStyle.maxWidth).toBe("100%");
+
+      await user.click(screen.getByRole("button", { name: "Copy address" }));
+      expect(writeText).toHaveBeenCalledWith(long);
+    } finally {
+      style.remove();
+    }
   });
 });
+
+function cssBlock(source: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = source.match(new RegExp(`${escaped}\\s*\\{[^}]*\\}`));
+  if (!match) {
+    throw new Error(`missing ${selector}`);
+  }
+  return match[0];
+}

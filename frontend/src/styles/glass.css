@@ -638,6 +638,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
   max-width: 640px;
 }
 
@@ -649,6 +650,8 @@ textarea {
   margin: 0;
   padding: 8px;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tunnel-list .empty {
@@ -680,6 +683,8 @@ textarea {
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
   padding: 18px;
   border-radius: 22px;
 }
@@ -699,6 +704,39 @@ textarea {
 
 .tunnel-detail .address {
   margin: 0;
+}
+
+.tunnel-keyline {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tunnel-key {
+  display: block;
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--inset-bg);
+  border: 1px solid var(--hairline);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.tunnel-keyline .btn {
+  flex: none;
 }
 
 .tunnel-mode {

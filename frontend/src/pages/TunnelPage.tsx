@@ -260,15 +260,43 @@ function MappingDetail({
         <span className={`pill ${session?.Status || "stopped"}`}>{statusKey ? t(statusKey) : session?.Status}</span>
         {mapping.openBrowser ? <span>{t("openInBrowser")}</span> : null}
       </p>
-      {mapping.mode === "forward" ? <p className="tunnel-meta">{mapping.peer}</p> : null}
-      {session?.Address ? <p className="address">{session.Address}</p> : null}
-      {session?.Err ? <p className="err">{session.Err}</p> : null}
-      {session?.Address ? (
-        <button className="btn btn-ghost" type="button" onClick={() => onCopy(session.Address)}>
-          {t("copy")}
-        </button>
+      {mapping.mode === "forward" && mapping.peer.trim() ? (
+        <KeyLine value={mapping.peer.trim()} copyLabel={t("tunnelCopyAddress")} onCopy={onCopy} />
       ) : null}
+      {session?.Address ? (
+        <KeyLine
+          value={session.Address}
+          copyLabel={t(mapping.mode === "serve" ? "tunnelCopyAddress" : "tunnelCopyLocal")}
+          onCopy={onCopy}
+          className="address"
+        />
+      ) : null}
+      {session?.Err ? <p className="err">{session.Err}</p> : null}
     </section>
+  );
+}
+
+function KeyLine({
+  value,
+  copyLabel,
+  onCopy,
+  className,
+}: {
+  value: string;
+  copyLabel: string;
+  onCopy: (text: string) => void;
+  className?: string;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="tunnel-keyline">
+      <code className={className ? `tunnel-key ${className}` : "tunnel-key"} title={value}>
+        {value}
+      </code>
+      <button className="btn btn-ghost" type="button" aria-label={copyLabel} title={copyLabel} onClick={() => onCopy(value)}>
+        {t("copy")}
+      </button>
+    </div>
   );
 }
 

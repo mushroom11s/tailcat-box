@@ -61,6 +61,8 @@ export const en = {
   tunnelEphemeral: "browser",
   tunnelServe: "Port serve",
   tunnelForward: "Local forward",
+  tunnelCopyAddress: "Copy address",
+  tunnelCopyLocal: "Copy local address",
   openInBrowser: "Open in browser",
 
   settingsTitle: "Settings",

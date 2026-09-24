@@ -65,6 +65,8 @@ export const zhCN = {
   tunnelEphemeral: "浏览器",
   tunnelServe: "端口监听",
   tunnelForward: "本地转发",
+  tunnelCopyAddress: "复制地址",
+  tunnelCopyLocal: "复制本地地址",
   openInBrowser: "用浏览器打开",
 
   settingsTitle: "设置",
