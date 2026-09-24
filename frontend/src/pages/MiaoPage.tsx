@@ -626,6 +626,93 @@ export default function MiaoPage() {
 
       {mode === "send" ? (
         <div className="miao-send">
+          <div className="miao-limits">
+            <label className="field">
+              {t("miaoTTL")}
+              <select value={ttlMode} onChange={(ev) => setTTLMode(ev.target.value as TTLMode)}>
+                <option value="1">{t("miaoDay1")}</option>
+                <option value="7">{t("miaoDay7")}</option>
+                <option value="15">{t("miaoDay15")}</option>
+                <option value="custom">{t("miaoCustomDays")}</option>
+                <option value="forever">{t("miaoForever")}</option>
+              </select>
+            </label>
+            {ttlMode === "custom" ? (
+              <label className="field">
+                {t("miaoDays")}
+                <input
+                  inputMode="numeric"
+                  value={customDays}
+                  onChange={(ev) => setCustomDays(ev.target.value)}
+                  aria-label={t("miaoDays")}
+                />
+              </label>
+            ) : null}
+            <label className="field">
+              {t("miaoDownloads")}
+              <select value={countMode} onChange={(ev) => setCountMode(ev.target.value as CountMode)}>
+                <option value="1">{t("miaoOnce")}</option>
+                <option value="3">{t("miaoCount3")}</option>
+                <option value="10">{t("miaoCount10")}</option>
+                <option value="unlimited">{t("miaoUnlimited")}</option>
+                <option value="custom">{t("miaoCustomCount")}</option>
+              </select>
+            </label>
+            {countMode === "custom" ? (
+              <label className="field">
+                {t("miaoCount")}
+                <input
+                  inputMode="numeric"
+                  value={customCount}
+                  onChange={(ev) => setCustomCount(ev.target.value)}
+                  aria-label={t("miaoCount")}
+                />
+              </label>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className={`miao-drop${dragOver ? " drag" : ""}`}
+            disabled={busy !== ""}
+            onClick={() => {
+              if (hasWailsBindings()) {
+                void pickNative();
+              } else {
+                inputRef.current?.click();
+              }
+            }}
+            onDragEnter={(ev) => {
+              ev.preventDefault();
+              setDragOver(true);
+            }}
+            onDragOver={(ev) => {
+              ev.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+          >
+            {busy === "pack" ? (
+              <LoadingCat size="lg" layout="block" label={t("miaoPacking")} />
+            ) : (
+              <span>
+                <strong>{t("miaoDrop")}</strong>
+                <span className="chat-quiet">{t("miaoDropHint")}</span>
+              </span>
+            )}
+          </button>
+          <input
+            ref={inputRef}
+            className="sr-only"
+            type="file"
+            multiple
+            aria-label={t("miaoPickFiles")}
+            onChange={(ev) => {
+              const list = Array.from(ev.target.files ?? []);
+              ev.target.value = "";
+              void acceptFileList(list);
+            }}
+          />
           {shares.length ? (
             <div className="miao-share-list">
               <h3>{t("miaoActive")}</h3>
@@ -636,93 +723,6 @@ export default function MiaoPage() {
               </div>
             </div>
           ) : null}
-            <div className="miao-limits">
-              <label className="field">
-                {t("miaoTTL")}
-                <select value={ttlMode} onChange={(ev) => setTTLMode(ev.target.value as TTLMode)}>
-                  <option value="1">{t("miaoDay1")}</option>
-                  <option value="7">{t("miaoDay7")}</option>
-                  <option value="15">{t("miaoDay15")}</option>
-                  <option value="custom">{t("miaoCustomDays")}</option>
-                  <option value="forever">{t("miaoForever")}</option>
-                </select>
-              </label>
-              {ttlMode === "custom" ? (
-                <label className="field">
-                  {t("miaoDays")}
-                  <input
-                    inputMode="numeric"
-                    value={customDays}
-                    onChange={(ev) => setCustomDays(ev.target.value)}
-                    aria-label={t("miaoDays")}
-                  />
-                </label>
-              ) : null}
-              <label className="field">
-                {t("miaoDownloads")}
-                <select value={countMode} onChange={(ev) => setCountMode(ev.target.value as CountMode)}>
-                  <option value="1">{t("miaoOnce")}</option>
-                  <option value="3">{t("miaoCount3")}</option>
-                  <option value="10">{t("miaoCount10")}</option>
-                  <option value="unlimited">{t("miaoUnlimited")}</option>
-                  <option value="custom">{t("miaoCustomCount")}</option>
-                </select>
-              </label>
-              {countMode === "custom" ? (
-                <label className="field">
-                  {t("miaoCount")}
-                  <input
-                    inputMode="numeric"
-                    value={customCount}
-                    onChange={(ev) => setCustomCount(ev.target.value)}
-                    aria-label={t("miaoCount")}
-                  />
-                </label>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              className={`miao-drop${dragOver ? " drag" : ""}`}
-              disabled={busy !== ""}
-              onClick={() => {
-                if (hasWailsBindings()) {
-                  void pickNative();
-                } else {
-                  inputRef.current?.click();
-                }
-              }}
-              onDragEnter={(ev) => {
-                ev.preventDefault();
-                setDragOver(true);
-              }}
-              onDragOver={(ev) => {
-                ev.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={onDrop}
-            >
-              {busy === "pack" ? (
-                <LoadingCat size="lg" layout="block" label={t("miaoPacking")} />
-              ) : (
-                <span>
-                  <strong>{t("miaoDrop")}</strong>
-                  <span className="chat-quiet">{t("miaoDropHint")}</span>
-                </span>
-              )}
-            </button>
-            <input
-              ref={inputRef}
-              className="sr-only"
-              type="file"
-              multiple
-              aria-label={t("miaoPickFiles")}
-              onChange={(ev) => {
-                const list = Array.from(ev.target.files ?? []);
-                ev.target.value = "";
-                void acceptFileList(list);
-              }}
-            />
         </div>
       ) : (
         <div className="miao-receive">
