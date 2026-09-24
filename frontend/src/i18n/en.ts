@@ -395,6 +395,22 @@ export const en = {
   chatNotifyVoice: "Sent a voice note",
   chatNotifyMessage: "New message",
   chatNotifyDenied: "System notifications are off, so new messages stay in the chat.",
+
+  qrShow: "QR",
+  qrShowLabel: "Show QR code",
+  qrShowPeerLabel: "Show peer QR code",
+  qrTitle: "QR code",
+  qrScan: "Scan QR",
+  qrScanTitle: "Scan QR code",
+  qrScanHelp: "Use the camera, or choose an image that contains the QR code.",
+  qrUseCamera: "Use camera",
+  qrPickImage: "Choose image",
+  qrNoCamera: "No camera is available. Choose an image of the QR code instead.",
+  qrNotFound: "No QR code found in that image.",
+  qrInvalid: "That QR code is not a Tailcat address.",
+  qrScanning: "Point the camera at a QR code.",
+  qrEncodeFailed: "Could not build a QR code.",
+  qrClose: "Close",
 } as const;
 
 export type MessageKey = keyof typeof en;

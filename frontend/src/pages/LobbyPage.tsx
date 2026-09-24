@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from "react";
+import QrScanButton from "../components/QrScanButton";
 import { useI18n } from "../i18n";
 
 export type LobbyKey = {
@@ -108,14 +109,17 @@ export default function LobbyPage({
       <div className="glass chat-lobby-panel">
         <div className="field">
           <label htmlFor="lobby-peer">{t("lobbyPeer")}</label>
-          <input
-            id="lobby-peer"
-            value={peer}
-            onChange={(ev) => onPeer(ev.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="tc…"
-            autoComplete="off"
-          />
+          <div className="qr-field">
+            <input
+              id="lobby-peer"
+              value={peer}
+              onChange={(ev) => onPeer(ev.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="tc…"
+              autoComplete="off"
+            />
+            <QrScanButton disabled={pending} onAccept={onPeer} />
+          </div>
         </div>
         <p className="chat-quiet">{t("lobbyConnectHint")}</p>
         <button className="btn btn-ghost" type="button" disabled={pending} onClick={onConnect}>
