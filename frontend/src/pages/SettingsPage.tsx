@@ -483,7 +483,7 @@ export default function SettingsPage({
           {downloaded ? (
             <div className="update-install">
               <h4>{t("updateInstallTitle")}</h4>
-              <p>{installSteps(update?.Platform ?? "", t)}</p>
+              <p>{installSteps(update?.Platform ?? "", update?.AssetName ?? "", t)}</p>
             </div>
           ) : null}
         </InfoCard>
@@ -584,12 +584,13 @@ function revealLabel(platform: string, t: (key: MessageKey) => string): string {
   return t("revealUpdate");
 }
 
-function installSteps(platform: string, t: (key: MessageKey) => string): string {
+function installSteps(platform: string, assetName: string, t: (key: MessageKey) => string): string {
+  const zip = assetName.toLowerCase().endsWith(".zip");
   if (platform === "darwin") {
-    return t("updateInstallMac");
+    return t(zip ? "updateInstallMacZip" : "updateInstallMac");
   }
   if (platform === "windows") {
-    return t("updateInstallWin");
+    return t(zip ? "updateInstallWinZip" : "updateInstallWin");
   }
   return t("updateInstallOther");
 }

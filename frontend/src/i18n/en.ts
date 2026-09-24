@@ -97,8 +97,12 @@ export const en = {
   updateNoPackage: "No install package is published for this system.",
   updateInstallTitle: "How to install",
   updateInstallMac:
+    "1. Quit Tailcat Box.\n2. Open the disk image in Downloads and drag Tailcat Box into Applications, replacing the old app.\n3. The build is unsigned. If macOS blocks it, Control-click the app and choose Open.",
+  updateInstallMacZip:
     "1. Quit Tailcat Box.\n2. Open the zip in Downloads and drag Tailcat Box.app into Applications, replacing the old one.\n3. The build is unsigned. If macOS blocks it, Control-click the app and choose Open.",
   updateInstallWin:
+    "1. Quit Tailcat Box.\n2. Run the setup program in Downloads. It installs Tailcat Box and can replace the previous copy.\n3. Windows SmartScreen may warn because this build is unsigned. Choose More info, then Run anyway.",
+  updateInstallWinZip:
     "1. Quit Tailcat Box.\n2. Open the zip in Downloads and replace the old tailcat-box.exe with the new one.\n3. Windows SmartScreen may warn because this build is unsigned.",
   updateInstallOther:
     "1. Quit Tailcat Box.\n2. Replace the running copy with the program inside the zip.\n3. No Linux package is published, and this build is unsigned.",

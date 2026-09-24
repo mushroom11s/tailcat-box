@@ -152,13 +152,22 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 
 ## 发布
 
-推送 `v*` 标签后，GitHub Actions 会构建未签名的压缩包：macOS（Apple Silicon 和 Intel）以及 Windows（amd64 和 ARM64），并附到 GitHub Release 上。文件名类似 `tailcat-box-macos-arm64-…`、`tailcat-box-macos-amd64-…`、`tailcat-box-windows-amd64-…`、`tailcat-box-windows-arm64-…`。说明写在 `docs/releases/`。这些包没有签名，所以 Gatekeeper 和 SmartScreen 会提示。
+推送 `v*` 标签后，GitHub Actions 会构建未签名的安装包，并附到 GitHub Release 上。下载后直接打开：
+
+| 文件 | 怎么安装 |
+| --- | --- |
+| `tailcat-box-macos-arm64-vX.Y.Z.dmg` | Apple Silicon。打开磁盘映像，把 Tailcat Box 拖进「应用程序」。 |
+| `tailcat-box-macos-amd64-vX.Y.Z.dmg` | Intel Mac。同样是拖进「应用程序」的磁盘映像。 |
+| `tailcat-box-windows-amd64-vX.Y.Z.exe` | Windows x64 的 NSIS 安装程序。运行它。 |
+| `tailcat-box-windows-arm64-vX.Y.Z.exe` | Windows ARM64 的 NSIS 安装程序。运行它。 |
+
+文件名里的版本就是 git 标签，带前导 `v`。这些构建没有签名，所以 Gatekeeper 和 SmartScreen 会提示。macOS：系统设置 → 隐私与安全性 → 仍要打开，或右键 → 打开。Windows：更多信息 → 仍要运行。该标签的说明写在 `docs/releases/`。
 
 怎么打标签、怎么先试构建，见 [docs/releases/README.md](docs/releases/README.md)。
 
 ## macOS 麦克风、摄像头和屏幕共享
 
-第一次发语音、打视频或共享屏幕时，macOS 会弹出系统授权。`build/darwin/Info.plist`（`wails dev` 用 `Info.dev.plist`）里有 `NSMicrophoneUsageDescription`、`NSCameraUsageDescription` 和 `NSScreenCaptureUsageDescription`。Wails 会把它写进 `tailcat-box.app/Contents/Info.plist`，发布用的压缩包保留整个 `.app`，所以装好的应用可以弹出系统对话框。没有这三行说明时，系统会直接拒绝，不会询问。
+第一次发语音、打视频或共享屏幕时，macOS 会弹出系统授权。`build/darwin/Info.plist`（`wails dev` 用 `Info.dev.plist`）里有 `NSMicrophoneUsageDescription`、`NSCameraUsageDescription` 和 `NSScreenCaptureUsageDescription`。Wails 会把它写进 `tailcat-box.app/Contents/Info.plist`，发布用的磁盘映像里是这个 `.app`，所以装好的应用可以弹出系统对话框。没有这三行说明时，系统会直接拒绝，不会询问。
 
 未签名的包在打开前仍会碰到 Gatekeeper（系统设置 → 隐私与安全性 → 仍要打开，或右键 → 打开）。这和麦克风、摄像头、屏幕录制是两回事。应用能运行之后，第一次使用才会弹出后面那些权限。屏幕录制跟着代码签名走，所以新的未签名构建可能要再允许一次，而且经常要退出并重新打开才生效。如果之前选了不允许，就到「麦克风」「摄像头」和「屏幕与系统音频录制」里打开猫砂盆。应用里的提示中英文都会说明这一步。
 

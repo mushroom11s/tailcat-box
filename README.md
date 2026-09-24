@@ -152,13 +152,22 @@ The Keys page also lists the Tailcat CLI key directory (`~/.config/tailcat/keys`
 
 ## Releases
 
-Pushing a `v*` tag builds unsigned macOS (Apple Silicon and Intel) and Windows (amd64 and ARM64) zips and attaches them to a GitHub Release. Names look like `tailcat-box-macos-arm64-…`, `tailcat-box-macos-amd64-…`, `tailcat-box-windows-amd64-…`, and `tailcat-box-windows-arm64-…`. Notes for that tag live under `docs/releases/`. The binaries are unsigned, so Gatekeeper and SmartScreen warnings are expected.
+Pushing a `v*` tag builds unsigned installers and attaches them to a GitHub Release. Download the file and open it:
+
+| File | How to install |
+| --- | --- |
+| `tailcat-box-macos-arm64-vX.Y.Z.dmg` | Apple Silicon. Open the disk image and drag Tailcat Box to Applications. |
+| `tailcat-box-macos-amd64-vX.Y.Z.dmg` | Intel Mac. Same drag-to-Applications disk image. |
+| `tailcat-box-windows-amd64-vX.Y.Z.exe` | Windows x64 NSIS setup. Run it. |
+| `tailcat-box-windows-arm64-vX.Y.Z.exe` | Windows ARM64 NSIS setup. Run it. |
+
+The version in the filename is the git tag, including the leading `v`. These builds are unsigned, so Gatekeeper and SmartScreen warnings are expected. macOS: System Settings → Privacy & Security → Open Anyway, or right-click → Open. Windows: More info → Run anyway. Notes for that tag live under `docs/releases/`.
 
 Tagging, dry-run builds, and which runners are used are described in [docs/releases/README.md](docs/releases/README.md).
 
 ## macOS microphone, camera, and screen sharing
 
-The first voice note, video call, or screen share asks macOS for permission. `build/darwin/Info.plist` (and `Info.dev.plist` for `wails dev`) includes `NSMicrophoneUsageDescription`, `NSCameraUsageDescription`, and `NSScreenCaptureUsageDescription`. Wails writes that file to `tailcat-box.app/Contents/Info.plist`, and the release zip keeps the whole `.app`, so the shipped build can show the system dialogs. Without those strings, macOS denies the capture and does not prompt.
+The first voice note, video call, or screen share asks macOS for permission. `build/darwin/Info.plist` (and `Info.dev.plist` for `wails dev`) includes `NSMicrophoneUsageDescription`, `NSCameraUsageDescription`, and `NSScreenCaptureUsageDescription`. Wails writes that file to `tailcat-box.app/Contents/Info.plist`, and the release disk image contains that `.app`, so the shipped build can show the system dialogs. Without those strings, macOS denies the capture and does not prompt.
 
 Unsigned builds still hit Gatekeeper before the app opens (System Settings → Privacy & Security → Open Anyway, or right-click → Open). That check is separate from microphone, camera, and screen recording. After the app is allowed to run, those prompts appear on first use. Screen recording follows the app’s code signature, so a new unsigned build may need to be allowed again, and macOS often applies it only after you quit and reopen the app. If you previously chose Don’t Allow, turn Tailcat Box on under Microphone, Camera, and Screen & System Audio Recording. The in-app message says the same thing in English and 简体中文.
 
