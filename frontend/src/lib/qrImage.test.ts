@@ -2,6 +2,7 @@ import * as QRCode from "qrcode";
 import { describe, expect, it } from "vitest";
 import iconUrl from "../assets/icon.png?inline";
 import roomQrMark from "../assets/room-qr-cat.png?inline";
+import navyCardFixture from "./fixtures/room-cat-navy-card.png?inline";
 import { decodeQrImageData, encodeQrDataURL } from "./qr";
 import { decodeQrFromFile } from "./qrImage";
 import { decodePng, encodePng, type RgbaImage } from "./qrMark";
@@ -38,6 +39,94 @@ function scaleNearest(image: RgbaImage, width: number, height: number): RgbaImag
   return { width, height, rgba };
 }
 
+function bilinear(image: RgbaImage, width: number, height: number): RgbaImage {
+  const rgba = new Uint8Array(width * height * 4);
+  const xScale = image.width / width;
+  const yScale = image.height / height;
+  for (let y = 0; y < height; y++) {
+    const sy = (y + 0.5) * yScale - 0.5;
+    const y0 = Math.max(0, Math.floor(sy));
+    const y1 = Math.min(image.height - 1, y0 + 1);
+    const fy = Math.min(1, Math.max(0, sy - y0));
+    for (let x = 0; x < width; x++) {
+      const sx = (x + 0.5) * xScale - 0.5;
+      const x0 = Math.max(0, Math.floor(sx));
+      const x1 = Math.min(image.width - 1, x0 + 1);
+      const fx = Math.min(1, Math.max(0, sx - x0));
+      const d = (y * width + x) * 4;
+      for (let c = 0; c < 4; c++) {
+        const p00 = image.rgba[(y0 * image.width + x0) * 4 + c];
+        const p10 = image.rgba[(y0 * image.width + x1) * 4 + c];
+        const p01 = image.rgba[(y1 * image.width + x0) * 4 + c];
+        const p11 = image.rgba[(y1 * image.width + x1) * 4 + c];
+        rgba[d + c] = Math.round(p00 * (1 - fx) * (1 - fy) + p10 * fx * (1 - fy) + p01 * (1 - fx) * fy + p11 * fx * fy);
+      }
+    }
+  }
+  return { width, height, rgba };
+}
+
+function roundedCard(qr: RgbaImage): RgbaImage {
+  const pad = Math.max(8, Math.round(qr.width * 0.08));
+  const radius = Math.max(12, Math.round(qr.width * 0.09));
+  const width = qr.width + pad * 2;
+  const height = qr.height + pad * 2;
+  const rgba = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const dx = x < radius ? radius - x : x >= width - radius ? x - (width - radius - 1) : 0;
+      const dy = y < radius ? radius - y : y >= height - radius ? y - (height - radius - 1) : 0;
+      if (dx * dx + dy * dy > radius * radius) {
+        continue;
+      }
+      const qx = x - pad;
+      const qy = y - pad;
+      if (qx >= 0 && qy >= 0 && qx < qr.width && qy < qr.height) {
+        const s = (qy * qr.width + qx) * 4;
+        rgba[i] = qr.rgba[s];
+        rgba[i + 1] = qr.rgba[s + 1];
+        rgba[i + 2] = qr.rgba[s + 2];
+        rgba[i + 3] = 255;
+      } else {
+        rgba[i] = 255;
+        rgba[i + 1] = 255;
+        rgba[i + 2] = 255;
+        rgba[i + 3] = 255;
+      }
+    }
+  }
+  return { width, height, rgba };
+}
+
+function placeOnNavy(card: RgbaImage, width: number, height: number, ox: number, oy: number): RgbaImage {
+  const rgba = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const shade = Math.round(18 + (y / height) * 10);
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      rgba[i] = shade;
+      rgba[i + 1] = shade + 4;
+      rgba[i + 2] = shade + 28;
+      rgba[i + 3] = 255;
+    }
+  }
+  for (let y = 0; y < card.height; y++) {
+    for (let x = 0; x < card.width; x++) {
+      const s = (y * card.width + x) * 4;
+      if (card.rgba[s + 3] === 0) {
+        continue;
+      }
+      const d = ((oy + y) * width + ox + x) * 4;
+      rgba[d] = card.rgba[s];
+      rgba[d + 1] = card.rgba[s + 1];
+      rgba[d + 2] = card.rgba[s + 2];
+      rgba[d + 3] = 255;
+    }
+  }
+  return { width, height, rgba };
+}
+
 function placeOnDark(qr: RgbaImage, width = 1400, height = 900): RgbaImage {
   const rgba = new Uint8Array(width * height * 4);
   for (let i = 0; i < rgba.length; i += 4) {
@@ -59,6 +148,19 @@ function placeOnDark(qr: RgbaImage, width = 1400, height = 900): RgbaImage {
     }
   }
   return { width, height, rgba };
+}
+
+function transparentDarkModules(image: RgbaImage): RgbaImage {
+  const rgba = new Uint8Array(image.rgba);
+  for (let i = 0; i < rgba.length; i += 4) {
+    if (rgba[i] < 16 && rgba[i + 1] < 16 && rgba[i + 2] < 16) {
+      rgba[i] = 255;
+      rgba[i + 1] = 255;
+      rgba[i + 2] = 255;
+      rgba[i + 3] = 0;
+    }
+  }
+  return { width: image.width, height: image.height, rgba };
 }
 
 function transparentLightModules(image: RgbaImage): RgbaImage {
@@ -118,10 +220,46 @@ describe("decodeQrFromFile", () => {
     await expect(decodeQrFromFile(await pngFile(desktop))).resolves.toBe(text);
   });
 
+  it("reads a logo QR whose dark modules are transparent white", async () => {
+    const text = "tc:fake-room-abc";
+    const image = transparentDarkModules(await rasterPng(await encodeQrDataURL(text, { centerMark: roomQrMark })));
+    expect(decodeQrImageData(toClamped(image), image.width, image.height)).toBeNull();
+    await expect(decodeQrFromFile(await pngFile(image))).resolves.toBe(text);
+  });
+
   it("reads a logo QR whose light modules are transparent black", async () => {
     const text = "tc:fake-room-abc";
     const image = transparentLightModules(await rasterPng(await encodeQrDataURL(text, { centerMark: roomQrMark })));
     expect(decodeQrImageData(toClamped(image), image.width, image.height)).toBeNull();
     await expect(decodeQrFromFile(await pngFile(image))).resolves.toBe(text);
+  });
+
+  it("reads a room-cat QR on a white card inside a large navy screenshot", async () => {
+    const text = `mw1.${"A".repeat(160)}`;
+    const native = await rasterPng(await encodeQrDataURL(text, { centerMark: roomQrMark }));
+    const card = roundedCard(bilinear(native, 172, 172));
+    for (const [width, height] of [
+      [1440, 900],
+      [3024, 1964],
+    ] as const) {
+      const shot = placeOnNavy(card, width, height, Math.round(width * 0.62), Math.round(height * 0.18));
+      expect(decodeQrImageData(toClamped(shot), shot.width, shot.height)).toBeNull();
+      await expect(decodeQrFromFile(await pngFile(shot, "navy-card.png"))).resolves.toBe(text);
+    }
+  });
+
+  it("reads the committed navy-card room QR fixture", async () => {
+    const text = `mw1.${"A".repeat(160)}`;
+    const image = await decodePng(dataUrlBytes(navyCardFixture));
+    expect(image.width).toBe(1440);
+    expect(image.height).toBe(900);
+    expect(decodeQrImageData(toClamped(image), image.width, image.height)).toBeNull();
+    await expect(decodeQrFromFile(await pngFile(image, "room-cat-navy-card.png"))).resolves.toBe(text);
+  });
+
+  it("does not invent a payload for a blank white card", async () => {
+    const card = roundedCard({ width: 180, height: 180, rgba: new Uint8Array(180 * 180 * 4).fill(255) });
+    const shot = placeOnNavy(card, 900, 600, 360, 80);
+    await expect(decodeQrFromFile(await pngFile(shot, "blank-card.png"))).resolves.toBeNull();
   });
 });
