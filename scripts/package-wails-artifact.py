@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
-"""Zip the Wails build/bin output for GitHub Release upload."""
+"""Package a Wails build as a GitHub Release installer.
+
+Windows jobs copy the NSIS setup produced by ``wails build -nsis``.
+macOS jobs build a compressed disk image that contains the ``.app`` and an
+Applications symlink (drag-to-Applications). The release asset is the
+installer itself, not a zip of it.
+
+Names follow the old zip basename, with the extension changed:
+
+    tailcat-box-windows-amd64-v0.4.0.exe
+    tailcat-box-windows-arm64-v0.4.0.exe
+    tailcat-box-macos-arm64-v0.4.0.dmg
+    tailcat-box-macos-amd64-v0.4.0.dmg
+
+``version`` keeps the leading ``v`` from the git tag.
+"""
 
 from __future__ import annotations
 
@@ -9,8 +24,11 @@ import platform
 import shutil
 import subprocess
 import sys
-import zipfile
+import tempfile
 from pathlib import Path
+
+
+VOLUME_NAME = "Tailcat Box"
 
 
 def normalize_arch(raw: str) -> str:
@@ -22,11 +40,12 @@ def normalize_arch(raw: str) -> str:
     return value or "unknown"
 
 
-def zip_name(os_slug: str, arch: str, version: str) -> str:
+def artifact_name(os_slug: str, arch: str, version: str) -> str:
     arch = normalize_arch(arch)
     if arch not in {"arm64", "amd64"}:
         raise SystemExit(f"unsupported arch: {arch}")
-    return f"tailcat-box-{os_slug}-{arch}-{version}.zip"
+    ext = {"windows": ".exe", "macos": ".dmg"}[os_slug]
+    return f"tailcat-box-{os_slug}-{arch}-{version}{ext}"
 
 
 def detect_arch() -> str:
@@ -38,34 +57,94 @@ def detect_arch() -> str:
     return normalize_arch(platform.machine())
 
 
-def collect_sources(bin_dir: Path, os_slug: str) -> list[Path]:
+def find_macos_app(bin_dir: Path) -> Path:
     if not bin_dir.is_dir():
         raise SystemExit(f"missing build output directory: {bin_dir}")
-
-    if os_slug == "macos":
-        apps = sorted(p for p in bin_dir.iterdir() if p.suffix == ".app" and p.is_dir())
-        if apps:
-            return [apps[0]]
+    apps = sorted(p for p in bin_dir.iterdir() if p.suffix == ".app" and p.is_dir())
+    if len(apps) == 1:
+        return apps[0]
+    if not apps:
         raise SystemExit(f"no .app bundle found in {bin_dir}")
-
-    if os_slug == "windows":
-        exes = sorted(p for p in bin_dir.iterdir() if p.suffix.lower() == ".exe" and p.is_file())
-        if exes:
-            return [exes[0]]
-        raise SystemExit(f"no .exe found in {bin_dir}")
-
-    raise SystemExit(f"unsupported os slug: {os_slug}")
+    raise SystemExit(f"expected one .app bundle in {bin_dir}, found {len(apps)}")
 
 
-def add_path(zf: zipfile.ZipFile, source: Path, arc_root: str | None = None) -> None:
-    if source.is_file():
-        zf.write(source, arcname=source.name if arc_root is None else f"{arc_root}/{source.name}")
+def is_arch_installer(name: str, arch: str) -> bool:
+    lower = name.lower()
+    suffix = f"-{arch}-installer.exe"
+    # Reject a combined amd64_arm64 installer; each matrix cell ships one arch.
+    return lower.endswith(suffix) and not lower.endswith(f"_{arch}-installer.exe")
+
+
+def find_windows_installer(bin_dir: Path, arch: str) -> Path:
+    if not bin_dir.is_dir():
+        raise SystemExit(f"missing build output directory: {bin_dir}")
+    arch = normalize_arch(arch)
+    matches = sorted(
+        p for p in bin_dir.iterdir() if p.is_file() and is_arch_installer(p.name, arch)
+    )
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise SystemExit(
+            f"no NSIS installer for {arch} in {bin_dir}. "
+            "Install NSIS so makensis is on PATH, then run `wails build -nsis`."
+        )
+    names = ", ".join(p.name for p in matches)
+    raise SystemExit(f"expected one {arch} NSIS installer in {bin_dir}, found: {names}")
+
+
+def copy_bundle(src: Path, dest: Path) -> None:
+    if shutil.which("ditto"):
+        subprocess.run(["ditto", str(src), str(dest)], check=True)
         return
-    for path in sorted(source.rglob("*")):
-        if path.is_dir():
-            continue
-        rel = path.relative_to(source.parent)
-        zf.write(path, arcname=str(rel).replace("\\", "/"))
+    shutil.copytree(src, dest, symlinks=True)
+
+
+def stage_macos_layout(app: Path, staging: Path) -> None:
+    """Place the app and an Applications symlink at the disk-image root."""
+    copy_bundle(app, staging / app.name)
+    applications = staging / "Applications"
+    applications.symlink_to("/Applications")
+
+
+def create_dmg(staging: Path, dest: Path, volume_name: str) -> None:
+    if shutil.which("hdiutil") is None:
+        raise SystemExit("hdiutil is required to build the macOS disk image")
+    if dest.exists():
+        dest.unlink()
+    # Stock hdiutil. Finder AppleScript layout hangs on headless GitHub runners,
+    # so the image root is just the .app plus the Applications symlink.
+    subprocess.run(
+        [
+            "hdiutil",
+            "create",
+            "-volname",
+            volume_name,
+            "-srcfolder",
+            str(staging),
+            "-ov",
+            "-format",
+            "UDZO",
+            str(dest),
+        ],
+        check=True,
+    )
+
+
+def package_macos_dmg(app: Path, dest: Path, volume_name: str = VOLUME_NAME) -> None:
+    staging = Path(tempfile.mkdtemp(prefix="tailcat-dmg-"))
+    try:
+        stage_macos_layout(app, staging)
+        create_dmg(staging, dest, volume_name)
+    finally:
+        shutil.rmtree(staging)
+
+
+def package_windows_installer(bin_dir: Path, dest: Path, arch: str) -> None:
+    installer = find_windows_installer(bin_dir, arch)
+    if dest.exists():
+        dest.unlink()
+    shutil.copy2(installer, dest)
 
 
 def main() -> int:
@@ -75,27 +154,19 @@ def main() -> int:
     parser.add_argument("--arch", default="", help="amd64 or arm64. Defaults to this machine.")
     parser.add_argument("--bin-dir", default="build/bin")
     parser.add_argument("--out-dir", default="dist-upload")
+    parser.add_argument("--volume-name", default=VOLUME_NAME)
     args = parser.parse_args()
 
     bin_dir = Path(args.bin_dir)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    sources = collect_sources(bin_dir, args.os_slug)
-    name = zip_name(args.os_slug, args.arch or detect_arch(), args.version)
-    dest = out_dir / name
-
-    if args.os_slug == "macos" and shutil.which("ditto"):
-        if len(sources) != 1:
-            raise SystemExit("macos packaging expects a single .app bundle")
-        subprocess.run(
-            ["ditto", "-c", "-k", "--keepParent", str(sources[0]), str(dest)],
-            check=True,
-        )
+    arch = args.arch or detect_arch()
+    dest = out_dir / artifact_name(args.os_slug, arch, args.version)
+    if args.os_slug == "windows":
+        package_windows_installer(bin_dir, dest, arch)
     else:
-        with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for source in sources:
-                add_path(zf, source)
+        package_macos_dmg(find_macos_app(bin_dir), dest, args.volume_name)
 
     print(dest)
     return 0

@@ -37,6 +37,9 @@ jobs:
       - name: Go tests
         run: go test ./...
 
+      - name: Package script tests
+        run: python3 scripts/package_wails_artifact_test.py
+
       - name: Frontend install and build
         working-directory: frontend
         run: |
