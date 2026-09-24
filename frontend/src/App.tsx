@@ -40,11 +40,9 @@ import {
   setNetworkSettings,
   startChatRoom,
   startForward,
-  startPing,
   startPortServe,
   stopChatRoom,
   stopSession,
-  tailcatVersion,
   type KeyInfo,
   type Session,
   type TailcatEvent,
@@ -91,10 +89,8 @@ function AppShell() {
   const [remarks, setRemarks] = useState<RemarkMap>(() => readRemarks());
   const [sessions, setSessions] = useState<Session[]>([]);
   const [keys, setKeys] = useState<KeyInfo[]>([]);
-  const [events, setEvents] = useState<TailcatEvent[]>([]);
   const [region, setRegion] = useState("");
   const [derpMapURL, setDerpMapURL] = useState("");
-  const [version, setVersion] = useState("");
   const [rooms, setRooms] = useState<Record<string, RoomSlice>>({});
   const [order, setOrder] = useState<string[]>([]);
   const [focus, setFocus] = useState("");
@@ -272,12 +268,10 @@ function AppShell() {
       const nextSessions = await listSessions();
       const nextKeys = await listKeys();
       const net = await getNetworkSettings();
-      const ver = await tailcatVersion();
       setSessions((prev) => (sameSessions(prev, nextSessions) ? prev : nextSessions));
       setKeys((prev) => (sameKeys(prev, nextKeys) ? prev : nextKeys));
       setRegion((prev) => (prev === net.Region ? prev : net.Region));
       setDerpMapURL((prev) => (prev === net.DERPMapURL ? prev : net.DERPMapURL));
-      setVersion((prev) => (prev === ver ? prev : ver));
     } catch {
       // Session refresh keeps the last good snapshot.
     }
@@ -350,7 +344,6 @@ function AppShell() {
   useEffect(() => {
     void refresh();
     const off = onTailcatEvent((ev) => {
-      setEvents((prev) => [...prev, ev]);
       const id = ev.SessionID;
       if (ev.Kind === "signal") {
         if (pageRef.current === "chat" && !lobbyRef.current && focusRef.current === id && ev.Data) {
@@ -746,7 +739,6 @@ function AppShell() {
 
   const chatRoom = !lobby && focus && rooms[focus] ? rooms[focus] : undefined;
   const showLobby = page === "chat" && !chatRoom;
-  void version;
 
   return (
     <div className="shell">
@@ -940,14 +932,9 @@ function AppShell() {
             error=""
             region={region}
             derpMapURL={derpMapURL}
-            sessions={sessions}
-            events={events}
-            peer={chatRoom?.peer ?? ""}
             onCreate={(name, client, keyRegion) => run(() => createKey(name, client, keyRegion))}
             onDelete={(name) => run(() => deleteKey(name))}
             onSaveNetwork={(nextRegion, nextDERP) => run(() => setNetworkSettings(nextRegion, nextDERP))}
-            onPing={(addr, untilDirect) => run(() => startPing(addr, untilDirect))}
-            onStop={(id) => run(() => stopSession(id))}
           />
         )}
       </main>
