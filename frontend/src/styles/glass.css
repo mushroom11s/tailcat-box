@@ -303,6 +303,14 @@ textarea {
   cursor: pointer;
 }
 
+.nav > .nav-btn,
+.nav-chat > .nav-btn,
+.sidebar-footer > .nav-btn {
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+}
+
 .nav-glyph {
   width: 18px;
   height: 18px;

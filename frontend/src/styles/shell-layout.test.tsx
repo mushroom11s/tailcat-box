@@ -152,6 +152,44 @@ describe("shell scroll", () => {
     }
   });
 
+  it("centers top-level menu labels and leaves room rows left-aligned", () => {
+    const menuRule = css.match(
+      /\.nav > \.nav-btn,\s*\.nav-chat > \.nav-btn,\s*\.sidebar-footer > \.nav-btn\s*\{[^}]*\}/,
+    );
+    expect(menuRule?.[0]).toContain("justify-content: center");
+    expect(menuRule?.[0]).toContain("text-align: center");
+    expect(menuRule?.[0]).toContain("width: 100%");
+    expect(cssBlock(css, ".nav-btn.nav-child")).not.toContain("justify-content: center");
+
+    const style = document.createElement("style");
+    style.textContent = [cssBlock(css, ".nav-btn"), menuRule?.[0] ?? "", cssBlock(css, ".nav-btn.nav-child")].join("\n");
+    document.head.appendChild(style);
+
+    try {
+      localStorage.setItem("tailcat-locale", "zh-CN");
+      render(
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>,
+      );
+
+      for (const name of ["喵传", "聊天", "穿透", "设置"]) {
+        const button = screen.getByRole("button", { name });
+        const buttonStyle = getComputedStyle(button);
+        expect(buttonStyle.justifyContent).toBe("center");
+        expect(buttonStyle.textAlign).toBe("center");
+        expect(buttonStyle.width).not.toBe("auto");
+        expect(buttonStyle.display).toBe("flex");
+      }
+
+      const fresh = screen.getByRole("button", { name: "+ 新房间" });
+      expect(getComputedStyle(fresh).justifyContent).not.toBe("center");
+      expect(getComputedStyle(fresh).textAlign).toBe("left");
+    } finally {
+      style.remove();
+    }
+  });
+
   it("centers the brand stack in the sidebar", () => {
     const style = document.createElement("style");
     style.textContent = [
