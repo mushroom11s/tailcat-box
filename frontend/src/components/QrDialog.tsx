@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   titleId: string;
@@ -32,7 +33,7 @@ export default function QrDialog({ titleId, title, onClose, children }: Props) {
     };
   }, []);
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" role="presentation" onClick={() => closeRef.current()}>
       <div
         ref={ref}
@@ -46,6 +47,7 @@ export default function QrDialog({ titleId, title, onClose, children }: Props) {
         <h3 id={titleId}>{title}</h3>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
