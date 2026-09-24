@@ -54,19 +54,22 @@ describe("toast stack", () => {
 
     const style = getComputedStyle(stack);
     expect(style.position).toBe("fixed");
-    expect(style.top).toBe("16px");
-    expect(style.right).toBe("16px");
+    expect(style.top).toBe("28px");
+    expect(style.right).toBe("28px");
     expect(Number.parseInt(style.zIndex, 10)).toBeGreaterThan(40);
     expect(style.pointerEvents).toBe("none");
     const rule = document.querySelector("[data-toast-test]")?.textContent ?? "";
     const stackRule = rule.slice(rule.indexOf(".toast-stack"));
     expect(stackRule.startsWith(".toast-stack")).toBe(true);
-    expect(stackRule).toContain("width: min(372px, calc(100vw - 32px))");
-    expect(stackRule).toContain("padding: 12px");
-    expect(stackRule).toContain("border-radius: 20px");
-    expect(stackRule).toContain("border-radius: 8px");
+    expect(stackRule).toContain("width: min(320px, calc(100vw - 56px))");
+    expect(stackRule).toContain("padding: 8px");
+    expect(stackRule).toContain("border-radius: 14px");
+    expect(stackRule).toContain("border-radius: 6px");
+    expect(stackRule).toContain("font-size: 11px");
+    expect(stackRule).toContain("font-size: 12px");
+    expect(stackRule).toContain("width: 22px");
     expect(stackRule).toContain("background: var(--glass-bg-strong)");
-    expect(stackRule).toContain("right: 16px");
+    expect(stackRule).toContain("right: 28px");
     expect(getComputedStyle(alert).pointerEvents).toBe("auto");
   });
 
