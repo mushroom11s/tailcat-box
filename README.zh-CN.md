@@ -12,23 +12,27 @@ macOS 和 Windows 上的 [Tailscale Tailcat](https://github.com/tailscale/tailca
 
 ## 功能演示
 
+窗口打开时是 1100×860，第一屏是喵传。侧栏当前项的描边是完整的。设置里是外观、语言、密钥和本机信息。
+
 <table>
   <tr>
-    <td align="center" valign="top" width="25%">
-      <b>聊天 — 发送与阅后即焚</b><br />
-      <img src="docs/assets/demo/chat-send-and-burn.gif" alt="聊天 — 发送与阅后即焚" width="100%" />
+    <td align="center" valign="top" width="50%">
+      <b>喵传 — 正在打包</b><br />
+      <img src="docs/assets/demo/miao-packing.png" alt="喵传正在把文件打包成一份分享" width="100%" />
     </td>
-    <td align="center" valign="top" width="25%">
-      <b>语音留言 — 按住与阅后即焚</b><br />
-      <img src="docs/assets/demo/voice-note-burn.gif" alt="语音留言 — 按住与阅后即焚" width="100%" />
+    <td align="center" valign="top" width="50%">
+      <b>分享二维码 — 中心是抠好的猫</b><br />
+      <img src="docs/assets/demo/miao-qr.png" alt="分享卡片上的二维码，中心是抠好的猫" width="100%" />
     </td>
-    <td align="center" valign="top" width="25%">
-      <b>实时语音 / 视频</b><br />
-      <img src="docs/assets/demo/voice-video-call.gif" alt="实时语音和视频" width="100%" />
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <b>下载 — 奔跑的猫</b><br />
+      <img src="docs/assets/demo/miao-running.png" alt="下载进度条上有一只奔跑的猫" width="100%" />
     </td>
-    <td align="center" valign="top" width="25%">
-      <b>穿透 — 转发并打开浏览器</b><br />
-      <img src="docs/assets/demo/tunnel-forward.gif" alt="穿透 — 转发并打开浏览器" width="100%" />
+    <td align="center" valign="top" width="50%">
+      <b>扫码 — 摄像头、图片或粘贴</b><br />
+      <img src="docs/assets/demo/qr-scan.png" alt="扫码对话框，可以开摄像头、选择图片或粘贴" width="100%" />
     </td>
   </tr>
 </table>
@@ -37,10 +41,10 @@ macOS 和 Windows 上的 [Tailscale Tailcat](https://github.com/tailscale/tailca
 
 ## 功能
 
-- **喵传** — 拖入文件（每份最多 300 MiB），可以同时开多份分享，每份有自己的二维码。另一台猫砂盆在这台电脑保持在线时，通过 Tailcat 把其中一份下载走
-- **聊天** — 开一个房间，交换 Tailcat 地址，发文字、文件和语音，也能实时语音、视频和共享屏幕
+- **喵传** — 打开后的第一屏。拖入文件（每份最多 300 MiB），可以同时开多份分享。每份有自己的二维码，中心是抠好的打包猫。打包时会看到那只猫，下载进度上有一只在跑的猫。可以粘贴分享码，也可以用摄像头、图片或剪贴板扫码。另一台猫砂盆在这台电脑保持在线时，通过 Tailcat 把其中一份下载走
+- **聊天** — 开一个房间，交换 Tailcat 地址（可以出示二维码，也可以粘贴一张二维码图片），发文字、文件和语音，也能实时语音、视频和共享屏幕
 - **穿透** — 把 TCP 端口挂到 Tailcat 地址上，再转到这台电脑，也可以打开对方的网页端口
-- **设置** — 跟随系统 / 浅色 / 深色，中英文，密钥和 DERP，诊断，本机信息，开机启动
+- **设置** — 跟随系统 / 浅色 / 深色，中英文，密钥和 DERP，本机信息，开机启动
 - **托盘** — macOS 和 Windows 上可以打开、隐藏，或跳到聊天、穿透、设置，也可以退出。左键点图标会显示窗口。macOS 应用菜单里也有这些操作。托盘图标和应用图标是同一只像素猫。关掉窗口只是藏起来，会话还在跑
 - **macOS 窗口** — 窗口化时保留系统标题栏，标题是 Tailcat Box。绿色按钮，以及「视图 → 进入全屏 / 退出全屏」（⌃⌘F），走系统全屏。Windows 和 Linux 不变
 
