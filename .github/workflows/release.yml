@@ -225,7 +225,8 @@ jobs:
           extra_ldflags="-X github.com/mushroom11s/tailcat-box/internal/appinfo.Version=${APP_VERSION}"
           if [ "${OS_SLUG}" = "windows" ]; then
             command -v makensis
-            makensis /VERSION
+            # Git Bash rewrites "/VERSION" into C:/Program Files/Git/VERSION.
+            MSYS_NO_PATHCONV=1 makensis /VERSION
             # This runner built one arch. Wails passes only that binary to
             # makensis, so the setup exe is single-arch (amd64 or arm64).
             wails build -trimpath -ldflags "${extra_ldflags}" -nsis
