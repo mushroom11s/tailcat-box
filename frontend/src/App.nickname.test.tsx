@@ -21,12 +21,14 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function renderApp() {
-  return render(
+async function renderApp() {
+  const view = render(
     <LocaleProvider>
       <App />
     </LocaleProvider>,
   );
+  fireEvent.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
+  return view;
 }
 
 function renderChat(nickname?: string) {
@@ -78,7 +80,7 @@ describe("local nickname", () => {
 
   it("shows You on a sent bubble when nothing is stored", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.click(screen.getByRole("button", { name: "Show room details" }));
@@ -93,7 +95,7 @@ describe("local nickname", () => {
 
   it("persists the nickname from Settings and uses it on outgoing bubbles", async () => {
     const user = userEvent.setup();
-    const first = renderApp();
+    const first = await renderApp();
     await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("heading", { name: "Profile" })).toBeTruthy();
     const field = screen.getByLabelText("Nickname");
@@ -118,14 +120,14 @@ describe("local nickname", () => {
     expect(label("in")).toBe("Peer");
     first.unmount();
 
-    renderApp();
+    await renderApp();
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     expect((screen.getByLabelText("Nickname") as HTMLInputElement).value).toBe("Mochi");
   });
 
   it("strips controls, trims on blur, and caps the field at 32 characters", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Settings" }));
     const field = screen.getByLabelText("Nickname") as HTMLInputElement;
     fireEvent.change(field, { target: { value: "  Mo\u0000chi\n  " } });
@@ -146,7 +148,7 @@ describe("local nickname", () => {
   it("shows the Chinese label and helper", async () => {
     localStorage.setItem("tailcat-locale", "zh-CN");
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "设置" }));
     expect(screen.getByRole("heading", { name: "个人" })).toBeTruthy();
     expect(screen.getByLabelText("昵称")).toBeTruthy();

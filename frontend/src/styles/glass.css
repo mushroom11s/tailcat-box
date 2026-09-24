@@ -35,7 +35,7 @@
     radial-gradient(860px 620px at 108% -8%, #e4c8ff 0%, transparent 52%),
     radial-gradient(760px 520px at 60% 118%, #c9f0ff 0%, transparent 48%),
     linear-gradient(165deg, #e7eefc 0%, #f6f0fb 46%, #e5eef8 100%);
-  --sidebar-w: 240px;
+  --sidebar-w: 260px;
   --scrollbar-size: 8px;
   --scrollbar-thumb: rgba(40, 30, 70, 0.22);
   --scrollbar-thumb-hover: rgba(40, 30, 70, 0.38);
@@ -284,6 +284,8 @@ textarea {
   flex: 1 1 auto;
   gap: 4px;
   min-height: 0;
+  padding-left: 8px;
+  padding-right: 8px;
   overflow: hidden;
 }
 
@@ -362,6 +364,10 @@ textarea {
   flex-direction: column;
   flex: 0 1 auto;
   gap: 4px;
+  margin-left: -8px;
+  margin-right: -8px;
+  padding-left: 8px;
+  padding-right: 8px;
   min-height: 0;
   overflow: hidden;
 }
@@ -505,6 +511,8 @@ textarea {
   flex-shrink: 0;
   gap: 10px;
   padding-top: 16px;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .theme-toggle {

@@ -38,6 +38,7 @@ describe("qr share and scan", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     renderApp();
+    await user.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
 
     expect(screen.getByRole("button", { name: "Scan QR" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));

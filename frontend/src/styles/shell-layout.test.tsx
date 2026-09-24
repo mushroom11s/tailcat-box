@@ -69,6 +69,7 @@ describe("shell scroll", () => {
       expect(marginTop).toBe(12);
       expect(rooms.contains(chat)).toBe(false);
 
+      await user.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
       await user.click(screen.getByRole("button", { name: "Create temporary room" }));
       const room = document.querySelector(".nav-btn.nav-child:not(.nav-new)") as HTMLElement;
       const fresh = screen.getByRole("button", { name: "+ New room" });
@@ -120,6 +121,7 @@ describe("shell scroll", () => {
         </LocaleProvider>,
       );
 
+      await user.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
       await user.click(screen.getByRole("button", { name: "Create temporary room" }));
       const list = document.querySelector(".nav-room-list") as HTMLElement;
       const rooms = document.querySelector(".nav-rooms") as HTMLElement;
@@ -198,6 +200,12 @@ describe("shell scroll", () => {
         </LocaleProvider>,
       );
 
+      const miao = screen.getByRole("button", { name: "喵传" });
+      expect(miao.classList.contains("active")).toBe(true);
+      expect(document.querySelector(".miao-page")).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "喵传" })).toBeTruthy();
+      expect(document.querySelector(".chat-lobby")).toBeNull();
+
       for (const name of ["喵传", "聊天", "穿透", "设置"]) {
         const button = screen.getByRole("button", { name });
         const glyph = button.querySelector(".nav-glyph") as HTMLElement;
@@ -225,6 +233,51 @@ describe("shell scroll", () => {
       expect(getComputedStyle(fresh).justifyContent).not.toBe("center");
       expect(getComputedStyle(fresh).textAlign).toBe("left");
       expect(getComputedStyle(fresh).position).not.toBe("relative");
+    } finally {
+      style.remove();
+    }
+  });
+
+  it("widens the sidebar and insets the active pill inside the clip", () => {
+    expect(cssBlock(css, ":root")).toContain("--sidebar-w: 260px");
+    expect(cssBlock(css, ".shell")).toContain("grid-template-columns: var(--sidebar-w) minmax(0, 1fr)");
+    const navRule = cssBlock(css, ".nav");
+    expect(navRule).toContain("padding-left: 8px");
+    expect(navRule).toContain("padding-right: 8px");
+    expect(navRule).toContain("overflow: hidden");
+    const chatRule = cssBlock(css, ".nav-chat");
+    expect(chatRule).toContain("padding-left: 8px");
+    expect(chatRule).toContain("padding-right: 8px");
+    expect(chatRule).toContain("margin-left: -8px");
+    expect(chatRule).toContain("margin-right: -8px");
+    expect(chatRule).toContain("overflow: hidden");
+    const footerRule = cssBlock(css, ".sidebar-footer");
+    expect(footerRule).toContain("padding-left: 8px");
+    expect(footerRule).toContain("padding-right: 8px");
+    expect(cssBlock(css, ".sidebar")).toContain("overflow: hidden");
+
+    const style = document.createElement("style");
+    style.textContent = [navRule, chatRule, footerRule, cssBlock(css, ".sidebar")].join("\n");
+    document.head.appendChild(style);
+    try {
+      localStorage.setItem("tailcat-locale", "zh-CN");
+      render(
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>,
+      );
+      const nav = document.querySelector(".nav") as HTMLElement;
+      const chat = document.querySelector(".nav-chat") as HTMLElement;
+      const footer = document.querySelector(".sidebar-footer") as HTMLElement;
+      expect(getComputedStyle(nav).paddingLeft).toBe("8px");
+      expect(getComputedStyle(nav).paddingRight).toBe("8px");
+      expect(getComputedStyle(chat).paddingLeft).toBe("8px");
+      expect(getComputedStyle(chat).paddingRight).toBe("8px");
+      expect(getComputedStyle(chat).marginLeft).toBe("-8px");
+      expect(getComputedStyle(chat).marginRight).toBe("-8px");
+      expect(getComputedStyle(footer).paddingLeft).toBe("8px");
+      expect(getComputedStyle(footer).paddingRight).toBe("8px");
+      expect(screen.getByRole("button", { name: "喵传" }).classList.contains("active")).toBe(true);
     } finally {
       style.remove();
     }

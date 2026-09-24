@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import App from "./App";
@@ -18,12 +18,18 @@ afterEach(() => {
   localStorage.removeItem(SELF_NICKNAME_KEY);
 });
 
-function renderApp() {
+function renderShell() {
   return render(
     <LocaleProvider>
       <App />
     </LocaleProvider>,
   );
+}
+
+async function renderApp() {
+  const view = renderShell();
+  fireEvent.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
+  return view;
 }
 
 function abbrev(address: string): string {
@@ -55,10 +61,12 @@ async function openRoomDetails(user: { click: (el: Element) => Promise<void> }) 
 }
 
 describe("phase A multi-room lobby", () => {
-  it("cold launch shows the lobby and starts no chat listener", async () => {
-    renderApp();
-    expect(screen.getByRole("heading", { name: "New room" })).toBeTruthy();
-    expect(screen.getByText("Leave the peer empty to open a room and share your address later.")).toBeTruthy();
+  it("cold launch opens Mew Share and starts no chat listener", async () => {
+    renderShell();
+    expect(screen.getByRole("heading", { name: "Mew Share" })).toBeTruthy();
+    expect(document.querySelector(".miao-page")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mew Share" }).classList.contains("active")).toBe(true);
+    expect(document.querySelector(".chat-lobby")).toBeNull();
     expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
     await waitFor(async () => {
       const sessions = await listSessions();
@@ -68,7 +76,7 @@ describe("phase A multi-room lobby", () => {
 
   it("creates an ephemeral room without connecting, and keeps typed peer text unsent", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.type(screen.getByLabelText("Peer address (optional)"), "tc:fake-echo");
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await openRoomDetails(user);
@@ -85,7 +93,7 @@ describe("phase A multi-room lobby", () => {
 
   it("connects from the lobby into a new ephemeral room and rejects a bad address", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.type(screen.getByLabelText("Peer address (optional)"), "nope");
     await user.click(screen.getByRole("button", { name: "Connect" }));
     expect(screen.getByText("Paste a Tailcat address that starts with tc.")).toBeTruthy();
@@ -102,7 +110,7 @@ describe("phase A multi-room lobby", () => {
 
   it("routes an event to the other room and returns to the last room from Chat", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     const firstAddress = await waitRoomAddress();
     await user.click(screen.getByRole("button", { name: "+ New room" }));
@@ -140,7 +148,7 @@ describe("phase A multi-room lobby", () => {
   it("labels rooms with the address abbreviation and outgoing bubbles with the self nickname", async () => {
     localStorage.setItem(SELF_NICKNAME_KEY, "Alice");
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     const address = await waitRoomAddress();
     expect(screen.getByRole("button", { name: abbrev(address) })).toBeTruthy();
@@ -160,7 +168,7 @@ describe("phase A multi-room lobby", () => {
 
   it("refuses the 9th room and lists every chat session", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     for (let i = 0; i < 8; i += 1) {
       if (i > 0) {
         await user.click(screen.getByRole("button", { name: "+ New room" }));
@@ -182,7 +190,7 @@ describe("phase A multi-room lobby", () => {
 
   it("uses the Chinese lobby strings", async () => {
     localStorage.setItem("tailcat-locale", "zh-CN");
-    renderApp();
+    await renderApp();
     expect(screen.getByRole("heading", { name: "新房间" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "+ 新房间" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "新建临时房间" })).toBeTruthy();
@@ -195,7 +203,7 @@ describe("phase A multi-room lobby", () => {
 
   it("creates a permanent room from a saved key and leaves the peer unsent", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Restart room" }));
     expect(screen.getByText("Choose a saved key.")).toBeTruthy();
     expect((await listSessions()).filter((item) => item.Kind === "chat")).toHaveLength(0);
@@ -220,7 +228,7 @@ describe("phase A multi-room lobby", () => {
 
   it("closes an empty room immediately and confirms before discarding messages", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     const first = await waitRoomAddress();
     await user.click(screen.getByRole("button", { name: "+ New room" }));

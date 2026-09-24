@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -40,12 +40,14 @@ const started: Session = {
   Dangerous: false,
 };
 
-function renderApp() {
-  return render(
+async function renderApp() {
+  const view = render(
     <LocaleProvider>
       <App />
     </LocaleProvider>,
   );
+  fireEvent.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
+  return view;
 }
 
 function button(name: string): HTMLButtonElement {
@@ -90,7 +92,7 @@ describe("lobby room start loading", () => {
     const pending = deferred<Session>();
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
 
     await user.click(button("Create temporary room"));
 
@@ -116,7 +118,7 @@ describe("lobby room start loading", () => {
     const pending = deferred<Session>();
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.type(screen.getByLabelText("New key name"), "home-busy");
     await user.click(button("Save key"));
     expect(await screen.findByRole("option", { name: "home-busy" })).toBeTruthy();
@@ -144,7 +146,7 @@ describe("lobby room start loading", () => {
     const pending = deferred<Session>();
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.type(screen.getByLabelText("Peer address (optional)"), "tc:fake-echo");
     await user.click(button("Connect"));
 
@@ -169,7 +171,7 @@ describe("lobby room start loading", () => {
     const pending = deferred<Session>();
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(button("Create temporary room"));
     expect(button("Creating…").disabled).toBe(true);
     expect(button("Creating…").querySelector("img")?.getAttribute("src")).toContain("loading-cat");
@@ -191,7 +193,7 @@ describe("lobby room start loading", () => {
   it("does not enter a loading state for validation errors", async () => {
     vi.mocked(startChatRoom).mockReturnValue(deferred<Session>().promise);
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
 
     await user.click(button("Restart room"));
     const keyAlert = screen.getByText("Choose a saved key.");
@@ -217,7 +219,7 @@ describe("lobby room start loading", () => {
     vi.mocked(startChatRoom).mockReturnValue(pending.promise);
     localStorage.setItem("tailcat-locale", "zh-CN");
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
 
     await user.click(button("新建临时房间"));
     expect(button("正在创建…").disabled).toBe(true);

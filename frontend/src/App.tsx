@@ -85,7 +85,7 @@ function AppShell() {
   const { push } = useToasts();
   const pushRef = useRef(push);
   pushRef.current = push;
-  const [page, setPageState] = useState<Page>("chat");
+  const [page, setPageState] = useState<Page>("miao");
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const [nickname, setNickname] = useState(() => readNickname());
   const [remarks, setRemarks] = useState<RemarkMap>(() => readRemarks());
