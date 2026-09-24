@@ -552,7 +552,9 @@ textarea {
 .main,
 .log,
 .result,
-.chat-log {
+.chat-log,
+.miao-send,
+.miao-join {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
 }
@@ -560,7 +562,9 @@ textarea {
 .main::-webkit-scrollbar,
 .log::-webkit-scrollbar,
 .result::-webkit-scrollbar,
-.chat-log::-webkit-scrollbar {
+.chat-log::-webkit-scrollbar,
+.miao-send::-webkit-scrollbar,
+.miao-join::-webkit-scrollbar {
   width: var(--scrollbar-size);
   height: var(--scrollbar-size);
 }
@@ -568,14 +572,18 @@ textarea {
 .main::-webkit-scrollbar-track,
 .log::-webkit-scrollbar-track,
 .result::-webkit-scrollbar-track,
-.chat-log::-webkit-scrollbar-track {
+.chat-log::-webkit-scrollbar-track,
+.miao-send::-webkit-scrollbar-track,
+.miao-join::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .main::-webkit-scrollbar-thumb,
 .log::-webkit-scrollbar-thumb,
 .result::-webkit-scrollbar-thumb,
-.chat-log::-webkit-scrollbar-thumb {
+.chat-log::-webkit-scrollbar-thumb,
+.miao-send::-webkit-scrollbar-thumb,
+.miao-join::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
   border: 2px solid transparent;
@@ -585,7 +593,9 @@ textarea {
 .main::-webkit-scrollbar-thumb:hover,
 .log::-webkit-scrollbar-thumb:hover,
 .result::-webkit-scrollbar-thumb:hover,
-.chat-log::-webkit-scrollbar-thumb:hover {
+.chat-log::-webkit-scrollbar-thumb:hover,
+.miao-send::-webkit-scrollbar-thumb:hover,
+.miao-join::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
   background-clip: content-box;
 }
@@ -2657,26 +2667,29 @@ textarea {
   gap: 12px;
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .miao-share-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  flex: 1 1 auto;
-  max-height: 46%;
-  min-height: 0;
-  overflow: auto;
+  flex: 0 0 auto;
 }
 
 .miao-share-list > h3 {
   margin: 0;
+  flex-shrink: 0;
 }
 
 .miao-limits {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .miao-limits .field {
@@ -2685,7 +2698,7 @@ textarea {
 }
 
 .miao-drop {
-  flex: 1;
+  flex: 1 0 auto;
   min-height: 160px;
   display: flex;
   align-items: center;
@@ -2697,6 +2710,12 @@ textarea {
   color: var(--text);
   cursor: pointer;
   text-align: center;
+}
+
+.miao-send:has(.miao-share-list) .miao-drop {
+  flex: 0 0 auto;
+  min-height: 92px;
+  padding: 16px 20px;
 }
 
 .miao-drop strong,
@@ -2718,17 +2737,38 @@ textarea {
   cursor: progress;
 }
 
-.miao-active,
+.miao-active {
+  padding: 16px 18px;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.miao-active h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.miao-active .field {
+  margin-bottom: 10px;
+}
+
+.miao-active .row {
+  margin-bottom: 0;
+}
+
 .miao-join {
   padding: 18px;
+  flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .miao-active-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 188px;
+  gap: 16px;
   align-items: start;
 }
 
@@ -2736,14 +2776,15 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 172px;
   padding: 8px;
   border-radius: var(--radius-sm);
   background: white;
 }
 
 .miao-qr img {
-  width: 220px;
-  height: 220px;
+  width: 172px;
+  height: 172px;
 }
 
 .miao-files {
@@ -2772,6 +2813,10 @@ textarea {
   resize: vertical;
   font-family: var(--mono);
   font-size: 12px;
+}
+
+.miao-active .field textarea {
+  min-height: 72px;
 }
 
 @media (max-width: 720px) {

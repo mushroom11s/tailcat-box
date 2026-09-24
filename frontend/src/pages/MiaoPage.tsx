@@ -142,7 +142,7 @@ function ShareCard({
         </div>
         <div className="miao-qr">
           {qrFailed ? <p className="err">{t("qrEncodeFailed")}</p> : null}
-          {qrSrc ? <img src={qrSrc} alt={t("miaoToken")} width={220} height={220} /> : <LoadingCat label={t("miaoPacking")} />}
+          {qrSrc ? <img src={qrSrc} alt={t("miaoToken")} width={172} height={172} /> : <LoadingCat label={t("miaoPacking")} />}
         </div>
       </div>
     </article>

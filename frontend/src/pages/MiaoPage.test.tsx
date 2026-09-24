@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { LocaleProvider } from "../i18n";
 import { resetBrowserMiao } from "../lib/miaoBrowser";
 import { MAX_SHARE_BYTES } from "../lib/miao";
+import css from "../styles/glass.css?inline";
 import MiaoPage from "./MiaoPage";
 
 afterEach(() => {
@@ -92,4 +93,80 @@ describe("Mew Share page", () => {
     expect(screen.getByRole("button", { name: "End share" })).toBeTruthy();
     expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
   });
+
+  it("scrolls the send column so active cards stay whole", async () => {
+    const listRule = cssBlock(css, ".miao-share-list");
+    expect(listRule).not.toMatch(/max-height\s*:/);
+    expect(listRule).not.toMatch(/overflow\s*:/);
+    expect(listRule).toContain("flex: 0 0 auto");
+
+    const sendRule = cssBlock(css, ".miao-send");
+    expect(sendRule).toContain("min-height: 0");
+    expect(sendRule).toContain("overflow-y: auto");
+    expect(sendRule).toContain("overflow-x: hidden");
+
+    const cardRule = cssBlock(css, ".miao-active");
+    expect(cardRule).toContain("overflow: visible");
+    expect(cardRule).not.toContain("min-height: 0");
+
+    const qrRule = cssBlock(css, ".miao-qr img");
+    const qrWidth = Number(qrRule.match(/width:\s*(\d+)px/)?.[1]);
+    expect(qrWidth).toBeGreaterThanOrEqual(160);
+    expect(qrWidth).toBeLessThanOrEqual(180);
+
+    const dropRule = cssBlock(css, ".miao-drop");
+    const shrunkRule = cssBlock(css, ".miao-send:has(.miao-share-list) .miao-drop");
+    const dropMin = Number(dropRule.match(/min-height:\s*(\d+)px/)?.[1]);
+    const shrunkMin = Number(shrunkRule.match(/min-height:\s*(\d+)px/)?.[1]);
+    expect(shrunkMin).toBeGreaterThan(0);
+    expect(shrunkMin).toBeLessThan(dropMin);
+
+    const style = document.createElement("style");
+    style.textContent = [sendRule, listRule, cardRule, dropRule, shrunkRule, qrRule].join("\n");
+    document.head.appendChild(style);
+
+    try {
+      const user = userEvent.setup();
+      renderPage();
+      const input = screen.getByLabelText("Choose files") as HTMLInputElement;
+      await user.upload(input, new File(["a"], "notes.txt", { type: "text/plain" }));
+      await user.upload(input, new File(["b"], "second.txt", { type: "text/plain" }));
+      expect(await screen.findByRole("article", { name: "second.txt" })).toBeTruthy();
+
+      const send = document.querySelector(".miao-send") as HTMLElement;
+      const list = document.querySelector(".miao-share-list") as HTMLElement;
+      const drop = document.querySelector(".miao-drop") as HTMLElement;
+      const cards = [...list.querySelectorAll("article")];
+      expect(cards).toHaveLength(2);
+      expect(send.contains(list)).toBe(true);
+      expect(send.contains(drop)).toBe(true);
+      expect(list.compareDocumentPosition(drop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      const sendStyle = getComputedStyle(send);
+      expect(sendStyle.overflowY).toBe("auto");
+      expect(parseFloat(sendStyle.minHeight)).toBe(0);
+      const listStyle = getComputedStyle(list);
+      expect(listStyle.maxHeight === "none" || listStyle.maxHeight === "").toBe(true);
+      expect(listStyle.overflowY === "visible" || listStyle.overflowY === "").toBe(true);
+      for (const card of cards) {
+        const cardStyle = getComputedStyle(card);
+        expect(cardStyle.overflowY === "visible" || cardStyle.overflowY === "").toBe(true);
+        expect(card.scrollHeight).toBeLessThanOrEqual(card.clientHeight + 1);
+      }
+      const qr = document.querySelector(".miao-qr img") as HTMLImageElement | null;
+      expect(qr?.width).toBe(qrWidth);
+      expect(qr?.height).toBe(qrWidth);
+    } finally {
+      style.remove();
+    }
+  });
 });
+
+function cssBlock(source: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = source.match(new RegExp(`${escaped}\\s*\\{[^}]*\\}`));
+  if (!match) {
+    throw new Error(`missing ${selector}`);
+  }
+  return match[0];
+}
