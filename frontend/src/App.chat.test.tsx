@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import appSource from "./App.tsx?raw";
@@ -14,12 +14,14 @@ afterEach(() => {
   cleanup();
 });
 
-function renderApp() {
-  return render(
+async function renderApp() {
+  const view = render(
     <LocaleProvider>
       <App />
     </LocaleProvider>,
   );
+  fireEvent.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
+  return view;
 }
 
 describe("phase 1 chat shell", () => {
@@ -27,7 +29,7 @@ describe("phase 1 chat shell", () => {
     const user = userEvent.setup();
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    renderApp();
+    await renderApp();
 
     const nav = document.querySelectorAll(".nav-btn");
     expect(Array.from(nav).map((node) => node.textContent)).toEqual(["Mew Share", "Chat", "+ New room", "Tunnel", "Settings"]);
@@ -76,7 +78,7 @@ describe("phase 1 chat shell", () => {
 
   it("keeps the draft when send fails and inserts a newline on Shift+Enter", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.click(screen.getByRole("button", { name: "Show room details" }));
@@ -108,7 +110,7 @@ describe("phase 1 chat shell", () => {
 
   it("uses 聊天 and 设置 in zh-CN", async () => {
     localStorage.setItem("tailcat-locale", "zh-CN");
-    renderApp();
+    await renderApp();
     const nav = document.querySelectorAll(".nav-btn");
     expect(Array.from(nav).map((node) => node.textContent)).toEqual(["喵传", "聊天", "+ 新房间", "穿透", "设置"]);
     expect(document.querySelector(".sidebar-footer .nav-btn")?.textContent).toBe("设置");
@@ -131,7 +133,7 @@ describe("phase 1 chat shell", () => {
 
   it("reaches Keys & DERP and Diagnostics inside Settings", async () => {
     const user = userEvent.setup();
-    renderApp();
+    await renderApp();
     await user.click(screen.getByRole("button", { name: "Create temporary room" }));
     await screen.findByRole("button", { name: "Copy" });
     await user.click(screen.getByRole("button", { name: "Show room details" }));

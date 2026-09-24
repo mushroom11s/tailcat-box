@@ -69,6 +69,7 @@ describe("shell scroll", () => {
       expect(marginTop).toBe(12);
       expect(rooms.contains(chat)).toBe(false);
 
+      await user.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
       await user.click(screen.getByRole("button", { name: "Create temporary room" }));
       const room = document.querySelector(".nav-btn.nav-child:not(.nav-new)") as HTMLElement;
       const fresh = screen.getByRole("button", { name: "+ New room" });
@@ -120,6 +121,7 @@ describe("shell scroll", () => {
         </LocaleProvider>,
       );
 
+      await user.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
       await user.click(screen.getByRole("button", { name: "Create temporary room" }));
       const list = document.querySelector(".nav-room-list") as HTMLElement;
       const rooms = document.querySelector(".nav-rooms") as HTMLElement;
@@ -197,6 +199,12 @@ describe("shell scroll", () => {
           <App />
         </LocaleProvider>,
       );
+
+      const miao = screen.getByRole("button", { name: "喵传" });
+      expect(miao.classList.contains("active")).toBe(true);
+      expect(document.querySelector(".miao-page")).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "喵传" })).toBeTruthy();
+      expect(document.querySelector(".chat-lobby")).toBeNull();
 
       for (const name of ["喵传", "聊天", "穿透", "设置"]) {
         const button = screen.getByRole("button", { name });
