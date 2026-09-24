@@ -34,6 +34,10 @@ export function DiscardChatMessage(arg1, arg2) {
   return window['go']['main']['App']['DiscardChatMessage'](arg1, arg2);
 }
 
+export function DiscardMiaoReceive(arg1) {
+  return window['go']['main']['App']['DiscardMiaoReceive'](arg1);
+}
+
 export function DownloadUpdate() {
   return window['go']['main']['App']['DownloadUpdate']();
 }
@@ -68,6 +72,10 @@ export function JoinMiaoShare(arg1, arg2) {
 
 export function ListKeys() {
   return window['go']['main']['App']['ListKeys']();
+}
+
+export function ListMiaoReceives() {
+  return window['go']['main']['App']['ListMiaoReceives']();
 }
 
 export function ListRemote(arg1, arg2) {

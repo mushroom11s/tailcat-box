@@ -40,7 +40,7 @@ export type MiaoReceipt = {
   files: MiaoSavedFile[];
 };
 
-export type ReceiveStatus = "connecting" | "queued" | "downloading" | "done" | "failed" | "cancelled";
+export type ReceiveStatus = "connecting" | "queued" | "downloading" | "done" | "failed" | "cancelled" | "interrupted";
 
 export type ReceiveJob = {
   id: string;
@@ -51,6 +51,8 @@ export type ReceiveJob = {
   saved?: MiaoSavedFile[];
   error?: string;
   dest: string;
+  payload?: string;
+  resumable?: boolean;
 };
 
 const RECEIVE_RANK: Record<ReceiveStatus, number> = {
@@ -60,10 +62,15 @@ const RECEIVE_RANK: Record<ReceiveStatus, number> = {
   done: 3,
   failed: 3,
   cancelled: 3,
+  interrupted: 3,
 };
 
 export function isReceiveStatus(value: unknown): value is ReceiveStatus {
-  return value === "connecting" || value === "queued" || value === "downloading" || value === "done" || value === "failed" || value === "cancelled";
+  return value === "connecting" || value === "queued" || value === "downloading" || value === "done" || value === "failed" || value === "cancelled" || value === "interrupted";
+}
+
+function receiveCanRestart(status: ReceiveStatus): boolean {
+  return status === "interrupted" || status === "failed" || status === "cancelled";
 }
 
 export function receiveTerminal(status: ReceiveStatus): boolean {
@@ -99,6 +106,8 @@ export function parseReceiveJob(raw: string): ReceiveJob | null {
       saved: Array.isArray(value.saved) ? value.saved : undefined,
       error: typeof value.error === "string" ? value.error : "",
       dest: typeof value.dest === "string" ? value.dest : "",
+      payload: typeof value.payload === "string" ? value.payload : "",
+      resumable: value.resumable === true,
     };
   } catch {
     return null;
@@ -111,10 +120,12 @@ export function upsertReceiveJob(list: ReceiveJob[], job: ReceiveJob): ReceiveJo
     return [job, ...list];
   }
   const prev = list[index];
-  if (RECEIVE_RANK[job.status] < RECEIVE_RANK[prev.status]) {
+  const restarting = receiveCanRestart(prev.status) && !receiveCanRestart(job.status) && job.status !== "done";
+  const finishing = receiveCanRestart(prev.status) && job.status === "done";
+  if (!restarting && !finishing && RECEIVE_RANK[job.status] < RECEIVE_RANK[prev.status]) {
     return list;
   }
-  if (receiveTerminal(prev.status) && job.status !== prev.status) {
+  if (!restarting && !finishing && receiveTerminal(prev.status) && job.status !== prev.status) {
     return list;
   }
   const bytesDone = job.status === prev.status ? Math.max(prev.bytesDone, job.bytesDone) : job.bytesDone;
@@ -127,6 +138,8 @@ export function upsertReceiveJob(list: ReceiveJob[], job: ReceiveJob): ReceiveJo
     files: job.files.length ? job.files : prev.files,
     saved: job.saved?.length ? job.saved : prev.saved,
     dest: job.dest || prev.dest,
+    payload: job.payload || prev.payload,
+    resumable: job.resumable ?? prev.resumable,
     error: job.status === "done" || job.status === "cancelled" ? "" : job.error || prev.error,
   };
   return next;
@@ -165,7 +178,7 @@ export type JoinPayload = {
   token: string;
 };
 
-const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode" | "miaoUnreachable" | "miaoEndedRemote" | "miaoBusyPeer" | "miaoCustomDaysInvalid" | "miaoCustomCountInvalid" | "miaoFolder" | "miaoPickFolder" | "miaoUnknownReceive" | "miaoReceiveStarted"> = {
+const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode" | "miaoUnreachable" | "miaoEndedRemote" | "miaoBusyPeer" | "miaoCustomDaysInvalid" | "miaoCustomCountInvalid" | "miaoFolder" | "miaoPickFolder" | "miaoUnknownReceive" | "miaoReceiveStarted" | "miaoPartialMismatch"> = {
   "This share is larger than 300 MiB.": "miaoTooBig",
   "Choose at least one file.": "miaoNeedFile",
   "Choose files, not folders.": "miaoFolder",
@@ -178,6 +191,7 @@ const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode"
   "Choose a folder to save into.": "miaoPickFolder",
   "Unknown download.": "miaoUnknownReceive",
   "That download has already started.": "miaoReceiveStarted",
+  "The partial file did not match. The download will start over.": "miaoPartialMismatch",
 };
 
 export type MiaoErrorKey = (typeof KNOWN_ERRORS)[string];

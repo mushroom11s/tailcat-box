@@ -689,6 +689,22 @@ func (a *App) CancelMiaoReceive(id string) error {
 	return a.miao.CancelReceive(id)
 }
 
+// ListMiaoReceives returns in-progress downloads and partials kept after a quit.
+func (a *App) ListMiaoReceives() ([]miao.ReceiveJob, error) {
+	if a.miao == nil {
+		return []miao.ReceiveJob{}, nil
+	}
+	return a.miao.ListReceives(), nil
+}
+
+// DiscardMiaoReceive deletes a failed or interrupted download and its partial files.
+func (a *App) DiscardMiaoReceive(id string) error {
+	if a.miao == nil {
+		return miao.ErrUnknownReceive
+	}
+	return a.miao.DiscardReceive(id)
+}
+
 // SetMiaoReceiveDest changes the save folder before files start writing.
 func (a *App) SetMiaoReceiveDest(id string, destDir string) error {
 	if a.miao == nil {

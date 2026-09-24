@@ -23,7 +23,7 @@ import {
   type ReceiveStatus,
   type Remaining,
 } from "../lib/miao";
-import { cancelMiaoReceive, endMiaoShare, hasWailsBindings, miaoShareStatus, onTailcatEvent, selectDirectory, selectFiles, setMiaoReceiveDest, startMiaoReceive, startMiaoShare } from "../lib/wails";
+import { cancelMiaoReceive, discardMiaoReceive, endMiaoShare, hasWailsBindings, listMiaoReceives, miaoShareStatus, onTailcatEvent, selectDirectory, selectFiles, setMiaoReceiveDest, startMiaoReceive, startMiaoShare } from "../lib/wails";
 
 type TTLMode = "1" | "7" | "15" | "custom" | "forever";
 type CountMode = "1" | "3" | "10" | "unlimited" | "custom";
@@ -74,6 +74,8 @@ function receiveStatusLabel(status: ReceiveStatus, t: (key: MessageKey) => strin
       return t("miaoStatusFailed");
     case "cancelled":
       return t("miaoStatusCancelled");
+    case "interrupted":
+      return t("miaoStatusInterrupted");
   }
 }
 
@@ -186,10 +188,14 @@ function ReceiveCard({
   job,
   onCancel,
   onChangeFolder,
+  onResume,
+  onDiscard,
 }: {
   job: ReceiveJob;
   onCancel: (id: string) => void;
   onChangeFolder: (job: ReceiveJob) => void;
+  onResume: (job: ReceiveJob) => void;
+  onDiscard: (id: string) => void;
 }) {
   const { t } = useI18n();
   const names = job.files.map((file) => file.name).join(", ");
@@ -198,6 +204,7 @@ function ReceiveCard({
   const pct = receivePercent(job);
   const active = !receiveTerminal(job.status);
   const canChangeFolder = hasWailsBindings() && (job.status === "connecting" || job.status === "queued");
+  const canResume = job.status === "interrupted" || job.status === "failed";
   const error = receiveErrorText(job, t);
   return (
     <article className="glass miao-active miao-receive-card" aria-label={label}>
@@ -244,6 +251,16 @@ function ReceiveCard({
           </button>
         </div>
       ) : null}
+      {canResume ? (
+        <div className="row">
+          <button className="btn" type="button" onClick={() => onResume(job)}>
+            {t("miaoResume")}
+          </button>
+          <button className="btn btn-ghost" type="button" onClick={() => onDiscard(job.id)}>
+            {t("miaoDiscard")}
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -271,6 +288,14 @@ export default function MiaoPage() {
 
   useEffect(() => {
     let live = true;
+    void listMiaoReceives()
+      .then((listed) => {
+        if (!live) {
+          return;
+        }
+        setJobs((current) => listed.reduce((list, job) => upsertReceiveJob(list, job), current));
+      })
+      .catch(() => undefined);
     void miaoShareStatus()
       .then((list) => {
         if (!live) {
@@ -521,6 +546,31 @@ export default function MiaoPage() {
     }
   }
 
+  async function resumeJob(job: ReceiveJob): Promise<void> {
+    const raw = (job.payload || "").trim();
+    if (!raw) {
+      setError(t("miaoBadCode"));
+      return;
+    }
+    setError("");
+    try {
+      const next = await startMiaoReceive(raw, job.dest);
+      setJobs((list) => upsertReceiveJob(list, next));
+    } catch (err) {
+      showError(err, "miaoUnreachable");
+    }
+  }
+
+  async function discardJob(id: string): Promise<void> {
+    setError("");
+    try {
+      await discardMiaoReceive(id);
+      setJobs((list) => list.filter((item) => item.id !== id));
+    } catch (err) {
+      showError(err, "miaoUnknownReceive");
+    }
+  }
+
   async function join(): Promise<void> {
     const raw = code.trim();
     if (!acceptMiaoCode(raw).ok) {
@@ -713,6 +763,8 @@ export default function MiaoPage() {
                     job={job}
                     onCancel={(id) => void cancelJob(id)}
                     onChangeFolder={(item) => void changeJobFolder(item)}
+                    onResume={(item) => void resumeJob(item)}
+                    onDiscard={(id) => void discardJob(id)}
                   />
                 ))}
               </div>

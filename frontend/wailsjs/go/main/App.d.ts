@@ -21,6 +21,8 @@ export function DialPipe(arg1:string,arg2:string):Promise<session.Session>;
 
 export function DiscardChatMessage(arg1:string,arg2:string):Promise<void>;
 
+export function DiscardMiaoReceive(arg1:string):Promise<void>;
+
 export function DownloadUpdate():Promise<main.UpdateStatus>;
 
 export function GetClientInfo():Promise<main.ClientInfo>;
@@ -38,6 +40,8 @@ export function EndMiaoShare(arg1:string):Promise<void>;
 export function JoinMiaoShare(arg1:string,arg2:string):Promise<Record<string, unknown>>;
 
 export function ListKeys():Promise<Array<store.KeyInfo>>;
+
+export function ListMiaoReceives():Promise<Array<Record<string, unknown>>>;
 
 export function ListRemote(arg1:string,arg2:string):Promise<Array<adapter.FileEntry>>;
 

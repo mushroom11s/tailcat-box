@@ -39,6 +39,50 @@ let holdReceives = false;
 let receiveGeneration = 0;
 let seq = 0;
 
+type SavedPartial = {
+  id: string;
+  payload: string;
+  dest: string;
+  addr: string;
+  token: string;
+  bytesDone: number;
+  bytesTotal: number;
+  files: { name: string; size: number }[];
+};
+
+const partials = new Map<string, SavedPartial>();
+const runTokens = new Map<string, number>();
+
+function partialKey(addr: string, token: string, dest: string): string {
+  return `${addr}\n${token}\n${dest}`;
+}
+
+function rememberPartial(job: ReceiveJob, addr: string, token: string): void {
+  if (job.bytesDone <= 0) {
+    return;
+  }
+  partials.set(partialKey(addr, token, job.dest), {
+    id: job.id,
+    payload: job.payload || "",
+    dest: job.dest,
+    addr,
+    token,
+    bytesDone: job.bytesDone,
+    bytesTotal: job.bytesTotal,
+    files: job.files.map((file) => ({ name: file.name, size: file.size })),
+  });
+}
+
+function forgetPartial(addr: string, token: string, dest: string): void {
+  partials.delete(partialKey(addr, token, dest));
+}
+
+function nextRun(jobID: string): number {
+  const token = (runTokens.get(jobID) ?? 0) + 1;
+  runTokens.set(jobID, token);
+  return token;
+}
+
 function id(): string {
   seq += 1;
   const bytes = new Uint8Array(8);
@@ -125,6 +169,10 @@ export function setBrowserReceiveHold(hold: boolean): void {
   }
 }
 
+export function browserReceiveHeld(): number {
+  return heldReceives.length;
+}
+
 export function releaseBrowserReceiveHolds(): void {
   const pending = heldReceives.splice(0, heldReceives.length);
   for (const resume of pending) {
@@ -143,6 +191,8 @@ export function resetBrowserMiao(): void {
   order.splice(0, order.length);
   receiveJobs.clear();
   receiveLanes.clear();
+  partials.clear();
+  runTokens.clear();
 }
 
 export async function browserStartMiao(files: MiaoFileInput[], ttlDays: number, forever: boolean, maxDownloads: number): Promise<MiaoShare> {
@@ -235,6 +285,14 @@ function emitReceive(job: ReceiveJob): void {
   emit({ SessionID: job.id, Kind: "miao-receive", Data: JSON.stringify(job) });
 }
 
+function sameShare(job: ReceiveJob, addr: string, token: string, dest: string): boolean {
+  if (job.dest !== dest || !job.payload) {
+    return false;
+  }
+  const parsed = parseJoin(job.payload);
+  return parsed?.addr === addr && parsed.token === token;
+}
+
 export function browserStartReceive(raw: string, dest: string): ReceiveJob {
   const payload = parseJoin(raw);
   if (!payload) {
@@ -247,21 +305,37 @@ export function browserStartReceive(raw: string, dest: string): ReceiveJob {
   if (current.maxDownloads > 0 && current.downloads >= current.maxDownloads) {
     throw new Error("The share has ended.");
   }
+  const folder = dest.trim();
+  const active = [...receiveJobs.values()].find(
+    (job) => sameShare(job, payload.addr, payload.token, folder) && (job.status === "connecting" || job.status === "queued" || job.status === "downloading"),
+  );
+  if (active) {
+    return active;
+  }
+  const saved = partials.get(partialKey(payload.addr, payload.token, folder));
+  const previous = [...receiveJobs.values()].find(
+    (job) => sameShare(job, payload.addr, payload.token, folder) && (job.status === "interrupted" || job.status === "failed" || job.status === "cancelled"),
+  );
+  const jobID = saved?.id ?? previous?.id ?? id();
+  const bytesDone = saved?.bytesDone ?? (previous?.status === "cancelled" ? 0 : previous?.bytesDone ?? 0);
   const key = `${payload.addr}\n${payload.token}`;
   const queued = receiveLanes.has(key);
   const job: ReceiveJob = {
-    id: id(),
+    id: jobID,
     status: queued ? "queued" : "connecting",
-    bytesDone: 0,
-    bytesTotal: 0,
-    files: [],
-    dest,
+    bytesDone,
+    bytesTotal: saved?.bytesTotal ?? previous?.bytesTotal ?? 0,
+    files: saved?.files ?? previous?.files ?? [],
+    dest: folder,
+    payload: raw.trim(),
+    resumable: bytesDone > 0,
     error: "",
   };
   emitReceive(job);
   const generation = receiveGeneration;
+  const runToken = nextRun(job.id);
   const prev = receiveLanes.get(key) ?? Promise.resolve();
-  const run = prev.catch(() => undefined).then(() => simulateReceive(generation, job.id, payload.addr, payload.token));
+  const run = prev.catch(() => undefined).then(() => simulateReceive(generation, runToken, job.id, payload.addr, payload.token));
   receiveLanes.set(key, run);
   void run.finally(() => {
     if (receiveLanes.get(key) === run) {
@@ -271,45 +345,52 @@ export function browserStartReceive(raw: string, dest: string): ReceiveJob {
   return job;
 }
 
-async function simulateReceive(generation: number, jobID: string, addr: string, token: string): Promise<void> {
-  const live = () => generation === receiveGeneration && receiveJobs.get(jobID);
+async function simulateReceive(generation: number, runToken: number, jobID: string, addr: string, token: string): Promise<void> {
+  const live = () => (generation === receiveGeneration && runTokens.get(jobID) === runToken ? receiveJobs.get(jobID) : undefined);
   const current = live();
-  if (!current || current.status === "cancelled") {
+  if (!current || current.status === "cancelled" || current.status === "interrupted") {
     return;
   }
   const share = findByPayload(addr, token);
   if (!share || share.status !== "active") {
     const failed = live();
-    if (failed && failed.status !== "cancelled") {
+    if (failed && failed.bytesDone > 0) {
+      rememberPartial(failed, addr, token);
+      emitReceive({ ...failed, status: "interrupted", resumable: true, error: "The share has ended." });
+    } else if (failed && failed.status !== "cancelled") {
       emitReceive({ ...failed, status: "failed", error: "The share has ended." });
     }
     return;
   }
   const files = share.files.map((file) => ({ name: file.name, size: file.size }));
   const total = share.total;
+  const base = Math.min(current.bytesDone, total);
   const pauses = receivePauses();
   for (let step = 1; step <= pauses.length; step += 1) {
     await pause(pauses[step - 1]);
     const job = live();
-    if (!job || job.status === "cancelled") {
+    if (!job || job.status === "cancelled" || job.status === "interrupted") {
       return;
     }
     const still = findByPayload(addr, token);
     if (!still || still.status !== "active") {
-      emitReceive({ ...job, status: "failed", error: "The share has ended.", files, bytesTotal: total });
+      if (job.bytesDone > 0) {
+        rememberPartial({ ...job, files, bytesTotal: total }, addr, token);
+        emitReceive({ ...job, status: "interrupted", resumable: true, error: "The share has ended.", files, bytesTotal: total });
+      } else {
+        emitReceive({ ...job, status: "failed", error: "The share has ended.", files, bytesTotal: total });
+      }
       return;
     }
-    emitReceive({
-      ...job,
-      status: "downloading",
-      files,
-      bytesTotal: total,
-      bytesDone: Math.round((total * step) / pauses.length),
-    });
+    const span = Math.max(0, total - base);
+    const bytesDone = Math.min(total, base + Math.round((span * step) / pauses.length));
+    const next = { ...job, status: "downloading" as const, files, bytesTotal: total, bytesDone };
+    rememberPartial(next, addr, token);
+    emitReceive(next);
   }
   const job = live();
   const finished = findByPayload(addr, token);
-  if (!job || job.status === "cancelled" || !finished) {
+  if (!job || job.status === "cancelled" || job.status === "interrupted" || !finished) {
     return;
   }
   finished.downloads += 1;
@@ -327,9 +408,10 @@ async function simulateReceive(generation: number, jobID: string, addr: string, 
     publish(finished, "active");
   }
   const done = live();
-  if (!done || done.status === "cancelled") {
+  if (!done || done.status === "cancelled" || done.status === "interrupted") {
     return;
   }
+  forgetPartial(addr, token, done.dest);
   emitReceive({
     ...done,
     status: "done",
@@ -337,6 +419,7 @@ async function simulateReceive(generation: number, jobID: string, addr: string, 
     saved,
     bytesTotal: total,
     bytesDone: total,
+    resumable: false,
     error: "",
   });
 }
@@ -346,10 +429,69 @@ export function browserCancelReceive(jobID: string): void {
   if (!job) {
     throw new Error("Unknown download.");
   }
-  if (job.status === "done" || job.status === "failed" || job.status === "cancelled") {
+  if (job.status === "done" || job.status === "failed" || job.status === "cancelled" || job.status === "interrupted") {
     return;
   }
-  emitReceive({ ...job, status: "cancelled", error: "" });
+  nextRun(jobID);
+  const parsed = job.payload ? parseJoin(job.payload) : null;
+  if (job.bytesDone > 0 && parsed) {
+    rememberPartial(job, parsed.addr, parsed.token);
+    emitReceive({ ...job, status: "interrupted", resumable: true, error: "" });
+    return;
+  }
+  if (parsed) {
+    forgetPartial(parsed.addr, parsed.token, job.dest);
+  }
+  emitReceive({ ...job, status: "cancelled", resumable: false, error: "" });
+}
+
+export function browserDiscardReceive(jobID: string): void {
+  const job = receiveJobs.get(jobID);
+  if (!job) {
+    throw new Error("Unknown download.");
+  }
+  if (job.status === "connecting" || job.status === "queued" || job.status === "downloading") {
+    throw new Error("That download has already started.");
+  }
+  nextRun(jobID);
+  receiveJobs.delete(jobID);
+  const parsed = job.payload ? parseJoin(job.payload) : null;
+  if (parsed) {
+    forgetPartial(parsed.addr, parsed.token, job.dest);
+  }
+  for (const [key, saved] of partials) {
+    if (saved.id === jobID) {
+      partials.delete(key);
+    }
+  }
+}
+
+export function browserListReceives(): ReceiveJob[] {
+  const out: ReceiveJob[] = [];
+  const seen = new Set<string>();
+  for (const job of receiveJobs.values()) {
+    if (job.status === "interrupted" || job.status === "failed") {
+      out.push(job);
+      seen.add(job.id);
+    }
+  }
+  for (const saved of partials.values()) {
+    if (seen.has(saved.id)) {
+      continue;
+    }
+    out.push({
+      id: saved.id,
+      status: saved.bytesDone > 0 ? "interrupted" : "failed",
+      bytesDone: saved.bytesDone,
+      bytesTotal: saved.bytesTotal,
+      files: saved.files,
+      dest: saved.dest,
+      payload: saved.payload,
+      resumable: saved.bytesDone > 0,
+      error: "",
+    });
+  }
+  return out;
 }
 
 export function browserSetReceiveDest(jobID: string, dest: string): void {

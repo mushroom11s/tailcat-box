@@ -282,7 +282,7 @@ func TestReceiveFolderCanChangeBeforeDownload(t *testing.T) {
 	}
 }
 
-func TestCancelReceiveDropsPartialFile(t *testing.T) {
+func TestCancelReceiveKeepsPartialFile(t *testing.T) {
 	root := t.TempDir()
 	svc := New(adapter.NewFake(), root)
 	events := collectReceive(t, svc)
@@ -297,21 +297,31 @@ func TestCancelReceiveDropsPartialFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitReceive(t, events, job.ID, receiveDownloading, func(job ReceiveJob) bool { return job.BytesDone > 0 })
+	partial := waitReceive(t, events, job.ID, receiveDownloading, func(job ReceiveJob) bool { return job.BytesDone > 0 })
 	if err := svc.CancelReceive(job.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.CancelReceive("missing"); !errors.Is(err, ErrUnknownReceive) {
 		t.Fatalf("err=%v", err)
 	}
-	cancelled := waitReceive(t, events, job.ID, receiveCancelled, nil)
-	if cancelled.Error != "" {
-		t.Fatalf("error=%q", cancelled.Error)
+	stopped := waitReceive(t, events, job.ID, receiveInterrupted, nil)
+	if stopped.Error != "" || !stopped.Resumable || stopped.BytesDone != partial.BytesDone {
+		t.Fatalf("stopped=%+v", stopped)
 	}
 	release()
-	entries, err := os.ReadDir(dest)
-	if err != nil || len(entries) != 0 {
-		t.Fatalf("left behind=%v err=%v", entries, err)
+	if _, err := os.Stat(filepath.Join(dest, "partial.bin")); !os.IsNotExist(err) {
+		t.Fatalf("finalized early err=%v", err)
+	}
+	part := findPart(t, dest)
+	info, err := os.Stat(part)
+	if err != nil || info.Size() != partial.BytesDone {
+		t.Fatalf("part=%s size=%v err=%v", part, info, err)
+	}
+	if err := svc.DiscardReceive(job.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, partialRootName)); !os.IsNotExist(err) {
+		t.Fatalf("partial left err=%v", err)
 	}
 	if _, err := svc.StartReceive(context.Background(), "not-a-code", dest, adapter.NetworkOpts{}); !errors.Is(err, ErrBadCode) {
 		t.Fatalf("err=%v", err)
@@ -321,13 +331,272 @@ func TestCancelReceiveDropsPartialFile(t *testing.T) {
 	}
 }
 
+func TestReceiveResumeContinuesFromPartial(t *testing.T) {
+	ad := adapter.NewFake()
+	host := New(ad, t.TempDir())
+	recvRoot := t.TempDir()
+	recv := New(ad, recvRoot)
+	events := collectReceive(t, recv)
+	payload := bytes.Repeat([]byte("r"), chunkSize+8)
+	snap, err := host.Start([]Source{{Name: "resume.bin", Data: payload}}, Limits{MaxDownloads: 4}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := hookTransfer(t, "chunk")
+	dest := t.TempDir()
+	job, err := recv.StartReceive(context.Background(), snap.Payload, dest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	partial := waitReceive(t, events, job.ID, receiveDownloading, func(job ReceiveJob) bool {
+		return job.BytesDone > 0 && job.BytesDone < int64(len(payload))
+	})
+	if err := recv.CancelReceive(job.ID); err != nil {
+		t.Fatal(err)
+	}
+	stopped := waitReceive(t, events, job.ID, receiveInterrupted, nil)
+	if stopped.BytesDone != partial.BytesDone {
+		t.Fatalf("kept=%d want %d", stopped.BytesDone, partial.BytesDone)
+	}
+	sent := armTransfer(t, "sent")
+	release()
+	waitArmed(t, sent, "sent")
+
+	again := New(ad, recvRoot)
+	againEvents := collectReceive(t, again)
+	listed := again.ListReceives()
+	if len(listed) != 1 || listed[0].ID != job.ID || listed[0].BytesDone != stopped.BytesDone || listed[0].Status != receiveInterrupted {
+		t.Fatalf("listed=%+v", listed)
+	}
+	resumed, err := again.StartReceive(context.Background(), snap.Payload, dest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resumed.ID != job.ID || resumed.BytesDone != stopped.BytesDone || resumed.BytesDone == 0 {
+		t.Fatalf("resumed=%+v want %d", resumed, stopped.BytesDone)
+	}
+	waitReceive(t, againEvents, job.ID, receiveDownloading, func(job ReceiveJob) bool {
+		return job.BytesDone >= stopped.BytesDone && job.BytesDone < int64(len(payload))
+	})
+	done := waitReceive(t, againEvents, job.ID, receiveDone, nil)
+	if done.BytesDone != int64(len(payload)) {
+		t.Fatalf("done=%d", done.BytesDone)
+	}
+	body, err := os.ReadFile(filepath.Join(dest, "resume.bin"))
+	if err != nil || !bytes.Equal(body, payload) {
+		t.Fatalf("saved err=%v match=%v", err, err == nil && bytes.Equal(body, payload))
+	}
+	if _, err := os.Stat(filepath.Join(dest, partialRootName)); !os.IsNotExist(err) {
+		t.Fatalf("partial remains err=%v", err)
+	}
+	for _, listedJob := range again.ListReceives() {
+		if listedJob.ID == job.ID {
+			t.Fatalf("finished download still listed: %+v", listedJob)
+		}
+	}
+	host.Close()
+	recv.Close()
+	again.Close()
+}
+
+func TestReceiveResumeLengthMismatchRefetches(t *testing.T) {
+	root := t.TempDir()
+	svc := New(adapter.NewFake(), root)
+	events := collectReceive(t, svc)
+	payload := bytes.Repeat([]byte("m"), chunkSize+8)
+	snap, err := svc.Start([]Source{{Name: "len.bin", Data: payload}}, Limits{MaxDownloads: 4}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := hookTransfer(t, "chunk")
+	dest := t.TempDir()
+	job, err := svc.StartReceive(context.Background(), snap.Payload, dest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitReceive(t, events, job.ID, receiveDownloading, func(job ReceiveJob) bool { return job.BytesDone > 0 })
+	if err := svc.CancelReceive(job.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitReceive(t, events, job.ID, receiveInterrupted, nil)
+	sent := armTransfer(t, "sent")
+	release()
+	waitArmed(t, sent, "sent")
+	part := findPart(t, dest)
+	info, err := os.Stat(part)
+	if err != nil || info.Size() < 2 {
+		t.Fatal(err)
+	}
+	if err := os.Truncate(part, info.Size()-1); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := svc.StartReceive(context.Background(), snap.Payload, dest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resumed.ID != job.ID {
+		t.Fatalf("id=%s want %s", resumed.ID, job.ID)
+	}
+	done := waitReceive(t, events, job.ID, receiveDone, nil)
+	if done.BytesDone != int64(len(payload)) {
+		t.Fatalf("done=%d", done.BytesDone)
+	}
+	body, err := os.ReadFile(filepath.Join(dest, "len.bin"))
+	if err != nil || !bytes.Equal(body, payload) {
+		t.Fatalf("saved err=%v", err)
+	}
+}
+
+func TestReceiveResumeCorruptPartialFailsClearly(t *testing.T) {
+	root := t.TempDir()
+	svc := New(adapter.NewFake(), root)
+	events := collectReceive(t, svc)
+	payload := bytes.Repeat([]byte("c"), chunkSize+8)
+	snap, err := svc.Start([]Source{{Name: "bad.bin", Data: payload}}, Limits{MaxDownloads: 4}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := hookTransfer(t, "chunk")
+	dest := t.TempDir()
+	job, err := svc.StartReceive(context.Background(), snap.Payload, dest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitReceive(t, events, job.ID, receiveDownloading, func(job ReceiveJob) bool { return job.BytesDone > 0 })
+	if err := svc.CancelReceive(job.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitReceive(t, events, job.ID, receiveInterrupted, nil)
+	sent := armTransfer(t, "sent")
+	release()
+	waitArmed(t, sent, "sent")
+	part := findPart(t, dest)
+	body, err := os.ReadFile(part)
+	if err != nil || len(body) == 0 {
+		t.Fatal(err)
+	}
+	body[0] ^= 0xff
+	if err := os.WriteFile(part, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.StartReceive(context.Background(), snap.Payload, dest, adapter.NetworkOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	failed := waitReceive(t, events, job.ID, receiveFailed, nil)
+	if failed.Error != ErrPartialMismatch.Error() {
+		t.Fatalf("failed=%+v", failed)
+	}
+	if _, err := os.Stat(part); !os.IsNotExist(err) {
+		t.Fatalf("corrupt part kept err=%v", err)
+	}
+	again, err := svc.StartReceive(context.Background(), snap.Payload, dest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.BytesDone != 0 {
+		t.Fatalf("retry started at %d", again.BytesDone)
+	}
+	done := waitReceive(t, events, job.ID, receiveDone, nil)
+	if done.BytesDone != int64(len(payload)) {
+		t.Fatalf("done=%d", done.BytesDone)
+	}
+	saved, err := os.ReadFile(filepath.Join(dest, "bad.bin"))
+	if err != nil || !bytes.Equal(saved, payload) {
+		t.Fatalf("saved err=%v", err)
+	}
+}
+
+func TestReceiveResumeRejectsEndedShare(t *testing.T) {
+	root := t.TempDir()
+	svc := New(adapter.NewFake(), root)
+	events := collectReceive(t, svc)
+	payload := bytes.Repeat([]byte("e"), chunkSize+8)
+	snap, err := svc.Start([]Source{{Name: "ended.bin", Data: payload}}, Limits{MaxDownloads: 4}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := hookTransfer(t, "chunk")
+	dest := t.TempDir()
+	job, err := svc.StartReceive(context.Background(), snap.Payload, dest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitReceive(t, events, job.ID, receiveDownloading, func(job ReceiveJob) bool { return job.BytesDone > 0 })
+	if err := svc.CancelReceive(job.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitReceive(t, events, job.ID, receiveInterrupted, nil)
+	sent := armTransfer(t, "sent")
+	release()
+	waitArmed(t, sent, "sent")
+	if err := svc.End(snap.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.StartReceive(context.Background(), snap.Payload, dest, adapter.NetworkOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	failed := waitReceive(t, events, job.ID, receiveInterrupted, func(job ReceiveJob) bool { return job.Error != "" })
+	if failed.Error != ErrUnreachable.Error() && failed.Error != ErrEnded.Error() {
+		t.Fatalf("error=%q", failed.Error)
+	}
+	if err := svc.DiscardReceive(job.ID); err != nil {
+		t.Fatal(err)
+	}
+	if len(svc.ListReceives()) != 0 {
+		t.Fatalf("still listed: %+v", svc.ListReceives())
+	}
+}
+
+func findPart(t *testing.T, dest string) string {
+	t.Helper()
+	var found string
+	err := filepath.WalkDir(filepath.Join(dest, partialRootName), func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !entry.IsDir() && strings.HasSuffix(path, ".part") {
+			found = path
+		}
+		return nil
+	})
+	if err != nil || found == "" {
+		t.Fatalf("part file err=%v path=%s", err, found)
+	}
+	return found
+}
+
+func armTransfer(t *testing.T, stage string) <-chan struct{} {
+	t.Helper()
+	hit := make(chan struct{})
+	var once sync.Once
+	prev := currentTransferHook()
+	setTransferHook(func(got string) {
+		if prev != nil {
+			prev(got)
+		}
+		if got == stage {
+			once.Do(func() { close(hit) })
+		}
+	})
+	return hit
+}
+
+func waitArmed(t *testing.T, hit <-chan struct{}, stage string) {
+	t.Helper()
+	select {
+	case <-hit:
+	case <-time.After(8 * time.Second):
+		t.Fatalf("timed out waiting for transfer stage %s", stage)
+	}
+}
+
 func hookTransfer(t *testing.T, stage string) func() {
 	t.Helper()
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	var once sync.Once
 	var releaseOnce sync.Once
-	transferHook = func(got string) {
+	setTransferHook(func(got string) {
 		if got != stage {
 			return
 		}
@@ -335,10 +604,10 @@ func hookTransfer(t *testing.T, stage string) func() {
 			close(entered)
 			<-release
 		})
-	}
+	})
 	unlock := func() { releaseOnce.Do(func() { close(release) }) }
 	t.Cleanup(func() {
-		transferHook = nil
+		setTransferHook(nil)
 		unlock()
 	})
 	return func() {

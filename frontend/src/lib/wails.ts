@@ -5,6 +5,7 @@ import {
   DecodeChatVoice as bindDecodeChatVoice,
   DeleteKey as bindDeleteKey,
   CancelMiaoReceive as bindCancelMiaoReceive,
+  DiscardMiaoReceive as bindDiscardMiaoReceive,
   EndMiaoShare as bindEndMiaoShare,
   DiscardChatMessage as bindDiscardChatMessage,
   DownloadUpdate as bindDownloadUpdate,
@@ -34,6 +35,7 @@ import {
   SetMiaoReceiveDest as bindSetMiaoReceiveDest,
   StartMiaoReceive as bindStartMiaoReceive,
   StartMiaoShare as bindStartMiaoShare,
+  ListMiaoReceives as bindListMiaoReceives,
   ListRemote as bindListRemote,
   SelectDirectory as bindSelectDirectory,
   SelectFiles as bindSelectFiles,
@@ -57,7 +59,7 @@ import {
 import { BrowserOpenURL, EventsOn } from "../../wailsjs/runtime/runtime";
 import { adapter, main, session, store } from "../../wailsjs/go/models";
 import { createBrowserHub } from "./chatBrowser";
-import { browserCancelReceive, browserEndMiao, browserJoinMiao, browserListMiao, browserSetReceiveDest, browserStartMiao, browserStartReceive, setMiaoBrowserEmit } from "./miaoBrowser";
+import { browserCancelReceive, browserDiscardReceive, browserEndMiao, browserJoinMiao, browserListMiao, browserListReceives, browserSetReceiveDest, browserStartMiao, browserStartReceive, setMiaoBrowserEmit } from "./miaoBrowser";
 import type { MiaoFileInput, MiaoReceipt, MiaoShare, ReceiveJob } from "./miao";
 
 export type Session = {
@@ -1396,6 +1398,22 @@ export async function setMiaoReceiveDest(id: string, destDir: string): Promise<v
     return;
   }
   browserSetReceiveDest(id, destDir);
+}
+
+export async function listMiaoReceives(): Promise<ReceiveJob[]> {
+  if (hasWailsBindings()) {
+    const raw = await bindListMiaoReceives();
+    return Array.isArray(raw) ? (raw as ReceiveJob[]) : [];
+  }
+  return browserListReceives();
+}
+
+export async function discardMiaoReceive(id: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindDiscardMiaoReceive(id);
+    return;
+  }
+  browserDiscardReceive(id);
 }
 
 export function onTrayNavigate(callback: (page: string) => void): () => void {

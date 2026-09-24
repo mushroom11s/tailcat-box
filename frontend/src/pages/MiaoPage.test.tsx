@@ -102,7 +102,7 @@ describe("Mew Share page", () => {
     expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
   });
 
-  it("keeps the code field usable and shows queued and in-progress downloads", async () => {
+  it("keeps the code field usable and resumes an interrupted download", async () => {
     const user = userEvent.setup();
     renderPage();
     const input = screen.getByLabelText("Choose files") as HTMLInputElement;
@@ -122,9 +122,8 @@ describe("Mew Share page", () => {
       await user.paste(code);
       expect((screen.getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(false);
       await user.click(screen.getByRole("button", { name: "Download" }));
-      expect(await screen.findByText("Queued")).toBeTruthy();
-      expect(screen.getAllByRole("progressbar")).toHaveLength(2);
-      expect(screen.getAllByRole("button", { name: "Cancel" })).toHaveLength(2);
+      expect(screen.getAllByRole("progressbar")).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: "Cancel" })).toHaveLength(1);
 
       releaseBrowserReceiveHolds();
       await waitFor(() => {
@@ -133,9 +132,21 @@ describe("Mew Share page", () => {
       });
       expect(screen.getByText("Downloading…")).toBeTruthy();
       expect(screen.getAllByText("notes.txt").length).toBeGreaterThan(0);
-      expect((screen.getByRole("textbox", { name: "Share code" }) as HTMLTextAreaElement).disabled).toBe(false);
+      const partial = Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(await screen.findByText("Interrupted")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Discard" })).toBeTruthy();
+      expect(Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))).toBe(partial);
+
+      await user.click(join);
+      await user.paste(code);
+      await user.click(screen.getByRole("button", { name: "Download" }));
+      expect(screen.getAllByRole("progressbar")).toHaveLength(1);
+      expect(Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))).toBeGreaterThan(0);
       setBrowserReceiveHold(false);
       expect(await screen.findByText("Saved")).toBeTruthy();
+      expect((screen.getByRole("textbox", { name: "Share code" }) as HTMLTextAreaElement).disabled).toBe(false);
     } finally {
       setBrowserReceiveHold(false);
       releaseBrowserReceiveHolds();
