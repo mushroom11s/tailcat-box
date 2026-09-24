@@ -25,6 +25,7 @@ const (
 	KindExitNode   Kind = "exit_node"
 	KindExec       Kind = "exec"
 	KindChat       Kind = "chat"
+	KindMiao       Kind = "miao"
 )
 
 type Status string

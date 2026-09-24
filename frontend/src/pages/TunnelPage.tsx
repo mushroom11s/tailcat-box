@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
 import QrScanButton from "../components/QrScanButton";
 import QrShareButton from "../components/QrShareButton";
+import LoadingCat from "../components/LoadingCat";
 import { statusMessageKey, useI18n } from "../i18n";
 import { draftMapping, mappingPrimary, type PortMappingRecord } from "../lib/portMappings";
 import { shareableAddress } from "../lib/qr";
@@ -108,6 +109,11 @@ export default function TunnelPage({ mappings, sessions, links, busy, error, onA
         <p className="err" role="alert">
           {error}
         </p>
+      ) : null}
+      {busy ? (
+        <div className="glass tunnel-busy">
+          <LoadingCat label={t("tunnelBusy")} />
+        </div>
       ) : null}
 
       <div className="glass tunnel-list nav-rooms" role="list" aria-label={t("tunnelList")}>

@@ -4,6 +4,7 @@ import {
   CreateKey as bindCreateKey,
   DecodeChatVoice as bindDecodeChatVoice,
   DeleteKey as bindDeleteKey,
+  EndMiaoShare as bindEndMiaoShare,
   DiscardChatMessage as bindDiscardChatMessage,
   DownloadUpdate as bindDownloadUpdate,
   DialPipe as bindDialPipe,
@@ -29,6 +30,7 @@ import {
   StartChatRoom as bindStartChatRoom,
   StartCopy as bindStartCopy,
   StartFilesServe as bindStartFilesServe,
+  StartMiaoShare as bindStartMiaoShare,
   ListRemote as bindListRemote,
   SelectDirectory as bindSelectDirectory,
   SelectFiles as bindSelectFiles,
@@ -44,12 +46,16 @@ import {
   GetClientInfo as bindGetClientInfo,
   GetSystemInfo as bindGetSystemInfo,
   GetUpdateStatus as bindGetUpdateStatus,
+  JoinMiaoShare as bindJoinMiaoShare,
+  MiaoShareStatus as bindMiaoShareStatus,
   SetLaunchAtLogin as bindSetLaunchAtLogin,
   SetUILocale as bindSetUILocale,
 } from "../../wailsjs/go/main/App";
 import { BrowserOpenURL, EventsOn } from "../../wailsjs/runtime/runtime";
 import { adapter, main, session, store } from "../../wailsjs/go/models";
 import { createBrowserHub } from "./chatBrowser";
+import { browserEndMiao, browserJoinMiao, browserStartMiao, setMiaoBrowserEmit } from "./miaoBrowser";
+import type { MiaoFileInput, MiaoReceipt, MiaoShare } from "./miao";
 
 export type Session = {
   ID: string;
@@ -1331,6 +1337,53 @@ export async function setLaunchAtLogin(enabled: boolean): Promise<SystemInfo> {
   return fakeSystemInfo();
 }
 
+export async function startMiaoShare(
+  files: MiaoFileInput[],
+  ttlDays: number,
+  forever: boolean,
+  maxDownloads: number,
+): Promise<MiaoShare> {
+  if (hasWailsBindings()) {
+    return (await bindStartMiaoShare(files, ttlDays, forever, maxDownloads)) as MiaoShare;
+  }
+  return browserStartMiao(files, ttlDays, forever, maxDownloads);
+}
+
+export async function endMiaoShare(id: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindEndMiaoShare(id);
+    return;
+  }
+  browserEndMiao(id);
+}
+
+export async function miaoShareStatus(): Promise<MiaoShare> {
+  if (hasWailsBindings()) {
+    return (await bindMiaoShareStatus()) as MiaoShare;
+  }
+  return {
+    id: "",
+    address: "",
+    token: "",
+    payload: "",
+    files: [],
+    total: 0,
+    forever: true,
+    ttlDays: 0,
+    expiresAt: "",
+    maxDownloads: 0,
+    downloads: 0,
+    status: "idle",
+  };
+}
+
+export async function joinMiaoShare(payload: string, destDir: string): Promise<MiaoReceipt> {
+  if (hasWailsBindings()) {
+    return (await bindJoinMiaoShare(payload, destDir)) as MiaoReceipt;
+  }
+  return browserJoinMiao(payload);
+}
+
 export function onTrayNavigate(callback: (page: string) => void): () => void {
   if (hasWailsBindings() && goWindow().runtime) {
     return EventsOn(TRAY_NAVIGATE_EVENT, (page: unknown) => {
@@ -1364,3 +1417,7 @@ export function onTailcatEvent(callback: (ev: TailcatEvent) => void): () => void
     fake.listeners = fake.listeners.filter((l) => l !== callback);
   };
 }
+
+setMiaoBrowserEmit((ev) => {
+  emitFake({ SessionID: ev.SessionID, Kind: ev.Kind, Data: ev.Data });
+});

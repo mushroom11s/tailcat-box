@@ -541,7 +541,8 @@ textarea {
   line-height: 1.45;
 }
 
-.main:has(.chat-page) {
+.main:has(.chat-page),
+.main:has(.miao-page) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2578,4 +2579,168 @@ textarea {
 
 .qr-modal .chat-quiet {
   margin: 0 0 12px;
+}
+
+.loading-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  vertical-align: middle;
+}
+
+.loading-cat img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.loading-cat.sm img,
+.btn .loading-cat img {
+  width: 32px;
+  height: 32px;
+}
+
+.loading-cat.block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.loading-cat-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tunnel-busy {
+  display: flex;
+  justify-content: center;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.miao-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+}
+
+.miao-page .lede {
+  margin-bottom: 0;
+}
+
+.miao-modes {
+  margin-bottom: 0;
+}
+
+.miao-limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.miao-limits .field {
+  min-width: 140px;
+  flex: 1;
+}
+
+.miao-drop {
+  flex: 1;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  border-radius: var(--radius);
+  border: 1.5px dashed color-mix(in srgb, var(--glow) 55%, var(--hairline));
+  background: color-mix(in srgb, var(--glass-bg) 72%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+}
+
+.miao-drop strong,
+.miao-drop .chat-quiet {
+  display: block;
+}
+
+.miao-drop .chat-quiet {
+  margin-top: 6px;
+}
+
+.miao-drop.drag,
+.miao-drop:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--glass-bg));
+}
+
+.miao-drop:disabled {
+  cursor: progress;
+}
+
+.miao-active,
+.miao-join {
+  padding: 18px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.miao-active-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 20px;
+  align-items: start;
+}
+
+.miao-qr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: white;
+}
+
+.miao-qr img {
+  width: 220px;
+  height: 220px;
+}
+
+.miao-files {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.miao-files li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.miao-size {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.miao-join textarea,
+.miao-active textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .miao-active-grid {
+    grid-template-columns: 1fr;
+  }
 }

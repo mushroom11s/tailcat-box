@@ -71,6 +71,7 @@ describe("lobby room start loading", () => {
     await user.click(button("Create temporary room"));
 
     expect(button("Creating…").disabled).toBe(true);
+    expect(button("Creating…").querySelector("img")?.getAttribute("src")).toContain("loading-cat");
     expect(button("Create").disabled).toBe(true);
     expect(button("Save key").disabled).toBe(true);
     expect(button("Connect").disabled).toBe(true);
@@ -95,6 +96,7 @@ describe("lobby room start loading", () => {
     await user.click(button("Create"));
 
     expect(button("Creating…").disabled).toBe(true);
+    expect(button("Creating…").querySelector("img")?.getAttribute("src")).toContain("loading-cat");
     expect(button("Create temporary room").disabled).toBe(true);
     expect(button("Connect").disabled).toBe(true);
     expect(button("Save key").disabled).toBe(true);
@@ -134,6 +136,7 @@ describe("lobby room start loading", () => {
     renderApp();
     await user.click(button("Create temporary room"));
     expect(button("Creating…").disabled).toBe(true);
+    expect(button("Creating…").querySelector("img")?.getAttribute("src")).toContain("loading-cat");
 
     pending.reject(new Error("network down"));
 

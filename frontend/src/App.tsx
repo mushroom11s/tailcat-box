@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ChatPage, { type ChatMessage } from "./pages/ChatPage";
 import LobbyPage from "./pages/LobbyPage";
+import MiaoPage from "./pages/MiaoPage";
 import SettingsPage from "./pages/SettingsPage";
 import TunnelPage from "./pages/TunnelPage";
 import { readMappings, toPortMapping, writeMappings, type PortMappingRecord } from "./lib/portMappings";
@@ -49,7 +50,7 @@ import {
   type UpdateStatus,
 } from "./lib/wails";
 
-type Page = "chat" | "tunnel" | "settings";
+type Page = "miao" | "chat" | "tunnel" | "settings";
 type Theme = "system" | "light" | "dark";
 
 const THEME_KEY = "tailcat-theme";
@@ -756,6 +757,14 @@ export default function App() {
           </div>
         </div>
         <nav className="nav">
+          <button
+            type="button"
+            className={`nav-btn ${page === "miao" ? "active" : ""}`}
+            onClick={() => setPage("miao")}
+          >
+            <NavGlyph name="miao" />
+            {t("navMiao")}
+          </button>
           {NAV.map((item) =>
             item.id === "tunnel" ? (
               <button
@@ -843,7 +852,9 @@ export default function App() {
         </div>
       </aside>
       <main ref={mainRef} className="glass main">
-        {page === "chat" ? (
+        {page === "miao" ? (
+          <MiaoPage />
+        ) : page === "chat" ? (
           showLobby || !chatRoom ? (
             <LobbyPage
               peer={lobbyPeer}
@@ -985,9 +996,11 @@ function showUpdateBadge(status: UpdateStatus | null): boolean {
   return status.Status !== "error" && status.Status !== "unsupported";
 }
 
-function NavGlyph({ name }: { name: "chat" | "tunnel" | "settings" }) {
+function NavGlyph({ name }: { name: "miao" | "chat" | "tunnel" | "settings" }) {
   const d =
-    name === "chat"
+    name === "miao"
+      ? "M7 4.5h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2zM12 8v5.5M9.6 11.2 12 13.6l2.4-2.4"
+      : name === "chat"
       ? "M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6A2.5 2.5 0 0 1 16.5 15H9l-3.5 3V6.5z"
       : name === "tunnel"
         ? "M9 8H7a4 4 0 0 0 0 8h2M15 8h2a4 4 0 0 1 0 8h-2M8 12h8"
