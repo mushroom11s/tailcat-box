@@ -238,6 +238,51 @@ describe("shell scroll", () => {
     }
   });
 
+  it("widens the sidebar and insets the active pill inside the clip", () => {
+    expect(cssBlock(css, ":root")).toContain("--sidebar-w: 260px");
+    expect(cssBlock(css, ".shell")).toContain("grid-template-columns: var(--sidebar-w) minmax(0, 1fr)");
+    const navRule = cssBlock(css, ".nav");
+    expect(navRule).toContain("padding-left: 8px");
+    expect(navRule).toContain("padding-right: 8px");
+    expect(navRule).toContain("overflow: hidden");
+    const chatRule = cssBlock(css, ".nav-chat");
+    expect(chatRule).toContain("padding-left: 8px");
+    expect(chatRule).toContain("padding-right: 8px");
+    expect(chatRule).toContain("margin-left: -8px");
+    expect(chatRule).toContain("margin-right: -8px");
+    expect(chatRule).toContain("overflow: hidden");
+    const footerRule = cssBlock(css, ".sidebar-footer");
+    expect(footerRule).toContain("padding-left: 8px");
+    expect(footerRule).toContain("padding-right: 8px");
+    expect(cssBlock(css, ".sidebar")).toContain("overflow: hidden");
+
+    const style = document.createElement("style");
+    style.textContent = [navRule, chatRule, footerRule, cssBlock(css, ".sidebar")].join("\n");
+    document.head.appendChild(style);
+    try {
+      localStorage.setItem("tailcat-locale", "zh-CN");
+      render(
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>,
+      );
+      const nav = document.querySelector(".nav") as HTMLElement;
+      const chat = document.querySelector(".nav-chat") as HTMLElement;
+      const footer = document.querySelector(".sidebar-footer") as HTMLElement;
+      expect(getComputedStyle(nav).paddingLeft).toBe("8px");
+      expect(getComputedStyle(nav).paddingRight).toBe("8px");
+      expect(getComputedStyle(chat).paddingLeft).toBe("8px");
+      expect(getComputedStyle(chat).paddingRight).toBe("8px");
+      expect(getComputedStyle(chat).marginLeft).toBe("-8px");
+      expect(getComputedStyle(chat).marginRight).toBe("-8px");
+      expect(getComputedStyle(footer).paddingLeft).toBe("8px");
+      expect(getComputedStyle(footer).paddingRight).toBe("8px");
+      expect(screen.getByRole("button", { name: "喵传" }).classList.contains("active")).toBe(true);
+    } finally {
+      style.remove();
+    }
+  });
+
   it("centers the brand stack in the sidebar", () => {
     const style = document.createElement("style");
     style.textContent = [
