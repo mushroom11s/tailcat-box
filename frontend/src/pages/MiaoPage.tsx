@@ -108,16 +108,16 @@ function ShareCard({
   return (
     <article className="glass miao-active" aria-label={label}>
       <div className="miao-active-grid">
-        <div>
-          <h3>{t("miaoFiles")}</h3>
-          <ul className="miao-files">
-            {share.files.map((file) => (
-              <li key={`${file.name}:${file.size}`}>
-                <span>{file.name}</span>
-                <span className="miao-size">{formatBytes(file.size)}</span>
-              </li>
-            ))}
-          </ul>
+        <h3>{t("miaoFiles")}</h3>
+        <ul className="miao-files">
+          {share.files.map((file) => (
+            <li key={`${file.name}:${file.size}`}>
+              <span>{file.name}</span>
+              <span className="miao-size">{formatBytes(file.size)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="miao-share-meta">
           <p className="chat-quiet">
             {t("miaoTotal")} {formatBytes(share.total)}
           </p>

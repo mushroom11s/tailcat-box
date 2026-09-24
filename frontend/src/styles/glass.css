@@ -2744,7 +2744,7 @@ textarea {
 }
 
 .miao-active h3 {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 16px;
 }
 
@@ -2768,8 +2768,32 @@ textarea {
 .miao-active-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 188px;
-  gap: 16px;
+  column-gap: 16px;
+  row-gap: 8px;
   align-items: start;
+}
+
+.miao-active-grid > h3 {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.miao-active .miao-files {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 0;
+}
+
+.miao-share-meta {
+  grid-column: 1;
+  grid-row: 3;
+  margin-top: 4px;
+}
+
+.miao-active-grid > .miao-qr {
+  grid-column: 2;
+  grid-row: 2 / span 2;
+  align-self: start;
 }
 
 .miao-qr {
@@ -2822,5 +2846,13 @@ textarea {
 @media (max-width: 720px) {
   .miao-active-grid {
     grid-template-columns: 1fr;
+  }
+
+  .miao-active-grid > h3,
+  .miao-active .miao-files,
+  .miao-share-meta,
+  .miao-active-grid > .miao-qr {
+    grid-column: 1;
+    grid-row: auto;
   }
 }
