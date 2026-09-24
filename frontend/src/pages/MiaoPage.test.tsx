@@ -157,13 +157,18 @@ describe("Mew Share page", () => {
       expect(await screen.findByRole("article", { name: "second.txt" })).toBeTruthy();
 
       const send = document.querySelector(".miao-send") as HTMLElement;
+      const limits = document.querySelector(".miao-limits") as HTMLElement;
       const list = document.querySelector(".miao-share-list") as HTMLElement;
       const drop = document.querySelector(".miao-drop") as HTMLElement;
+      const fileInput = send.querySelector('input[type="file"]') as HTMLElement;
       const cards = [...list.querySelectorAll("article")];
       expect(cards).toHaveLength(2);
+      expect(send.contains(limits)).toBe(true);
       expect(send.contains(list)).toBe(true);
       expect(send.contains(drop)).toBe(true);
-      expect(list.compareDocumentPosition(drop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(limits.compareDocumentPosition(drop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(drop.compareDocumentPosition(fileInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(fileInput.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
       const sendStyle = getComputedStyle(send);
       expect(sendStyle.overflowY).toBe("auto");
