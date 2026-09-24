@@ -2624,8 +2624,8 @@ textarea {
 }
 
 .loading-cat img {
-  width: 48px;
-  height: 48px;
+  width: 45px;
+  height: 60px;
   object-fit: contain;
   image-rendering: pixelated;
   background: transparent;
@@ -2633,14 +2633,14 @@ textarea {
 
 .loading-cat.sm img,
 .btn .loading-cat img {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 40px;
 }
 
 .loading-cat.lg img {
-  /* 1:1 with the cleaned asset so pixelated scaling does not grow a fringe. */
-  width: 94px;
-  height: 121px;
+  /* 1:1 with the 3:4 cut-out so pixelated scaling does not grow a fringe. */
+  width: 90px;
+  height: 120px;
 }
 
 .loading-cat.block {
