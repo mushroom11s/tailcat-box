@@ -287,16 +287,33 @@ function KeyLine({
   onCopy: (text: string) => void;
   className?: string;
 }) {
-  const { t } = useI18n();
   return (
-    <div className="tunnel-keyline">
-      <code className={className ? `tunnel-key ${className}` : "tunnel-key"} title={value}>
-        {value}
-      </code>
-      <button className="btn btn-ghost" type="button" aria-label={copyLabel} title={copyLabel} onClick={() => onCopy(value)}>
-        {t("copy")}
+    <div className="tunnel-codeblock">
+      <pre>
+        <code className={className ? `tunnel-key ${className}` : "tunnel-key"} title={value}>
+          {value}
+        </code>
+      </pre>
+      <button className="tunnel-code-copy" type="button" aria-label={copyLabel} title={copyLabel} onClick={() => onCopy(value)}>
+        <CopyIcon />
       </button>
     </div>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"
+      />
+    </svg>
   );
 }
 

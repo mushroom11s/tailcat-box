@@ -62,7 +62,11 @@ describe("tunnel page", () => {
     const serve = await screen.findByText(/tc:fake-port-/, { selector: ".address" });
     expect(serve.tagName).toBe("CODE");
     expect(serve.classList.contains("tunnel-key")).toBe(true);
-    expect(serve.closest(".tunnel-keyline")?.querySelector("button")?.getAttribute("aria-label")).toBe("Copy address");
+    const serveCopy = serve.closest(".tunnel-codeblock")?.querySelector("button");
+    expect(serveCopy?.getAttribute("aria-label")).toBe("Copy address");
+    expect(serveCopy?.querySelector("svg")).toBeTruthy();
+    expect(serveCopy?.textContent?.trim()).toBe("");
+    expect(serve.parentElement?.tagName).toBe("PRE");
     const addr = (serve.textContent ?? "").trim();
 
     await user.click(screen.getByRole("button", { name: "+ New mapping" }));
@@ -82,7 +86,8 @@ describe("tunnel page", () => {
     });
     const listen = screen.getByText("127.0.0.1:18080", { selector: ".address" });
     expect(listen.tagName).toBe("CODE");
-    expect(listen.closest(".tunnel-keyline")?.querySelector("button")?.getAttribute("aria-label")).toBe(
+    expect(listen.parentElement?.tagName).toBe("PRE");
+    expect(listen.closest(".tunnel-codeblock")?.querySelector("button")?.getAttribute("aria-label")).toBe(
       "Copy local address",
     );
     const peer = document.querySelector(".tunnel-detail code.tunnel-key:not(.address)");
@@ -182,7 +187,10 @@ describe("tunnel page", () => {
     await user.click(screen.getByRole("button", { name: "保存映射" }));
     const key = document.querySelector(".tunnel-detail code.tunnel-key");
     expect(key?.textContent).toBe("tc:zh-key");
-    expect(screen.getByRole("button", { name: "复制地址" }).getAttribute("title")).toBe("复制地址");
+    expect(key?.parentElement?.tagName).toBe("PRE");
+    const copyZh = screen.getByRole("button", { name: "复制地址" });
+    expect(copyZh.getAttribute("title")).toBe("复制地址");
+    expect(copyZh.querySelector("svg")).toBeTruthy();
   });
 
   it("keeps a long forward key inside the card and copies it", async () => {
@@ -193,9 +201,10 @@ describe("tunnel page", () => {
     style.textContent = [
       ":root { --mono: ui-monospace, Menlo, monospace; }",
       cssBlock(css, ".tunnel-detail"),
-      cssBlock(css, ".tunnel-keyline"),
-      cssBlock(css, ".tunnel-key"),
-      cssBlock(css, ".tunnel-keyline .btn"),
+      cssBlock(css, ".tunnel-codeblock"),
+      cssBlock(css, ".tunnel-codeblock pre"),
+      cssBlock(css, ".tunnel-codeblock code"),
+      cssBlock(css, ".tunnel-code-copy"),
     ].join("\n");
     document.head.appendChild(style);
     try {
@@ -213,24 +222,36 @@ describe("tunnel page", () => {
       expect(code.tagName).toBe("CODE");
       expect(code.textContent).toBe(long);
       expect(code.getAttribute("title")).toBe(long);
-      const line = code.parentElement as HTMLElement;
-      expect(line.classList.contains("tunnel-keyline")).toBe(true);
-      expect(line.closest(".tunnel-detail")).toBeTruthy();
+      const pre = code.parentElement as HTMLElement;
+      expect(pre.tagName).toBe("PRE");
+      const block = pre.parentElement as HTMLElement;
+      expect(block.classList.contains("tunnel-codeblock")).toBe(true);
+      expect(block.closest(".tunnel-detail")).toBeTruthy();
 
       const valueStyle = getComputedStyle(code);
       expect(valueStyle.minWidth).toBe("0");
       expect(valueStyle.maxWidth).toBe("100%");
       expect(valueStyle.wordBreak).toBe("break-all");
       expect(valueStyle.overflowWrap).toBe("anywhere");
+      expect(valueStyle.whiteSpace).toBe("pre-wrap");
       expect(valueStyle.fontFamily.toLowerCase()).toContain("monospace");
 
-      const lineStyle = getComputedStyle(line);
-      expect(lineStyle.display).toBe("flex");
-      expect(lineStyle.minWidth).toBe("0");
-      expect(lineStyle.maxWidth).toBe("100%");
-      expect(getComputedStyle(line.querySelector("button") as HTMLElement).flexShrink).toBe("0");
+      const preStyle = getComputedStyle(pre);
+      expect(preStyle.overflow).toBe("auto");
+      expect(preStyle.maxWidth).toBe("100%");
+      expect(preStyle.minWidth).toBe("0");
 
-      const cardStyle = getComputedStyle(line.parentElement as HTMLElement);
+      const blockStyle = getComputedStyle(block);
+      expect(blockStyle.position).toBe("relative");
+      expect(blockStyle.minWidth).toBe("0");
+      expect(blockStyle.maxWidth).toBe("100%");
+
+      const copy = block.querySelector("button") as HTMLElement;
+      expect(copy.classList.contains("btn")).toBe(false);
+      expect(copy.querySelector("svg")).toBeTruthy();
+      expect(getComputedStyle(copy).position).toBe("absolute");
+
+      const cardStyle = getComputedStyle(block.parentElement as HTMLElement);
       expect(cardStyle.display).toBe("flex");
       expect(cardStyle.minWidth).toBe("0");
       expect(cardStyle.maxWidth).toBe("100%");
