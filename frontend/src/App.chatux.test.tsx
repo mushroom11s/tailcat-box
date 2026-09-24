@@ -93,6 +93,16 @@ describe("room identity bar", () => {
     expect(screen.getByText("tc:fake-room-abcd")).toBeTruthy();
 
     view.rerender(identityRoom({ peer: "tc:fake-echo", remarks: { "tc:fake-echo": "Bob" } }));
+    expect(screen.queryByLabelText("Peer")).toBeNull();
+    expect(screen.queryByText("Peer connected")).toBeNull();
+    expect(document.querySelector(".chat-identity-peer")?.textContent).toBe("Bob");
+    expect(screen.getByText("tc…abcd")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Show room details" }));
+    expect(screen.getByLabelText("Peer")).toBeTruthy();
+    expect(screen.getByText("Peer connected")).toBeTruthy();
+
+    view.rerender(identityRoom({ peer: "tc:fake-echo", remarks: { "tc:fake-echo": "Bob" } }));
     expect(screen.getByLabelText("Peer")).toBeTruthy();
     expect(screen.getByText("Peer connected")).toBeTruthy();
 
@@ -103,6 +113,10 @@ describe("room identity bar", () => {
     view.rerender(identityRoom({ peer: "tc:fake-echo", remarks: { "tc:fake-echo": "Bob" } }));
     expect(screen.queryByLabelText("Peer")).toBeNull();
     expect(document.querySelector(".chat-identity-peer")?.textContent).toBe("Bob");
+
+    view.rerender(identityRoom({ peer: "" }));
+    expect(screen.queryByLabelText("Peer")).toBeNull();
+    expect(screen.getByText("Not connected")).toBeTruthy();
 
     await user.click(screen.getByText("tc…abcd"));
     expect(screen.getByLabelText("Peer")).toBeTruthy();
