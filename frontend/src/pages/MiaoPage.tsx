@@ -3,6 +3,7 @@ import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
 import LoadingCat from "../components/LoadingCat";
 import QrScanButton from "../components/QrScanButton";
 import { useI18n, type MessageKey } from "../i18n";
+import iconUrl from "../assets/icon.png?inline";
 import { encodeQrDataURL } from "../lib/qr";
 import {
   acceptMiaoCode,
@@ -89,7 +90,7 @@ function ShareCard({
     }
     let live = true;
     setQrFailed(false);
-    void encodeQrDataURL(payload)
+    void encodeQrDataURL(payload, { errorCorrectionLevel: "H", centerMark: iconUrl })
       .then((url) => {
         if (live) {
           setQrSrc(url);
@@ -108,16 +109,16 @@ function ShareCard({
   return (
     <article className="glass miao-active" aria-label={label}>
       <div className="miao-active-grid">
-        <div>
-          <h3>{t("miaoFiles")}</h3>
-          <ul className="miao-files">
-            {share.files.map((file) => (
-              <li key={`${file.name}:${file.size}`}>
-                <span>{file.name}</span>
-                <span className="miao-size">{formatBytes(file.size)}</span>
-              </li>
-            ))}
-          </ul>
+        <h3>{t("miaoFiles")}</h3>
+        <ul className="miao-files">
+          {share.files.map((file) => (
+            <li key={`${file.name}:${file.size}`}>
+              <span>{file.name}</span>
+              <span className="miao-size">{formatBytes(file.size)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="miao-share-meta">
           <p className="chat-quiet">
             {t("miaoTotal")} {formatBytes(share.total)}
           </p>
@@ -142,7 +143,9 @@ function ShareCard({
         </div>
         <div className="miao-qr">
           {qrFailed ? <p className="err">{t("qrEncodeFailed")}</p> : null}
-          {qrSrc ? <img src={qrSrc} alt={t("miaoToken")} width={220} height={220} /> : <LoadingCat label={t("miaoPacking")} />}
+          {qrSrc ? <img src={qrSrc} alt={t("miaoToken")} width={172} height={172} /> : (
+            <LoadingCat size="lg" layout="block" label={t("miaoPacking")} />
+          )}
         </div>
       </div>
     </article>
@@ -420,9 +423,11 @@ export default function MiaoPage() {
           {shares.length ? (
             <div className="miao-share-list">
               <h3>{t("miaoActive")}</h3>
-              {shares.map((share) => (
-                <ShareCard key={share.id} share={share} now={now} onEnd={(id) => void endShare(id)} />
-              ))}
+              <div className="miao-share-cards">
+                {shares.map((share) => (
+                  <ShareCard key={share.id} share={share} now={now} onEnd={(id) => void endShare(id)} />
+                ))}
+              </div>
             </div>
           ) : null}
             <div className="miao-limits">
@@ -492,7 +497,7 @@ export default function MiaoPage() {
               onDrop={onDrop}
             >
               {busy === "pack" ? (
-                <LoadingCat layout="block" label={t("miaoPacking")} />
+                <LoadingCat size="lg" layout="block" label={t("miaoPacking")} />
               ) : (
                 <span>
                   <strong>{t("miaoDrop")}</strong>

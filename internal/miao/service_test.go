@@ -20,11 +20,9 @@ func TestShareDownloadThenCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snap.Status != "active" || snap.Payload == "" || !strings.Contains(snap.Payload, snap.Address) || !strings.Contains(snap.Payload, snap.Token) {
-		t.Fatalf("snap=%+v", snap)
-	}
-	if _, err := ParseJoin(snap.Payload); err != nil {
-		t.Fatal(err)
+	parsed, err := ParseJoin(snap.Payload)
+	if err != nil || !strings.HasPrefix(snap.Payload, "mw1.") || parsed.Addr != snap.Address || parsed.Token != snap.Token {
+		t.Fatalf("snap=%+v parsed=%+v err=%v", snap, parsed, err)
 	}
 	entries, err := os.ReadDir(root)
 	if err != nil || len(entries) != 1 {
@@ -162,6 +160,38 @@ func TestConcurrentSharesStayIndependent(t *testing.T) {
 func TestParseJoinRejectsAddressOnly(t *testing.T) {
 	if _, err := ParseJoin("tc:fake-room"); !errors.Is(err, ErrBadCode) {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestLegacyJSONStillJoins(t *testing.T) {
+	root := t.TempDir()
+	svc := New(adapter.NewFake(), root)
+	snap, err := svc.Start([]Source{{Name: "legacy.txt", Data: []byte("old")}}, Limits{MaxDownloads: 2}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(snap.Payload, "mw1.") {
+		t.Fatalf("payload=%q", snap.Payload)
+	}
+	legacy := `{"v":1,"kind":"miao","addr":"` + snap.Address + `","token":"` + snap.Token + `"}`
+	dest := t.TempDir()
+	receipt, err := svc.Join(context.Background(), legacy, dest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(receipt.Files) != 1 || receipt.Files[0].Name != "legacy.txt" {
+		t.Fatalf("receipt=%+v", receipt.Files)
+	}
+	body, err := os.ReadFile(receipt.Files[0].Path)
+	if err != nil || string(body) != "old" {
+		t.Fatalf("body=%q err=%v", body, err)
+	}
+	again, err := svc.Join(context.Background(), snap.Payload, t.TempDir(), adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(again.Files) != 1 || again.Files[0].Name != "legacy.txt" {
+		t.Fatalf("compact receipt=%+v", again.Files)
 	}
 }
 

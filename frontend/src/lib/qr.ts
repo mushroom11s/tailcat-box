@@ -1,5 +1,6 @@
 import * as QRCode from "qrcode";
 import jsQR from "jsqr";
+import { composeMarkedQrPng } from "./qrMark";
 
 /** A Tailcat address uses the same "starts with tc" check as paste and join. */
 export function shareableAddress(value: string): string {
@@ -12,11 +13,35 @@ export function acceptScannedText(raw: string): { ok: true; value: string } | { 
   return value ? { ok: true, value } : { ok: false };
 }
 
-/** Encode the raw address or key. No URL scheme is added. */
-export async function encodeQrDataURL(text: string): Promise<string> {
+export type QrErrorCorrection = "L" | "M" | "Q" | "H";
+
+export type QrCenterMark = string | HTMLImageElement;
+
+export type QrEncodeOptions = {
+  errorCorrectionLevel?: QrErrorCorrection;
+  /** Image URL, data URL, or element. Only callers that pass this get a baked-in mark. */
+  centerMark?: QrCenterMark;
+};
+
+function resolveEncode(arg?: QrErrorCorrection | QrEncodeOptions): { level: QrErrorCorrection; centerMark?: QrCenterMark } {
+  if (typeof arg === "string" || arg == null) {
+    return { level: arg ?? "M" };
+  }
+  return {
+    level: arg.errorCorrectionLevel ?? (arg.centerMark ? "H" : "M"),
+    centerMark: arg.centerMark,
+  };
+}
+
+/** Encode the raw address or key. No URL scheme is added. A center mark is opt-in and returns one PNG. */
+export async function encodeQrDataURL(text: string, errorCorrectionLevelOrOptions?: QrErrorCorrection | QrEncodeOptions): Promise<string> {
+  const { level, centerMark } = resolveEncode(errorCorrectionLevelOrOptions);
+  if (centerMark) {
+    return composeMarkedQrPng(text, level, centerMark);
+  }
   const svg = await QRCode.toString(text, {
     type: "svg",
-    errorCorrectionLevel: "M",
+    errorCorrectionLevel: level,
     margin: 2,
     width: 280,
     color: { dark: "#000000", light: "#ffffff" },

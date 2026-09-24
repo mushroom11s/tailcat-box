@@ -1,4 +1,5 @@
 import {
+  encodeJoin,
   fileToBase64,
   parseJoin,
   shareTooLarge,
@@ -137,7 +138,10 @@ export async function browserStartMiao(files: MiaoFileInput[], ttlDays: number, 
   const shareID = id();
   const token = id();
   const address = `tc:fake-miao-${shareID.slice(0, 8)}`;
-  const payload = JSON.stringify({ v: 1, kind: "miao", addr: address, token });
+  const payload = encodeJoin(address, token);
+  if (!payload) {
+    throw new Error("That share code is not valid.");
+  }
   const blobs: Record<string, string> = {};
   const infos = decoded.map((file, index) => {
     blobs[String(index)] = file.dataBase64;
