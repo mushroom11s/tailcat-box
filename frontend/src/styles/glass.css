@@ -282,7 +282,7 @@ textarea {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  gap: 4px;
+  gap: 8px;
   min-height: 0;
   padding-left: 8px;
   padding-right: 8px;
@@ -346,7 +346,7 @@ textarea {
   font-weight: 600;
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--glow) 55%, white),
-    0 10px 24px color-mix(in srgb, var(--glow) 42%, transparent),
+    0 4px 10px color-mix(in srgb, var(--glow) 42%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
@@ -376,7 +376,7 @@ textarea {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  gap: 4px;
+  gap: 8px;
   margin: 12px 12px 4px 20px;
   min-height: 0;
   overflow: hidden;
@@ -386,7 +386,7 @@ textarea {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  gap: 4px;
+  gap: 8px;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -2898,14 +2898,40 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.miao-progress-wrap {
+  position: relative;
+  margin: 4px 0 22px;
+  padding-top: 30px;
+  overflow: visible;
+}
+
 .miao-progress {
   height: 8px;
-  margin: 4px 0 8px;
   border-radius: 999px;
   overflow: hidden;
   background: color-mix(in srgb, var(--text) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--glow) 42%, var(--hairline));
   box-shadow: inset 0 1px 2px color-mix(in srgb, black 35%, transparent);
+}
+
+.miao-progress-cat {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: clamp(20px, var(--miao-pct, 0%), calc(100% - 20px));
+  width: 40px;
+  height: 53px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  line-height: 0;
+}
+
+.miao-progress-cat img {
+  display: block;
+  width: 40px;
+  height: 53px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .miao-progress > span {

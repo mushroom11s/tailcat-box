@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
 import LoadingCat from "../components/LoadingCat";
 import QrScanButton from "../components/QrScanButton";
 import { useI18n, type MessageKey } from "../i18n";
 import iconUrl from "../assets/icon.png?inline";
+import runningCatGif from "../assets/running-cat.gif";
+import runningCatWebp from "../assets/running-cat.webp";
 import { encodeQrDataURL } from "../lib/qr";
 import {
   acceptMiaoCode,
@@ -23,7 +25,7 @@ import {
   type ReceiveJob,
   type Remaining,
 } from "../lib/miao";
-import { cancelMiaoReceive, discardMiaoReceive, endMiaoShare, hasWailsBindings, listMiaoReceives, miaoShareStatus, onTailcatEvent, selectDirectory, selectFiles, setMiaoReceiveDest, startMiaoReceive, startMiaoShare } from "../lib/wails";
+import { cancelMiaoReceive, discardMiaoReceive, endMiaoShare, hasWailsBindings, listMiaoReceives, miaoRestoreNotes, miaoShareStatus, onTailcatEvent, selectDirectory, selectFiles, setMiaoReceiveDest, startMiaoReceive, startMiaoShare } from "../lib/wails";
 
 type TTLMode = "1" | "7" | "15" | "custom" | "forever";
 type CountMode = "1" | "3" | "10" | "unlimited" | "custom";
@@ -79,6 +81,10 @@ function receiveStatusLabel(status: string, t: (key: MessageKey) => string): str
     default:
       return t("miaoReceiveJob");
   }
+}
+
+function showRunningCat(status: ReceiveJob["status"]): boolean {
+  return status === "connecting" || status === "queued" || status === "downloading" || status === "done";
 }
 
 function receiveErrorText(job: ReceiveJob, t: (key: MessageKey) => string): string {
@@ -225,15 +231,23 @@ function ReceiveCard({
           ))}
         </ul>
       ) : null}
-      <div
-        className="miao-progress"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={pct}
-        aria-label={status}
-      >
-        <span style={{ width: `${pct}%` }} />
+      <div className="miao-progress-wrap">
+        <div
+          className="miao-progress"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct}
+          aria-label={status}
+        >
+          <span style={{ width: `${pct}%` }} />
+        </div>
+        {showRunningCat(job.status) ? (
+          <picture className="miao-progress-cat" style={{ "--miao-pct": `${pct}%` } as CSSProperties}>
+            <source srcSet={runningCatWebp} type="image/webp" />
+            <img src={runningCatGif} alt="" />
+          </picture>
+        ) : null}
       </div>
       <p className="chat-quiet miao-receive-bytes">
         {formatBytes(job.bytesDone)} / {formatBytes(job.bytesTotal)}
@@ -314,10 +328,26 @@ export default function MiaoPage() {
         });
       })
       .catch(() => undefined);
+    void miaoRestoreNotes()
+      .then((notes) => {
+        if (!live || notes.length === 0) {
+          return;
+        }
+        const lines = notes
+          .map((note) => {
+            const key = miaoErrorKey(new Error(note));
+            return key ? t(key) : note;
+          })
+          .filter((line, index, all) => line !== "" && all.indexOf(line) === index);
+        if (lines.length) {
+          setError(lines.join(" "));
+        }
+      })
+      .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     return onTailcatEvent((ev) => {

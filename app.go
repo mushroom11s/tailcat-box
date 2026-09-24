@@ -634,6 +634,18 @@ func (a *App) EndMiaoShare(id string) error {
 	return a.miao.End(id)
 }
 
+// MiaoRestoreNotes reports shares that could not come back after a restart.
+func (a *App) MiaoRestoreNotes() []string {
+	if a.miao == nil {
+		return []string{}
+	}
+	notes := a.miao.RestoreNotes()
+	if notes == nil {
+		return []string{}
+	}
+	return notes
+}
+
 // MiaoShareStatus returns every share that is still listening.
 func (a *App) MiaoShareStatus() []miao.Snapshot {
 	if a.miao == nil {

@@ -86,6 +86,10 @@ export function ListSessions() {
   return window['go']['main']['App']['ListSessions']();
 }
 
+export function MiaoRestoreNotes() {
+  return window['go']['main']['App']['MiaoRestoreNotes']();
+}
+
 export function MiaoShareStatus() {
   return window['go']['main']['App']['MiaoShareStatus']();
 }

@@ -1,4 +1,4 @@
-# 猫砂盆
+# 猫砂盆 <img src="docs/assets/loading-cat.gif" alt="" height="28" />
 
 [English](README.md)
 
@@ -7,7 +7,7 @@ macOS 和 Windows 上的 [Tailscale Tailcat](https://github.com/tailscale/tailca
 [![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/mushroom11s/tailcat-box)](https://github.com/mushroom11s/tailcat-box/releases) [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey)
 
 <p align="center">
-  <img src="docs/assets/loading-cat.gif" alt="猫砂盆" width="180" />
+  <img src="docs/assets/icon.png" alt="猫砂盆" width="160" />
 </p>
 
 ## 功能演示
@@ -146,7 +146,7 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 | Windows | `%AppData%\tailcat-box` |
 | Linux | `~/.config/tailcat-box` |
 
-如果这台电脑上已经有旧目录 `<用户配置目录>/tailcat-desktop-client`，而还没有 `tailcat-box`，密钥和设置会继续用旧目录。想换过去，把那个文件夹改名为 `tailcat-box`。也可以用 `TAILCAT_KEYS_DIR` 和 `TAILCAT_SETTINGS_DIR` 指定目录。聊天文件在 `<用户配置目录>/tailcat-box/chat`（`TAILCAT_CHAT_DIR` 可以改这个路径）。喵传的临时副本在 `<用户配置目录>/tailcat-box/miao`（`TAILCAT_MIAO_DIR`），那一份分享结束就会删掉。
+如果这台电脑上已经有旧目录 `<用户配置目录>/tailcat-desktop-client`，而还没有 `tailcat-box`，密钥和设置会继续用旧目录。想换过去，把那个文件夹改名为 `tailcat-box`。也可以用 `TAILCAT_KEYS_DIR` 和 `TAILCAT_SETTINGS_DIR` 指定目录。聊天文件在 `<用户配置目录>/tailcat-box/chat`（`TAILCAT_CHAT_DIR` 可以改这个路径）。喵传的临时副本在 `<用户配置目录>/tailcat-box/miao`（`TAILCAT_MIAO_DIR`）。退出后再打开，同一份口令还会在；那一份共享结束才会删掉。
 
 设置里的密钥页还会列出 Tailcat 命令行的密钥目录（一般是 `~/.config/tailcat/keys`），方便把命令行的密钥导进来。
 

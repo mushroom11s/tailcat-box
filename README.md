@@ -1,4 +1,4 @@
-# Tailcat Box
+# Tailcat Box <img src="docs/assets/loading-cat.gif" alt="" height="28" />
 
 [中文说明](README.zh-CN.md)
 
@@ -7,7 +7,7 @@ Desktop GUI for [Tailscale Tailcat](https://github.com/tailscale/tailcat) on mac
 [![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/mushroom11s/tailcat-box)](https://github.com/mushroom11s/tailcat-box/releases) [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey)
 
 <p align="center">
-  <img src="docs/assets/loading-cat.gif" alt="Tailcat Box" width="180" />
+  <img src="docs/assets/icon.png" alt="Tailcat Box" width="160" />
 </p>
 
 ## Demo
@@ -146,7 +146,7 @@ New installs store keys and settings under `<user-config>/tailcat-box` (keys are
 | Windows | `%AppData%\tailcat-box` |
 | Linux | `~/.config/tailcat-box` |
 
-If `<user-config>/tailcat-desktop-client` already exists and `tailcat-box` does not, the app keeps using the old directory for keys and settings. Move or rename that folder to `tailcat-box` when you want the new path. Override those directories with `TAILCAT_KEYS_DIR` and `TAILCAT_SETTINGS_DIR`. Chat files are stored in `<user-config>/tailcat-box/chat` (override with `TAILCAT_CHAT_DIR`). Mew Share temp copies live in `<user-config>/tailcat-box/miao` (override with `TAILCAT_MIAO_DIR`) and are deleted when that share ends.
+If `<user-config>/tailcat-desktop-client` already exists and `tailcat-box` does not, the app keeps using the old directory for keys and settings. Move or rename that folder to `tailcat-box` when you want the new path. Override those directories with `TAILCAT_KEYS_DIR` and `TAILCAT_SETTINGS_DIR`. Chat files are stored in `<user-config>/tailcat-box/chat` (override with `TAILCAT_CHAT_DIR`). Mew Share temp copies live in `<user-config>/tailcat-box/miao` (override with `TAILCAT_MIAO_DIR`). They come back with the same code when you open the app again, and are deleted when that share ends.
 
 The Keys page also lists the Tailcat CLI key directory (`~/.config/tailcat/keys`, or the OS equivalent) so you can import those keys.
 

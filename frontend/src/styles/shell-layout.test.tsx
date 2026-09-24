@@ -238,6 +238,20 @@ describe("shell scroll", () => {
     }
   });
 
+  it("gives sidebar menu buttons and room rows vertical breathing room", () => {
+    const navRule = cssBlock(css, ".nav");
+    expect(navRule).toContain("gap: 8px");
+    expect(navRule).toContain("padding-left: 8px");
+    expect(navRule).toContain("padding-right: 8px");
+    expect(cssBlock(css, ".nav-rooms")).toContain("gap: 8px");
+    expect(cssBlock(css, ".nav-room-list")).toContain("gap: 8px");
+    const active = cssBlock(css, ".nav-btn.active");
+    expect(active).toContain("0 0 0 1px");
+    expect(active).toContain("0 4px 10px");
+    expect(active).not.toContain("0 10px 24px");
+    expect(cssBlock(css, ":root")).toContain("--sidebar-w: 260px");
+  });
+
   it("widens the sidebar and insets the active pill inside the clip", () => {
     expect(cssBlock(css, ":root")).toContain("--sidebar-w: 260px");
     expect(cssBlock(css, ".shell")).toContain("grid-template-columns: var(--sidebar-w) minmax(0, 1fr)");

@@ -35,7 +35,14 @@ func TestShareDownloadThenCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(staged) != 1 || staged[0].Name() == "笔记.txt" {
+	var stored []string
+	for _, entry := range staged {
+		if entry.Name() == "share.json" {
+			continue
+		}
+		stored = append(stored, entry.Name())
+	}
+	if len(stored) != 1 || stored[0] == "笔记.txt" {
 		t.Fatalf("storage names=%v", names(staged))
 	}
 
@@ -140,9 +147,7 @@ func TestConcurrentSharesStayIndependent(t *testing.T) {
 	if err != nil || string(body) != "one" {
 		t.Fatalf("body=%q err=%v", body, err)
 	}
-	if _, err := os.Stat(filepath.Join(root, first.ID)); !os.IsNotExist(err) {
-		t.Fatalf("ended share still on disk: %v", err)
-	}
+	waitGone(t, filepath.Join(root, first.ID))
 	if _, err := os.Stat(filepath.Join(root, second.ID)); err != nil {
 		t.Fatal(err)
 	}
@@ -663,6 +668,20 @@ func names(entries []os.DirEntry) []string {
 		out[i] = entry.Name()
 	}
 	return out
+}
+
+func waitGone(t *testing.T, path string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return
+		}
+		time.Sleep(15 * time.Millisecond)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("ended share still on disk: %v", err)
+	}
 }
 
 func waitEmpty(t *testing.T, root string) {
