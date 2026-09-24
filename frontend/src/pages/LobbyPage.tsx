@@ -79,9 +79,11 @@ export default function LobbyPage({
       <div className="glass chat-lobby-panel">
         <h3>{t("lobbyTempTitle")}</h3>
         {panelBusy(busy === "temp", t("lobbyCreating"))}
-        <button className="btn" type="button" disabled={pending} onClick={onCreate}>
-          {t("lobbyCreate")}
-        </button>
+        {busy === "temp" ? null : (
+          <button className="btn" type="button" disabled={pending} onClick={onCreate}>
+            {t("lobbyCreate")}
+          </button>
+        )}
       </div>
 
       <div className="glass chat-lobby-panel">
