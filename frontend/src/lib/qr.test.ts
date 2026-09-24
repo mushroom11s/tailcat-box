@@ -122,8 +122,9 @@ describe("qr helpers", () => {
 
     const center = pixel(image, Math.round((box.minX + box.maxX) / 2), Math.round((box.minY + box.maxY) / 2));
     expect(center[0]).toBeGreaterThan(200);
-    expect(nearestBlackDistance(image, box)).toBeGreaterThanOrEqual(6);
-    expect(nearestBlackDistance(image, box)).toBeLessThanOrEqual(24);
+    const gap = nearestBlackDistance(image, box);
+    expect(gap).toBeGreaterThanOrEqual(3);
+    expect(gap).toBeLessThanOrEqual(12);
 
     const plain = QRCode.create(text, { errorCorrectionLevel: "H" });
     const modulePx = 8;
@@ -141,6 +142,8 @@ describe("qr helpers", () => {
   });
 
   it("bakes the app icon so modules sit in the gaps around the cat", async () => {
+    const icon = await decodePng(dataUrlBytes(iconUrl));
+    expect(transparentFraction(icon)).toBeGreaterThan(0.15);
     const text = "mw1.AAAVdGM6ZmFrZS1taWFvLWFiY2QxMjM0ACBhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ";
     const url = await encodeQrDataURL(text, { centerMark: iconUrl });
     expect(url.startsWith("data:image/png")).toBe(true);
@@ -220,9 +223,114 @@ describe("qr helpers", () => {
     }
     expect(light).toBeGreaterThan(10);
   });
+
+  it("wraps room QR modules into the cat silhouette instead of a rectangular hole", async () => {
+    const logo = await decodePng(dataUrlBytes(roomQrMark));
+    expect(transparentFraction(logo)).toBeGreaterThan(0.12);
+    for (const [x, y] of [
+      [0, 0],
+      [logo.width - 1, 0],
+      [0, logo.height - 1],
+      [logo.width - 1, logo.height - 1],
+    ]) {
+      expect(logo.rgba[(y * logo.width + x) * 4 + 3]).toBe(0);
+    }
+
+    const text = "tc:fake-room-abc";
+    const url = await encodeQrDataURL(text, { errorCorrectionLevel: "H", centerMark: roomQrMark });
+    expect(url.startsWith("data:image/png")).toBe(true);
+    const image = await decodePng(dataUrlBytes(url));
+    expect(decodeQrImageData(toClamped(image), image.width, image.height)).toBe(text);
+
+    const painted = boundsWhere(image, (r, g, b) => r !== g || g !== b || (r !== 0 && r !== 255));
+    expect(painted).not.toBeNull();
+    const box = painted as Box;
+    let blackInBox = 0;
+    for (let y = box.minY; y <= box.maxY; y++) {
+      for (let x = box.minX; x <= box.maxX; x++) {
+        const [r, g, b] = pixel(image, x, y);
+        if (r === 0 && g === 0 && b === 0) {
+          blackInBox += 1;
+        }
+      }
+    }
+    expect(blackInBox).toBeGreaterThan(20);
+    expect(mostlyBlackModules(image, box)).toBeGreaterThan(0);
+
+    const plain = QRCode.create(text, { errorCorrectionLevel: "H" });
+    const modulePx = 8;
+    const margin = 2;
+    for (const [row, col] of [
+      [0, 0],
+      [0, plain.modules.size - 1],
+      [plain.modules.size - 1, 0],
+    ]) {
+      const x = (col + margin) * modulePx;
+      const y = (row + margin) * modulePx;
+      const [r, g, b] = pixel(image, x, y);
+      expect(r === 0 && g === 0 && b === 0).toBe(plain.modules.get(row, col) === 1);
+    }
+  });
+
+  it("clears a solid rectangle and keeps QR inside a transparent notch", async () => {
+    const text = "tc:fake-room-abc";
+    const solidUrl = await encodeQrDataURL(text, { errorCorrectionLevel: "H", centerMark: await pngDataUrl(blockMark(false)) });
+    const notchedUrl = await encodeQrDataURL(text, { errorCorrectionLevel: "H", centerMark: await pngDataUrl(blockMark(true)) });
+    const solid = await decodePng(dataUrlBytes(solidUrl));
+    const notched = await decodePng(dataUrlBytes(notchedUrl));
+    expect(decodeQrImageData(toClamped(solid), solid.width, solid.height)).toBe(text);
+    expect(decodeQrImageData(toClamped(notched), notched.width, notched.height)).toBe(text);
+    const solidBox = boundsWhere(solid, (r, g, b) => g > 120 && r < 40 && b < 40);
+    const notchedBox = boundsWhere(notched, (r, g, b) => g > 120 && r < 40 && b < 40);
+    expect(solidBox).not.toBeNull();
+    expect(notchedBox).not.toBeNull();
+    expect(mostlyBlackModules(solid, solidBox as Box)).toBe(0);
+    expect(mostlyBlackModules(notched, notchedBox as Box)).toBeGreaterThan(0);
+  });
 });
 
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
+
+function blockMark(notch: boolean): RgbaImage {
+  const size = 48;
+  const rgba = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (notch && x >= 18 && x < 36 && y < 16) {
+        continue;
+      }
+      const i = (y * size + x) * 4;
+      rgba[i + 1] = 160;
+      rgba[i + 3] = 255;
+    }
+  }
+  return { width: size, height: size, rgba };
+}
+
+function mostlyBlackModules(image: RgbaImage, box: Box): number {
+  const modulePx = 8;
+  let kept = 0;
+  for (let my = Math.floor(box.minY / modulePx); my <= Math.floor(box.maxY / modulePx); my++) {
+    for (let mx = Math.floor(box.minX / modulePx); mx <= Math.floor(box.maxX / modulePx); mx++) {
+      let black = 0;
+      for (let y = my * modulePx; y < (my + 1) * modulePx; y++) {
+        for (let x = mx * modulePx; x < (mx + 1) * modulePx; x++) {
+          if (x < box.minX || y < box.minY || x > box.maxX || y > box.maxY) {
+            continue;
+          }
+          const [r, g, b] = pixel(image, x, y);
+          if (r === 0 && g === 0 && b === 0) {
+            black += 1;
+          }
+        }
+      }
+      if (black >= 32) {
+        kept += 1;
+      }
+    }
+  }
+  return kept;
+}
 
 function plusMark(): RgbaImage {
   const size = 17;
@@ -291,6 +399,24 @@ function boundsWhere(image: RgbaImage, match: (r: number, g: number, b: number, 
     }
   }
   return maxX < 0 ? null : { minX, minY, maxX, maxY };
+}
+
+function transparentFraction(image: RgbaImage): number {
+  const art = boundsWhere(image, (_r, _g, _b, a) => a >= 128);
+  if (!art) {
+    return 1;
+  }
+  let transparent = 0;
+  let area = 0;
+  for (let y = art.minY; y <= art.maxY; y++) {
+    for (let x = art.minX; x <= art.maxX; x++) {
+      area += 1;
+      if (image.rgba[(y * image.width + x) * 4 + 3] < 128) {
+        transparent += 1;
+      }
+    }
+  }
+  return area === 0 ? 1 : transparent / area;
 }
 
 function nearestBlackDistance(image: RgbaImage, box: Box): number {
