@@ -128,14 +128,73 @@ describe("in-app update", () => {
     expect(await screen.findByRole("button", { name: /NEW!/ })).toBeTruthy();
   });
 
-  it("calls the update check when Check now is pressed", async () => {
+  it("calls the update check when Check for updates is pressed", async () => {
     const user = userEvent.setup();
     renderApp();
     emitTrayNavigate("settings");
     const before = updateCheckCount();
-    await user.click(await screen.findByRole("button", { name: "Check now" }));
+    await user.click(await screen.findByRole("button", { name: "Check for updates" }));
     await waitFor(() => {
       expect(updateCheckCount()).toBe(before + 1);
     });
+  });
+
+  it("says the app is already current and does not offer a download", async () => {
+    renderApp();
+    emitUpdateStatus(status({
+      UpdateAvailable: false,
+      LatestVersion: "0.1.0-dev",
+      Status: "upToDate",
+      ReleaseURL: "https://github.com/mushroom11s/tailcat-box/releases/tag/v0.1.0-dev",
+      DownloadURL: "",
+      Notes: "",
+    }));
+    emitTrayNavigate("settings");
+    expect(await screen.findByText("You're on the latest release.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Download" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /NEW!/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "View release" })).toBeTruthy();
+  });
+
+  it("explains a failed check when GitHub cannot be reached", async () => {
+    renderApp();
+    emitUpdateStatus(status({
+      UpdateAvailable: false,
+      LatestVersion: "",
+      Status: "error",
+      Error: "network",
+      ReleaseURL: "",
+      DownloadURL: "",
+      Notes: "",
+    }));
+    emitTrayNavigate("settings");
+    expect(await screen.findByText("Couldn't reach GitHub. Check the network and try again.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Download" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "View release" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /NEW!/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Check for updates" })).toBeTruthy();
+  });
+
+  it("opens the GitHub release page and names the check in Chinese", async () => {
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    emitUpdateStatus(status({ UpdateAvailable: true }));
+    renderApp();
+    emitTrayNavigate("settings");
+    await user.click(await screen.findByRole("button", { name: "View release" }));
+    expect(open).toHaveBeenCalledWith(
+      "https://github.com/mushroom11s/tailcat-box/releases/tag/v0.2.0",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    open.mockRestore();
+
+    localStorage.setItem("tailcat-locale", "zh-CN");
+    cleanup();
+    renderApp();
+    emitTrayNavigate("settings");
+    expect(await screen.findByRole("button", { name: "检查更新" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "下载更新" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "查看这个版本" })).toBeTruthy();
   });
 });

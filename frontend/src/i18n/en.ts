@@ -95,7 +95,7 @@ export const en = {
   tailcatVersion: "Tailcat version",
   lastUpdateCheck: "Last update check",
   never: "Never",
-  checkNow: "Check now",
+  checkNow: "Check for updates",
   updateNew: "NEW!",
   updateNewBadge: "NEW! A newer version is available",
   latestVersion: "Latest version",
