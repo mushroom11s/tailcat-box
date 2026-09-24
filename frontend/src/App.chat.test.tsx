@@ -143,6 +143,6 @@ describe("phase 1 chat shell", () => {
     expect(screen.queryByRole("button", { name: "Restart room" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Chat" }));
     expect(screen.queryByRole("heading", { name: "Services" })).toBeNull();
-    expect(document.querySelectorAll(".nav-btn").length).toBe(6);
+    expect(document.querySelectorAll(".nav-btn").length).toBe(5);
   });
 });
