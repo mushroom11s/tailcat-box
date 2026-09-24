@@ -306,9 +306,25 @@ textarea {
 .nav > .nav-btn,
 .nav-chat > .nav-btn,
 .sidebar-footer > .nav-btn {
-  justify-content: center;
-  text-align: center;
+  position: relative;
+  justify-content: flex-start;
   width: 100%;
+}
+
+.nav > .nav-btn > .nav-glyph,
+.nav-chat > .nav-btn > .nav-glyph,
+.sidebar-footer > .nav-btn > .nav-glyph {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.nav > .nav-btn > .nav-label,
+.nav-chat > .nav-btn > .nav-label,
+.sidebar-footer > .nav-btn > .nav-label {
+  width: 100%;
+  text-align: center;
 }
 
 .nav-glyph {

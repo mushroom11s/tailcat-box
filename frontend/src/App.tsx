@@ -829,7 +829,7 @@ function AppShell() {
             onClick={() => setPage("miao")}
           >
             <NavGlyph name="miao" />
-            {t("navMiao")}
+            <span className="nav-label">{t("navMiao")}</span>
           </button>
           {NAV.map((item) =>
             item.id === "tunnel" ? (
@@ -840,7 +840,7 @@ function AppShell() {
                 onClick={() => setPage(item.id)}
               >
                 <NavGlyph name={item.id} />
-                {t(item.labelKey)}
+                <span className="nav-label">{t(item.labelKey)}</span>
               </button>
             ) : (
               <span key={item.id} className="nav-chat">
@@ -850,7 +850,7 @@ function AppShell() {
                   onClick={openChat}
                 >
                   <NavGlyph name="chat" />
-                  {t("navChat")}
+                  <span className="nav-label">{t("navChat")}</span>
                 </button>
                 <div className="nav-rooms">
                   <button
@@ -912,7 +912,7 @@ function AppShell() {
             onClick={() => setPage("settings")}
           >
             <NavGlyph name="settings" />
-            {t("navSettings")}
+            <span className="nav-label">{t("navSettings")}</span>
           </button>
           {fallback ? <div className="fallback-chip">{t("fallbackChip")}</div> : null}
         </div>

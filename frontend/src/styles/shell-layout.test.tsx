@@ -152,17 +152,42 @@ describe("shell scroll", () => {
     }
   });
 
-  it("centers top-level menu labels and leaves room rows left-aligned", () => {
+  it("pins top-level menu icons left and centers labels separately", () => {
     const menuRule = css.match(
       /\.nav > \.nav-btn,\s*\.nav-chat > \.nav-btn,\s*\.sidebar-footer > \.nav-btn\s*\{[^}]*\}/,
     );
-    expect(menuRule?.[0]).toContain("justify-content: center");
-    expect(menuRule?.[0]).toContain("text-align: center");
+    expect(menuRule?.[0]).toContain("position: relative");
+    expect(menuRule?.[0]).toContain("justify-content: flex-start");
     expect(menuRule?.[0]).toContain("width: 100%");
+    expect(menuRule?.[0]).not.toContain("justify-content: center");
+    expect(menuRule?.[0]).not.toContain("text-align: center");
+
+    const glyphRule = css.match(
+      /\.nav > \.nav-btn > \.nav-glyph,\s*\.nav-chat > \.nav-btn > \.nav-glyph,\s*\.sidebar-footer > \.nav-btn > \.nav-glyph\s*\{[^}]*\}/,
+    );
+    expect(glyphRule?.[0]).toContain("position: absolute");
+    expect(glyphRule?.[0]).toContain("left: 12px");
+    expect(glyphRule?.[0]).toContain("top: 50%");
+    expect(glyphRule?.[0]).toContain("transform: translateY(-50%)");
+
+    const labelRule = css.match(
+      /\.nav > \.nav-btn > \.nav-label,\s*\.nav-chat > \.nav-btn > \.nav-label,\s*\.sidebar-footer > \.nav-btn > \.nav-label\s*\{[^}]*\}/,
+    );
+    expect(labelRule?.[0]).toContain("width: 100%");
+    expect(labelRule?.[0]).toContain("text-align: center");
+    expect(cssBlock(css, ".nav-btn")).toContain("padding: 10px 12px");
+    expect(cssBlock(css, ".nav-btn")).toContain("text-align: left");
     expect(cssBlock(css, ".nav-btn.nav-child")).not.toContain("justify-content: center");
 
     const style = document.createElement("style");
-    style.textContent = [cssBlock(css, ".nav-btn"), menuRule?.[0] ?? "", cssBlock(css, ".nav-btn.nav-child")].join("\n");
+    style.textContent = [
+      cssBlock(css, ".nav-btn"),
+      menuRule?.[0] ?? "",
+      glyphRule?.[0] ?? "",
+      labelRule?.[0] ?? "",
+      cssBlock(css, ".nav-glyph"),
+      cssBlock(css, ".nav-btn.nav-child"),
+    ].join("\n");
     document.head.appendChild(style);
 
     try {
@@ -175,16 +200,31 @@ describe("shell scroll", () => {
 
       for (const name of ["喵传", "聊天", "穿透", "设置"]) {
         const button = screen.getByRole("button", { name });
+        const glyph = button.querySelector(".nav-glyph") as HTMLElement;
+        const label = button.querySelector(".nav-label") as HTMLElement;
         const buttonStyle = getComputedStyle(button);
-        expect(buttonStyle.justifyContent).toBe("center");
-        expect(buttonStyle.textAlign).toBe("center");
+        const glyphStyle = getComputedStyle(glyph);
+        const labelStyle = getComputedStyle(label);
+        expect(buttonStyle.justifyContent).toBe("flex-start");
+        expect(buttonStyle.textAlign).toBe("left");
+        expect(buttonStyle.position).toBe("relative");
         expect(buttonStyle.width).not.toBe("auto");
         expect(buttonStyle.display).toBe("flex");
+        expect(buttonStyle.paddingLeft).toBe("12px");
+        expect(glyphStyle.position).toBe("absolute");
+        expect(glyphStyle.left).toBe("12px");
+        expect(label.textContent).toBe(name);
+        expect(labelStyle.textAlign).toBe("center");
+        expect(labelStyle.width).not.toBe("auto");
+        expect(labelStyle.position).not.toBe("absolute");
       }
 
       const fresh = screen.getByRole("button", { name: "+ 新房间" });
+      expect(fresh.querySelector(".nav-glyph")).toBeNull();
+      expect(fresh.querySelector(".nav-label")).toBeNull();
       expect(getComputedStyle(fresh).justifyContent).not.toBe("center");
       expect(getComputedStyle(fresh).textAlign).toBe("left");
+      expect(getComputedStyle(fresh).position).not.toBe("relative");
     } finally {
       style.remove();
     }
