@@ -185,7 +185,8 @@ func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (
 		_ = pkg.Remove()
 		return Snapshot{}, err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	life, stopLife := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(life)
 	room, err := s.ad.StartRoom(ctx, adapter.RoomOpts{
 		SessionID:      sess.ID,
 		PrivateKeyJSON: keyJSON,
@@ -194,9 +195,11 @@ func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (
 	})
 	if err != nil {
 		cancel()
+		stopLife()
 		_ = pkg.Remove()
 		return Snapshot{}, err
 	}
+	sig := &readySignal{ch: make(chan struct{})}
 	h := &host{
 		svc:       s,
 		id:        sess.ID,
@@ -210,7 +213,10 @@ func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (
 		room:      room,
 		cancel:    cancel,
 		ctx:       ctx,
-		ready:     make(chan struct{}),
+		ready:     sig.ch,
+		readySig:  sig,
+		life:      life,
+		stopLife:  stopLife,
 		forever:   lim.TTL <= 0,
 		expires:   time.Time{},
 		createdAt: sess.CreatedAt,
@@ -934,7 +940,9 @@ type host struct {
 	ctx       context.Context
 	timer     *time.Timer
 	ready     chan struct{}
-	readyOnce sync.Once
+	readySig  *readySignal
+	life      context.Context
+	stopLife  context.CancelFunc
 	mu        sync.Mutex
 	sendMu    sync.Mutex
 	ended     bool
@@ -947,17 +955,29 @@ type host struct {
 }
 
 func (h *host) readLoop() {
-	for ev := range h.room.Events() {
+	h.mu.Lock()
+	room := h.room
+	sig := h.readySig
+	h.mu.Unlock()
+	if room == nil {
+		return
+	}
+	for ev := range room.Events() {
 		switch ev.Kind {
 		case adapter.ChatEventReady:
 			h.mu.Lock()
-			h.address = ev.Address
-			if h.sess != nil && h.sess.Status == session.StatusStarting {
-				h.sess.Address = ev.Address
-				_ = h.sess.Transition(session.StatusRunning)
+			current := h.room == room
+			if current {
+				h.address = ev.Address
+				if h.sess != nil && h.sess.Status == session.StatusStarting {
+					h.sess.Address = ev.Address
+					_ = h.sess.Transition(session.StatusRunning)
+				}
 			}
 			h.mu.Unlock()
-			h.readyOnce.Do(func() { close(h.ready) })
+			if current {
+				sig.close()
+			}
 		case adapter.ChatEventInbound:
 			if ev.Port != portMiao {
 				continue
@@ -1158,7 +1178,12 @@ func (h *host) end(reason string) {
 	cancel := h.cancel
 	room := h.room
 	dir := h.dir
+	stop := h.stopLife
+	sig := h.readySig
 	h.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
 	if timer != nil {
 		timer.Stop()
 	}
@@ -1175,7 +1200,19 @@ func (h *host) end(reason string) {
 	if !keep {
 		h.publish(snap)
 	}
-	h.readyOnce.Do(func() { close(h.ready) })
+	sig.close()
+}
+
+type readySignal struct {
+	ch   chan struct{}
+	once sync.Once
+}
+
+func (r *readySignal) close() {
+	if r == nil || r.ch == nil {
+		return
+	}
+	r.once.Do(func() { close(r.ch) })
 }
 
 func (h *host) snapshot() Snapshot {
