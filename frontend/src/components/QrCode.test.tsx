@@ -51,7 +51,9 @@ describe("qr share and scan", () => {
     expect(payload.startsWith("tc:fake-room-")).toBe(true);
     expect(payload.includes("http")).toBe(false);
     expect(payload.includes("#invite")).toBe(false);
-    expect(within(dialog).getByRole("img", { name: payload }).getAttribute("src")?.startsWith("data:image/")).toBe(true);
+    await waitFor(() => {
+      expect(within(dialog).getByRole("img", { name: payload }).getAttribute("src")?.startsWith("data:image/png")).toBe(true);
+    });
     await user.click(within(dialog).getByRole("button", { name: "Copy" }));
     expect(writeText).toHaveBeenCalledWith(payload);
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -116,6 +118,9 @@ describe("qr share and scan", () => {
     await user.click(screen.getByRole("button", { name: "Show QR code" }));
     const dialog = await screen.findByRole("dialog", { name: "QR code" });
     expect(dialog.querySelector(".qr-payload")?.textContent).toBe(addr);
+    await waitFor(() => {
+      expect(within(dialog).getByRole("img", { name: addr }).getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
+    });
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     await user.click(screen.getByRole("button", { name: "+ New mapping" }));

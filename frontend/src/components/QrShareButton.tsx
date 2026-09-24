@@ -7,6 +7,8 @@ import QrDialog from "./QrDialog";
 type Props = {
   value: string;
   disabled?: boolean;
+  /** PNG data URL or image URL baked into the QR bitmap. */
+  centerMark?: string;
 };
 
 async function copyText(text: string): Promise<void> {
@@ -25,7 +27,7 @@ async function copyText(text: string): Promise<void> {
   }
 }
 
-export default function QrShareButton({ value, disabled = false }: Props) {
+export default function QrShareButton({ value, disabled = false, centerMark }: Props) {
   const { t } = useI18n();
   const text = value.trim();
   const [open, setOpen] = useState(false);
@@ -42,7 +44,7 @@ export default function QrShareButton({ value, disabled = false }: Props) {
     setSrc("");
     setFailed(false);
     try {
-      const url = await encodeQrDataURL(text);
+      const url = await encodeQrDataURL(text, centerMark ? { centerMark } : undefined);
       if (id === ticket.current) {
         setSrc(url);
       }

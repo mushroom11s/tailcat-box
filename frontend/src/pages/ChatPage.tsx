@@ -4,6 +4,7 @@ import QrScanButton from "../components/QrScanButton";
 import QrShareButton from "../components/QrShareButton";
 import VoiceNote from "../components/VoiceNote";
 import iconUrl from "../assets/icon.png";
+import roomQrMark from "../assets/room-qr-cat.png?inline";
 import { useI18n } from "../i18n";
 import { localizeChatError, systemText } from "../lib/chatText";
 import { purgeDiscardIds } from "../lib/chatPurge";
@@ -1026,7 +1027,7 @@ export default function ChatPage({
             >
               {t("copy")}
             </button>
-            <QrShareButton value={address} disabled={!address} />
+            <QrShareButton value={address} disabled={!address} centerMark={roomQrMark} />
             <span
               className={`chat-identity-peer${remarkFor(remarks, peer) || peer.trim() ? "" : " is-quiet"}`}
               title={peer || t("chatNotConnected")}
@@ -1060,7 +1061,7 @@ export default function ChatPage({
           <button className="btn btn-ghost" type="button" disabled={!address} onClick={() => copyText(address)}>
             {t("copy")}
           </button>
-          <QrShareButton value={address} disabled={!address} />
+          <QrShareButton value={address} disabled={!address} centerMark={roomQrMark} />
           {roomError ? (
             <button className="btn" type="button" onClick={() => onRetry()}>
               {t("chatRetry")}
