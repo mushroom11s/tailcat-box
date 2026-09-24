@@ -85,6 +85,73 @@ describe("shell scroll", () => {
     }
   });
 
+  it("scrolls only the room rows and hides that scrollbar", async () => {
+    const listRule = cssBlock(css, ".nav-room-list");
+    expect(listRule).toContain("overflow-y: auto");
+    expect(listRule).toContain("min-height: 0");
+    expect(listRule).toContain("scrollbar-width: none");
+    expect(listRule).toContain("-ms-overflow-style: none");
+    const webkit = cssBlock(css, ".nav-room-list::-webkit-scrollbar");
+    expect(webkit).toContain("display: none");
+    expect(webkit).toContain("width: 0");
+    expect(webkit).toContain("height: 0");
+    expect(cssBlock(css, ".sidebar")).toContain("overflow: hidden");
+    expect(cssBlock(css, ".nav")).toContain("min-height: 0");
+    expect(cssBlock(css, ".nav-chat")).toContain("min-height: 0");
+    expect(cssBlock(css, ".nav-rooms")).toContain("overflow: hidden");
+    expect(cssBlock(css, ".brand")).toContain("flex-shrink: 0");
+    expect(cssBlock(css, ".sidebar-footer")).toContain("flex-shrink: 0");
+    expect(cssBlock(css, ".nav-btn")).toContain("flex-shrink: 0");
+
+    const style = document.createElement("style");
+    style.textContent = [
+      cssBlock(css, ".nav-rooms"),
+      cssBlock(css, ".nav-room-list"),
+      cssBlock(css, ".nav-room-list::-webkit-scrollbar"),
+    ].join("\n");
+    document.head.appendChild(style);
+
+    try {
+      localStorage.setItem("tailcat-locale", "en");
+      const user = userEvent.setup();
+      render(
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Create temporary room" }));
+      const list = document.querySelector(".nav-room-list") as HTMLElement;
+      const rooms = document.querySelector(".nav-rooms") as HTMLElement;
+      const room = document.querySelector(".nav-room-row") as HTMLElement;
+      const fresh = screen.getByRole("button", { name: "+ New room" });
+      const chat = screen.getByRole("button", { name: "Chat" });
+      const tunnel = screen.getByRole("button", { name: "Tunnel" });
+      const settings = screen.getByRole("button", { name: "Settings" });
+      const brand = document.querySelector(".brand") as HTMLElement;
+      const footer = document.querySelector(".sidebar-footer") as HTMLElement;
+
+      expect(rooms.contains(list)).toBe(true);
+      expect(rooms.contains(fresh)).toBe(true);
+      expect(list.contains(room)).toBe(true);
+      expect(list.contains(fresh)).toBe(false);
+      expect(list.contains(chat)).toBe(false);
+      expect(list.contains(tunnel)).toBe(false);
+      expect(list.contains(settings)).toBe(false);
+      expect(list.contains(brand)).toBe(false);
+      expect(footer.contains(settings)).toBe(true);
+      expect(document.querySelector(".sidebar")?.contains(tunnel)).toBe(true);
+
+      const listStyle = getComputedStyle(list);
+      expect(listStyle.overflowY).toBe("auto");
+      expect(listStyle.overflowX).toBe("hidden");
+      expect(listStyle.scrollbarWidth).toBe("none");
+      expect(listStyle.minHeight).toBe("0px");
+    } finally {
+      style.remove();
+    }
+  });
+
   it("centers the brand stack in the sidebar", () => {
     const style = document.createElement("style");
     style.textContent = [

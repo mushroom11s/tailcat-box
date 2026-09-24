@@ -185,6 +185,7 @@ textarea {
   flex-direction: column;
   padding: 22px 14px 16px;
   min-height: 0;
+  overflow: hidden;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--hairline);
 }
@@ -194,6 +195,7 @@ textarea {
   flex-direction: column;
   align-items: center;
   text-align: center;
+  flex-shrink: 0;
   gap: 8px;
   padding: 6px 10px 22px;
 }
@@ -279,7 +281,10 @@ textarea {
 .nav {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 4px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .nav-btn {
@@ -290,6 +295,7 @@ textarea {
   text-align: left;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 10px;
   padding: 10px 12px;
   border-radius: 14px;
@@ -330,14 +336,40 @@ textarea {
 .nav-chat {
   display: flex;
   flex-direction: column;
+  flex: 0 1 auto;
   gap: 4px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .nav-rooms {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 4px;
   margin: 12px 12px 4px 20px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.nav-room-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 4px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.nav-room-list::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
 }
 
 .nav-btn.nav-child {
@@ -446,6 +478,7 @@ textarea {
   margin-top: auto;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   gap: 10px;
   padding-top: 16px;
 }

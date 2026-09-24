@@ -785,44 +785,46 @@ export default function App() {
                   >
                     {t("navNewRoom")}
                   </button>
-                  {order.map((id) => {
-                    const room = rooms[id];
-                    if (!room) {
-                      return null;
-                    }
-                    const peers = order.map((roomID) => rooms[roomID]?.peer ?? "");
-                    const label = roomPrimaryLabel(
-                      room.address,
-                      t("roomStarting"),
-                      room.peer,
-                      remarks,
-                      remarkIsShared(room.peer, peers, remarks),
-                    );
-                    const selected = page === "chat" && !showLobby && focus === id;
-                    return (
-                      <div key={id} className="nav-room-row">
-                        <button
-                          type="button"
-                          className={`nav-btn nav-child ${selected ? "active" : ""}`}
-                          title={roomTooltip(room.address, room.keyName)}
-                          onClick={() => selectRoom(id)}
-                        >
-                          <span className="nav-room-label">
-                            <span className="nav-room-primary">{label}</span>
-                            {room.keyName ? <span className="nav-room-key">{room.keyName}</span> : null}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className="nav-room-close"
-                          aria-label={`${t("roomClose")} ${label}`}
-                          onClick={() => requestCloseRoom(id)}
-                        >
-                          <RoomCloseIcon />
-                        </button>
-                      </div>
-                    );
-                  })}
+                  <div className="nav-room-list">
+                    {order.map((id) => {
+                      const room = rooms[id];
+                      if (!room) {
+                        return null;
+                      }
+                      const peers = order.map((roomID) => rooms[roomID]?.peer ?? "");
+                      const label = roomPrimaryLabel(
+                        room.address,
+                        t("roomStarting"),
+                        room.peer,
+                        remarks,
+                        remarkIsShared(room.peer, peers, remarks),
+                      );
+                      const selected = page === "chat" && !showLobby && focus === id;
+                      return (
+                        <div key={id} className="nav-room-row">
+                          <button
+                            type="button"
+                            className={`nav-btn nav-child ${selected ? "active" : ""}`}
+                            title={roomTooltip(room.address, room.keyName)}
+                            onClick={() => selectRoom(id)}
+                          >
+                            <span className="nav-room-label">
+                              <span className="nav-room-primary">{label}</span>
+                              {room.keyName ? <span className="nav-room-key">{room.keyName}</span> : null}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            className="nav-room-close"
+                            aria-label={`${t("roomClose")} ${label}`}
+                            onClick={() => requestCloseRoom(id)}
+                          >
+                            <RoomCloseIcon />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </span>
             ),
