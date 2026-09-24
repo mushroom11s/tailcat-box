@@ -91,56 +91,89 @@ export function receivePercent(job: ReceiveJob): number {
   return Math.max(0, Math.min(100, Math.round(ratio * 100)));
 }
 
-export function parseReceiveJob(raw: string): ReceiveJob | null {
-  try {
-    const value = JSON.parse(raw) as Partial<ReceiveJob>;
-    if (!value || typeof value.id !== "string" || !value.id || !isReceiveStatus(value.status)) {
-      return null;
-    }
-    return {
-      id: value.id,
-      status: value.status,
-      bytesDone: asCount(value.bytesDone),
-      bytesTotal: asCount(value.bytesTotal),
-      files: asFiles(value.files),
-      saved: Array.isArray(value.saved) ? value.saved : undefined,
-      error: typeof value.error === "string" ? value.error : "",
-      dest: typeof value.dest === "string" ? value.dest : "",
-      payload: typeof value.payload === "string" ? value.payload : "",
-      resumable: value.resumable === true,
-    };
-  } catch {
+export function parseReceiveJob(raw: unknown): ReceiveJob | null {
+  const value = asRecord(raw, (record) => readString(record, "id", "ID") !== "" && isReceiveStatus(readString(record, "status", "Status")));
+  if (!value) {
     return null;
   }
+  const id = readString(value, "id", "ID");
+  const status = readString(value, "status", "Status");
+  if (!id || !isReceiveStatus(status)) {
+    return null;
+  }
+  const resumable = readField(value, "resumable", "Resumable");
+  return {
+    id,
+    status,
+    bytesDone: asCount(readField(value, "bytesDone", "BytesDone")),
+    bytesTotal: asCount(readField(value, "bytesTotal", "BytesTotal")),
+    files: asFiles(readField(value, "files", "Files")),
+    saved: asSaved(readField(value, "saved", "Saved")),
+    error: readString(value, "error", "Error"),
+    dest: readString(value, "dest", "Dest"),
+    payload: readString(value, "payload", "Payload"),
+    resumable: typeof resumable === "boolean" ? resumable : undefined,
+  };
+}
+
+export function parseShare(raw: unknown): MiaoShare | null {
+  const value = asRecord(raw, (record) => readString(record, "id", "ID") !== "");
+  if (!value) {
+    return null;
+  }
+  const id = readString(value, "id", "ID");
+  if (!id) {
+    return null;
+  }
+  const endReason = readString(value, "endReason", "EndReason");
+  return {
+    id,
+    address: readString(value, "address", "Address"),
+    token: readString(value, "token", "Token"),
+    payload: readString(value, "payload", "Payload"),
+    files: asFiles(readField(value, "files", "Files")),
+    total: asCount(readField(value, "total", "Total")),
+    forever: readField(value, "forever", "Forever") === true,
+    ttlDays: asCount(readField(value, "ttlDays", "TTLDays")),
+    expiresAt: readString(value, "expiresAt", "ExpiresAt"),
+    maxDownloads: asCount(readField(value, "maxDownloads", "MaxDownloads")),
+    downloads: asCount(readField(value, "downloads", "Downloads")),
+    status: readString(value, "status", "Status") || "active",
+    endReason: endReason || undefined,
+  };
 }
 
 export function upsertReceiveJob(list: ReceiveJob[], job: ReceiveJob): ReceiveJob[] {
-  const index = list.findIndex((item) => item.id === job.id);
+  const incoming = parseReceiveJob(job);
+  if (!incoming) {
+    return list;
+  }
+  const index = list.findIndex((item) => item.id === incoming.id);
   if (index < 0) {
-    return [job, ...list];
+    return [incoming, ...list];
   }
   const prev = list[index];
-  const restarting = receiveCanRestart(prev.status) && !receiveCanRestart(job.status) && job.status !== "done";
-  const finishing = receiveCanRestart(prev.status) && job.status === "done";
-  if (!restarting && !finishing && RECEIVE_RANK[job.status] < RECEIVE_RANK[prev.status]) {
+  const restarting = receiveCanRestart(prev.status) && !receiveCanRestart(incoming.status) && incoming.status !== "done";
+  const finishing = receiveCanRestart(prev.status) && incoming.status === "done";
+  if (!restarting && !finishing && RECEIVE_RANK[incoming.status] < RECEIVE_RANK[prev.status]) {
     return list;
   }
-  if (!restarting && !finishing && receiveTerminal(prev.status) && job.status !== prev.status) {
+  if (!restarting && !finishing && receiveTerminal(prev.status) && incoming.status !== prev.status) {
     return list;
   }
-  const bytesDone = job.status === prev.status ? Math.max(prev.bytesDone, job.bytesDone) : job.bytesDone;
+  const bytesDone = incoming.status === prev.status ? Math.max(prev.bytesDone, incoming.bytesDone) : incoming.bytesDone;
   const next = list.slice();
   next[index] = {
     ...prev,
-    ...job,
+    ...incoming,
     bytesDone,
-    bytesTotal: job.bytesTotal > 0 ? job.bytesTotal : prev.bytesTotal,
-    files: job.files.length ? job.files : prev.files,
-    saved: job.saved?.length ? job.saved : prev.saved,
-    dest: job.dest || prev.dest,
-    payload: job.payload || prev.payload,
-    resumable: job.resumable ?? prev.resumable,
-    error: job.status === "done" || job.status === "cancelled" ? "" : job.error || prev.error,
+    bytesTotal: incoming.bytesTotal > 0 ? incoming.bytesTotal : prev.bytesTotal,
+    files: (incoming.files?.length ? incoming.files : prev.files) ?? [],
+    saved: (incoming.saved?.length ? incoming.saved : prev.saved) ?? [],
+    dest: incoming.dest || prev.dest,
+    payload: incoming.payload || prev.payload,
+    resumable: incoming.resumable ?? prev.resumable,
+    error: incoming.status === "done" || incoming.status === "cancelled" ? "" : incoming.error || prev.error,
   };
   return next;
 }
@@ -153,6 +186,50 @@ function asCount(value: unknown): number {
   return n;
 }
 
+function asRecord(raw: unknown, ready: (record: Record<string, unknown>) => boolean, depth = 0): Record<string, unknown> | null {
+  if (depth > 3 || raw == null) {
+    return null;
+  }
+  if (typeof raw === "string") {
+    try {
+      return asRecord(JSON.parse(raw), ready, depth + 1);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+  const record = raw as Record<string, unknown>;
+  if (ready(record)) {
+    return record;
+  }
+  for (const key of ["result", "Result", "data", "Data", "job", "Job"]) {
+    if (!(key in record)) {
+      continue;
+    }
+    const inner = asRecord(record[key], ready, depth + 1);
+    if (inner) {
+      return inner;
+    }
+  }
+  return null;
+}
+
+function readField(record: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const key of keys) {
+    if (record[key] !== undefined) {
+      return record[key];
+    }
+  }
+  return undefined;
+}
+
+function readString(record: Record<string, unknown>, ...keys: string[]): string {
+  const value = readField(record, ...keys);
+  return typeof value === "string" ? value : "";
+}
+
 function asFiles(value: unknown): MiaoFileInfo[] {
   if (!Array.isArray(value)) {
     return [];
@@ -162,13 +239,42 @@ function asFiles(value: unknown): MiaoFileInfo[] {
     if (!item || typeof item !== "object") {
       continue;
     }
-    const row = item as Partial<MiaoFileInfo>;
-    if (typeof row.name !== "string" || !row.name) {
+    const row = item as Record<string, unknown>;
+    const name = readString(row, "name", "Name");
+    if (!name) {
       continue;
     }
-    files.push({ name: row.name, size: asCount(row.size), sha256: row.sha256 });
+    const sha256 = readString(row, "sha256", "SHA256");
+    files.push({ name, size: asCount(readField(row, "size", "Size")), sha256: sha256 || undefined });
   }
   return files;
+}
+
+function asSaved(value: unknown): MiaoSavedFile[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const saved: MiaoSavedFile[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const row = item as Record<string, unknown>;
+    const name = readString(row, "name", "Name");
+    if (!name) {
+      continue;
+    }
+    const sha256 = readString(row, "sha256", "SHA256");
+    const dataBase64 = readString(row, "dataBase64", "DataBase64");
+    saved.push({
+      name,
+      size: asCount(readField(row, "size", "Size")),
+      path: readString(row, "path", "Path"),
+      sha256: sha256 || undefined,
+      dataBase64: dataBase64 || undefined,
+    });
+  }
+  return saved;
 }
 
 export type JoinPayload = {

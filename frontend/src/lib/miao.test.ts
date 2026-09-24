@@ -111,6 +111,46 @@ describe("miao share helpers", () => {
     expect(parseReceiveJob("{")).toBeNull();
   });
 
+  it("upserts a receive job whose files are null or missing", () => {
+    const nullFiles = {
+      id: "null-files",
+      status: "connecting",
+      bytesDone: "12",
+      bytesTotal: null,
+      files: null,
+      saved: null,
+      dest: "/tmp/in",
+    } as unknown as ReceiveJob;
+    let thrown: unknown;
+    let jobs: ReceiveJob[] = [];
+    try {
+      jobs = upsertReceiveJob([], nullFiles);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeUndefined();
+    expect(jobs[0]?.files).toEqual([]);
+    expect(jobs[0]?.saved).toEqual([]);
+    expect(jobs[0]?.bytesDone).toBe(12);
+    expect(jobs[0]?.bytesTotal).toBe(0);
+    const updated = upsertReceiveJob(jobs, { ...nullFiles, status: "downloading" });
+    expect(updated[0]?.status).toBe("downloading");
+    expect(updated[0]?.files).toEqual([]);
+
+    const missing = upsertReceiveJob([], { id: "missing-files", status: "queued", dest: "" } as ReceiveJob);
+    expect(missing[0]?.files).toEqual([]);
+
+    const parsed = parseReceiveJob({ id: "obj", status: "downloading", files: null, saved: null, bytesDone: 3, bytesTotal: 9 });
+    expect(parsed?.files).toEqual([]);
+    expect(parsed?.saved ?? []).toEqual([]);
+    expect(parsed?.status).toBe("downloading");
+
+    const wrapped = parseReceiveJob({
+      result: { ID: "wrap", Status: "connecting", Files: null, BytesDone: 1, BytesTotal: 4, Dest: "/tmp" },
+    });
+    expect(wrapped).toMatchObject({ id: "wrap", status: "connecting", files: [], bytesDone: 1, bytesTotal: 4, dest: "/tmp" });
+  });
+
   it("queues a second receive for the same share and reports progress", async () => {
     const seen: ReceiveJob[] = [];
     setMiaoBrowserEmit((ev) => {
