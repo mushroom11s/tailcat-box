@@ -397,6 +397,8 @@ export const zhCN = {
   chatNotifyMessage: "新消息",
   chatNotifyDenied: "系统通知没开，新消息只留在聊天里。",
   toastDismiss: "关闭",
+  toastError: "错误",
+  toastWarn: "提醒",
 
   qrShow: "二维码",
   qrShowLabel: "显示二维码",

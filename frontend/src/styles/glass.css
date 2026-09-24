@@ -2899,8 +2899,8 @@ textarea {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
-  width: min(360px, calc(100vw - 32px));
+  gap: 10px;
+  width: min(372px, calc(100vw - 32px));
   pointer-events: none;
 }
 
@@ -2909,45 +2909,86 @@ textarea {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 12px 10px 12px 14px;
-  border-radius: var(--radius-sm);
+  padding: 12px 10px 12px 12px;
+  border-radius: 14px;
+  background: var(--glass-bg-strong);
+  border: 1px solid color-mix(in srgb, var(--danger) 46%, var(--glass-border));
+  box-shadow: var(--shadow), var(--glass-highlight);
+  backdrop-filter: blur(var(--blur)) saturate(var(--saturate));
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--saturate));
 }
 
-.toast-error {
-  border-color: color-mix(in srgb, var(--danger) 45%, var(--glass-border));
+.toast-warn {
+  border-color: color-mix(in srgb, var(--warn) 50%, var(--glass-border));
 }
 
-.toast-info {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--glass-border));
+.toast-badge {
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--danger);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.toast-warn .toast-badge {
+  background: var(--warn);
+}
+
+.toast-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 1px;
+}
+
+.toast-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+  color: var(--danger);
+}
+
+.toast-warn .toast-label {
+  color: var(--warn);
 }
 
 .toast-message {
   margin: 0;
-  flex: 1;
-  min-width: 0;
   font-size: 13px;
   line-height: 1.45;
   color: var(--text);
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .toast-dismiss {
   appearance: none;
   border: 0;
-  background: var(--icon-bg);
-  color: var(--text);
+  background: transparent;
+  color: var(--muted);
   width: 28px;
   height: 28px;
+  margin: -2px -2px 0 0;
   padding: 0;
   border-radius: 999px;
   cursor: pointer;
   flex-shrink: 0;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
 }
 
 .toast-dismiss:hover {
   background: var(--icon-bg-hover);
+  color: var(--text);
 }
 
 .status-pill.bad {

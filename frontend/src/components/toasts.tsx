@@ -11,10 +11,10 @@ import {
 import { createPortal } from "react-dom";
 import { useI18n } from "../i18n";
 
-export const ERROR_TOAST_MS = 8000;
-export const INFO_TOAST_MS = 6500;
+export const ERROR_TOAST_MS = 7000;
+export const WARN_TOAST_MS = 7000;
 
-export type ToastKind = "error" | "info";
+export type ToastKind = "error" | "warn";
 
 type ToastItem = {
   id: number;
@@ -72,7 +72,13 @@ function ToastStack({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id
   const stack = (
     <div className="toast-stack">
       {toasts.map((item) => (
-        <ToastCard key={item.id} item={item} dismissLabel={t("toastDismiss")} onDismiss={onDismiss} />
+        <ToastCard
+          key={item.id}
+          item={item}
+          label={t(item.kind === "warn" ? "toastWarn" : "toastError")}
+          dismissLabel={t("toastDismiss")}
+          onDismiss={onDismiss}
+        />
       ))}
     </div>
   );
@@ -84,14 +90,16 @@ function ToastStack({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id
 
 function ToastCard({
   item,
+  label,
   dismissLabel,
   onDismiss,
 }: {
   item: ToastItem;
+  label: string;
   dismissLabel: string;
   onDismiss: (id: number) => void;
 }) {
-  const duration = item.kind === "error" ? ERROR_TOAST_MS : INFO_TOAST_MS;
+  const duration = item.kind === "warn" ? WARN_TOAST_MS : ERROR_TOAST_MS;
   const endsAt = useRef(0);
   const leftMs = useRef(duration);
   const timer = useRef<number | null>(null);
@@ -122,7 +130,7 @@ function ToastCard({
 
   return (
     <div
-      className={`glass toast toast-${item.kind}`}
+      className={`toast toast-${item.kind}`}
       role="alert"
       onMouseEnter={() => {
         leftMs.current = Math.max(0, endsAt.current - Date.now());
@@ -132,7 +140,13 @@ function ToastCard({
         schedule(leftMs.current);
       }}
     >
-      <p className="toast-message">{item.message}</p>
+      <span className="toast-badge" aria-hidden="true">
+        !
+      </span>
+      <div className="toast-copy">
+        <p className="toast-label">{label}</p>
+        <p className="toast-message">{item.message}</p>
+      </div>
       <button className="toast-dismiss" type="button" aria-label={dismissLabel} onClick={() => onDismiss(item.id)}>
         <span aria-hidden="true">×</span>
       </button>
