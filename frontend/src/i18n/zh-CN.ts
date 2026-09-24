@@ -48,6 +48,8 @@ export const zhCN = {
   langEnglish: "English",
   langChinese: "简体中文",
   on: "开",
+  desktopNotifications: "桌面通知",
+  desktopNotificationsHelp: "窗口最小化或在后台时，有人进房间、喵传开始或下载完成，会发一条系统通知。",
   off: "关",
 
   tunnelTitle: "穿透",
@@ -362,6 +364,10 @@ export const zhCN = {
   chatNotifyVoice: "发来一条语音",
   chatNotifyMessage: "新消息",
   chatNotifyDenied: "系统通知没开，新消息只留在聊天里。",
+  notifyPeerJoined: "{peer} 进了房间",
+  notifyMiaoStarted: "喵传开始了 · {name}",
+  notifyMiaoDone: "喵传下载好了 · {name}",
+  notifyFileFallback: "文件",
   toastDismiss: "关闭",
   toastError: "错误",
 

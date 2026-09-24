@@ -44,6 +44,9 @@ export const en = {
   langChinese: "简体中文",
   on: "On",
   off: "Off",
+  desktopNotifications: "Desktop notifications",
+  desktopNotificationsHelp:
+    "When the window is minimized or in the background, mention a peer joining, a Mew Share coming in, or a download finishing.",
 
   tunnelTitle: "Tunnel",
   tunnelLede:
@@ -362,6 +365,10 @@ export const en = {
   chatNotifyVoice: "Sent a voice note",
   chatNotifyMessage: "New message",
   chatNotifyDenied: "System notifications are off, so new messages stay in the chat.",
+  notifyPeerJoined: "{peer} joined the room",
+  notifyMiaoStarted: "Mew Share started · {name}",
+  notifyMiaoDone: "Mew Share download finished · {name}",
+  notifyFileFallback: "a file",
   toastDismiss: "Dismiss",
   toastError: "Error",
 

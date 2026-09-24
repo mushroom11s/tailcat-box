@@ -1,9 +1,15 @@
 export type OsNotifyResult = "sent" | "denied" | "unavailable" | "failed";
 
+export type NotifyData = {
+  page?: string;
+  room?: string;
+};
+
 type NotifyOptions = {
   id: string;
   title: string;
   body?: string;
+  data?: NotifyData;
 };
 
 type RuntimeNotify = {
@@ -29,6 +35,28 @@ function runtimeNotify(): RuntimeNotify | null {
 
 export function resetOsNotificationsForTests(): void {
   gate = null;
+}
+
+// focusAppWindow restores a minimized Wails window and brings it forward.
+export function focusAppWindow(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const rt = (window as Window & { runtime?: Record<string, unknown> }).runtime;
+  if (!rt) {
+    return;
+  }
+  for (const name of ["WindowUnminimise", "WindowShow"]) {
+    const fn = rt[name];
+    if (typeof fn !== "function") {
+      continue;
+    }
+    try {
+      fn();
+    } catch {
+      // The browser preview has no native window.
+    }
+  }
 }
 
 // ensureOsNotifications initializes the Wails notification service once per
@@ -77,7 +105,12 @@ export async function sendOsNotification(options: NotifyOptions): Promise<OsNoti
     return "unavailable";
   }
   try {
-    await rt.SendNotification({ id: options.id, title: options.title, body: options.body });
+    await rt.SendNotification({
+      id: options.id,
+      title: options.title,
+      body: options.body,
+      data: options.data,
+    });
     return "sent";
   } catch {
     return "failed";

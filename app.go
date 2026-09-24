@@ -19,6 +19,7 @@ import (
 	"github.com/mushroom11s/tailcat-box/internal/autostart"
 	"github.com/mushroom11s/tailcat-box/internal/chat"
 	"github.com/mushroom11s/tailcat-box/internal/miao"
+	"github.com/mushroom11s/tailcat-box/internal/notify"
 	"github.com/mushroom11s/tailcat-box/internal/service"
 	"github.com/mushroom11s/tailcat-box/internal/session"
 	"github.com/mushroom11s/tailcat-box/internal/settings"
@@ -249,6 +250,7 @@ func miaoDataDir() string {
 // so we can call the runtime methods.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	runtime.OnNotificationResponse(ctx, a.onNotification)
 	a.tray = tray.New(a.showWindow, a.quitApp, a.activeSessionCount)
 	a.tray.SetHide(a.hideWindow)
 	a.tray.SetNavigate(a.navigate)
@@ -293,6 +295,20 @@ func (a *App) showWindow() {
 		return
 	}
 	runtime.WindowShow(a.ctx)
+}
+
+// onNotification brings the window forward and opens the view stored on the notice.
+func (a *App) onNotification(result runtime.NotificationResult) {
+	if a.ctx == nil {
+		return
+	}
+	runtime.WindowUnminimise(a.ctx)
+	a.showWindow()
+	target, ok := notify.TargetFromUserInfo(result.Response.UserInfo)
+	if !ok {
+		return
+	}
+	runtime.EventsEmit(a.ctx, notify.OpenEvent, target)
 }
 
 func (a *App) hideWindow() {
