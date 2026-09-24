@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useI18n } from "../i18n";
+import { readQrPaste } from "../lib/qrClipboard";
 import { acceptScannedText, decodeQrImageData } from "../lib/qr";
 import { decodeQrFromFile } from "../lib/qrImage";
 import QrDialog from "./QrDialog";
@@ -23,6 +24,8 @@ export default function QrScanButton({ onAccept, disabled = false, decodeFile = 
   const activeRef = useRef(false);
   const tokenRef = useRef(0);
 
+  const pasteRef = useRef<() => void>(() => undefined);
+
   useEffect(() => {
     return () => {
       activeRef.current = false;
@@ -34,6 +37,25 @@ export default function QrScanButton({ onAccept, disabled = false, decodeFile = 
       streamRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function onKey(ev: KeyboardEvent) {
+      if (ev.altKey || ev.shiftKey || (!ev.ctrlKey && !ev.metaKey)) {
+        return;
+      }
+      if (ev.key !== "v" && ev.key !== "V") {
+        return;
+      }
+      ev.preventDefault();
+      ev.stopPropagation();
+      pasteRef.current();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   function stopCamera() {
     activeRef.current = false;
@@ -138,6 +160,49 @@ export default function QrScanButton({ onAccept, disabled = false, decodeFile = 
     }
   }
 
+  async function pasteFromClipboard() {
+    setError("");
+    stopCamera();
+    const token = tokenRef.current;
+    try {
+      const result = await readQrPaste();
+      if (token !== tokenRef.current) {
+        return;
+      }
+      if (!result.ok) {
+        const key =
+          result.reason === "empty" ? "qrPasteEmpty" : result.reason === "unusable" ? "qrPasteUnusable" : "qrPasteDenied";
+        setError(t(key));
+        return;
+      }
+      if (result.kind === "text") {
+        finish(result.text);
+        return;
+      }
+      let text: string | null = null;
+      try {
+        text = await decodeFile(result.file);
+      } catch {
+        text = null;
+      }
+      if (token !== tokenRef.current) {
+        return;
+      }
+      if (!text) {
+        setError(t("qrNotFound"));
+        return;
+      }
+      finish(text);
+    } catch {
+      if (token === tokenRef.current) {
+        setError(t("qrPasteDenied"));
+      }
+    }
+  }
+  pasteRef.current = () => {
+    void pasteFromClipboard();
+  };
+
   async function onFile(ev: ChangeEvent<HTMLInputElement>) {
     const file = ev.target.files?.[0];
     ev.target.value = "";
@@ -188,6 +253,9 @@ export default function QrScanButton({ onAccept, disabled = false, decodeFile = 
             </button>
             <button className="btn btn-ghost" type="button" onClick={() => fileRef.current?.click()}>
               {t("qrPickImage")}
+            </button>
+            <button className="btn btn-ghost" type="button" onClick={() => void pasteFromClipboard()}>
+              {t("qrPaste")}
             </button>
             <button className="btn btn-ghost" type="button" onClick={close}>
               {t("qrClose")}
