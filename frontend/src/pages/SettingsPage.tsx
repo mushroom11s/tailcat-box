@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useToasts } from "../components/toasts";
-import DiagnosticsSection from "../components/DiagnosticsSection";
 import KeysDERPSection from "../components/KeysDERPSection";
 import ReleaseNotes from "../components/ReleaseNotes";
 import iconUrl from "../assets/icon.png";
@@ -20,9 +19,7 @@ import {
   setLaunchAtLogin,
   type ClientInfo,
   type KeyInfo,
-  type Session,
   type SystemInfo,
-  type TailcatEvent,
   type UpdateStatus,
 } from "../lib/wails";
 
@@ -39,14 +36,9 @@ type Props = {
   error: string;
   region: string;
   derpMapURL: string;
-  sessions: Session[];
-  events: TailcatEvent[];
-  peer: string;
   onCreate: (name: string, client: boolean, region: string) => void | Promise<void>;
   onDelete: (name: string) => void | Promise<void>;
   onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
-  onPing: (addr: string, untilDirect: boolean) => void | Promise<void>;
-  onStop: (id: string) => void | Promise<void>;
 };
 
 function formatUptime(startedAt: string): string {
@@ -173,14 +165,9 @@ export default function SettingsPage({
   error,
   region,
   derpMapURL,
-  sessions,
-  events,
-  peer,
   onCreate,
   onDelete,
   onSaveNetwork,
-  onPing,
-  onStop,
 }: Props) {
   const { locale, setLocale, t } = useI18n();
   const [client, setClient] = useState<ClientInfo | null>(null);
@@ -500,15 +487,6 @@ export default function SettingsPage({
         onCreate={onCreate}
         onDelete={onDelete}
         onSaveNetwork={onSaveNetwork}
-      />
-      <DiagnosticsSection
-        sessions={sessions}
-        events={events}
-        peer={peer}
-        busy={busy}
-        error={error}
-        onPing={onPing}
-        onStop={onStop}
       />
     </section>
   );
