@@ -78,6 +78,7 @@ type Props = {
   notifyNote?: string;
   remarks?: RemarkMap;
   onRemark?: (address: string, raw: string, commit: boolean) => void;
+  onSSH?: (address: string) => void;
 };
 
 const noRemarks: RemarkMap = {};
@@ -181,6 +182,7 @@ export default function ChatPage({
   notifyNote = "",
   remarks = noRemarks,
   onRemark,
+  onSSH,
 }: Props) {
   const { t } = useI18n();
   const [chatQuery, setChatQuery] = useState("");
@@ -1075,6 +1077,19 @@ export default function ChatPage({
             >
               {remarkFor(remarks, peer) || (peer.trim() ? abbreviateAddress(peer) : t("chatNotConnected"))}
             </span>
+            {peer.trim() && onSSH ? (
+              <button
+                className="btn"
+                type="button"
+                aria-label={t("sshOpenShellLabel")}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  onSSH(peer.trim());
+                }}
+              >
+                {t("sshOpenShell")}
+              </button>
+            ) : null}
             <button
               className="chat-identity-toggle"
               type="button"
@@ -1149,6 +1164,11 @@ export default function ChatPage({
           <button className="btn" type="button" disabled={!address} onClick={() => connect()}>
             {t("chatConnect")}
           </button>
+          {peer.trim() && onSSH ? (
+            <button className="btn btn-ghost" type="button" aria-label={t("sshOpenShellLabel")} onClick={() => onSSH(peer.trim())}>
+              {t("sshOpenShell")}
+            </button>
+          ) : null}
         </div>
         <p id="chat-peer-help" className="chat-quiet chat-help">
           {peer ? <span>{t("chatPeerConnected")}</span> : null}

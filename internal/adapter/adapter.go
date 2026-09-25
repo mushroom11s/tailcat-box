@@ -70,16 +70,33 @@ func (o FilesServeOpts) mode() FileServeMode {
 }
 
 // SSHServeOpts matches CLI `serve ssh` / `serve no-auth-ssh`.
+// RestrictClients allowlists Tailcat node keys (tunnel identity). An empty
+// list still denies every client. AllowAny leaves the tunnel open to anyone
+// who has the address. IdentityJSON is a persisted tailcat private key so the
+// address stays stable. PinnedAddr, when it matches that key, reuses the
+// embedded DERP region.
 type SSHServeOpts struct {
-	NoAuth         bool
-	AuthorizedKeys string // path or authorized_keys text; ignored when NoAuth
+	NoAuth          bool
+	AuthorizedKeys  string // path or authorized_keys text; ignored when NoAuth
+	RestrictClients bool
+	AllowAny        bool
+	AllowedNodeKeys []string
+	IdentityJSON    string
+	PinnedAddr      string
 }
 
 // SSHClientOpts matches CLI `tailcat ssh`.
+// Interactive requests a PTY shell and stays open. NoClientAuth offers only
+// the SSH "none" method. ClientKeyJSON is the tunnel node identity peers
+// allowlist. ClientNodeKey is that identity's public key ("nodekey:…").
 type SSHClientOpts struct {
-	User     string
-	Command  string
-	Identity string // optional private key path
+	User          string
+	Command       string
+	Identity      string // optional SSH private key path
+	Interactive   bool
+	NoClientAuth  bool
+	ClientKeyJSON string
+	ClientNodeKey string
 }
 
 // NetworkOpts is CLI `--region` / `--derpmap-url` for adapter starts.
@@ -125,8 +142,18 @@ type TailcatAdapter interface {
 	ListRemote(ctx context.Context, peerAddr string, path string) ([]FileEntry, error)
 	// StartSSHServe starts an SSH server. NoAuth is CLI `no-auth-ssh`; otherwise AuthorizedKeys is required.
 	StartSSHServe(ctx context.Context, sessionID string, opts SSHServeOpts) (<-chan Event, error)
-	// StartSSHClient dials SSH on port 22 and runs command (empty command uses a short identity check).
+	// StartSSHClient dials SSH on port 22. Interactive opens a PTY shell;
+	// otherwise command runs once (empty command uses a short identity check).
 	StartSSHClient(ctx context.Context, sessionID string, serverAddr string, opts SSHClientOpts) (<-chan Event, error)
+	// WriteSSH sends terminal input to an interactive SSH client session.
+	WriteSSH(sessionID string, data string) error
+	// SubscribeSSH replays and follows interactive SSH output. Cancel removes the subscriber.
+	SubscribeSSH(sessionID string) (<-chan []byte, func(), error)
+	// NodeKeyFromAddr returns the node public key ("nodekey:…") carried by a
+	// Tailcat address or an already-encoded node key.
+	NodeKeyFromAddr(raw string) (string, error)
+	// PublicNodeKey returns the node public key for a persisted identity JSON blob.
+	PublicNodeKey(identityJSON string) (string, error)
 	// StartSOCKS listens locally as a SOCKS5 proxy toward serverAddr.
 	StartSOCKS(ctx context.Context, sessionID string, serverAddr string, listen string) (<-chan Event, error)
 	// StartExitNode serves as an exit node (CLI `serve exit-node`).

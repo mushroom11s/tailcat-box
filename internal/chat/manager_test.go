@@ -29,6 +29,34 @@ func waitRoomRunning(t *testing.T, m *Manager, id string) session.Session {
 	}
 }
 
+func TestPeerAddressesFollowsConnect(t *testing.T) {
+	m := NewManager(adapter.NewFake(), t.TempDir())
+	a, err := m.Start(StartOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := m.Start(StartOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	readyB := waitRoomRunning(t, m, b.ID)
+	if err := m.Connect(a.ID, readyB.Address); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.After(2 * time.Second)
+	for {
+		got := m.PeerAddresses()
+		if len(got) == 1 && got[0] == readyB.Address {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("peers=%v", m.PeerAddresses())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
 func TestManagerTwoRoomsAndStopOne(t *testing.T) {
 	m := NewManager(adapter.NewFake(), t.TempDir())
 	a, err := m.Start(StartOpts{})

@@ -5,6 +5,7 @@ import ChatPage, { type ChatMessage } from "./pages/ChatPage";
 import LobbyPage from "./pages/LobbyPage";
 import MiaoPage from "./pages/MiaoPage";
 import SettingsPage from "./pages/SettingsPage";
+import type { SSHShell } from "./components/SSHDesk";
 import TunnelPage from "./pages/TunnelPage";
 import { readMappings, toPortMapping, writeMappings, type PortMappingRecord } from "./lib/portMappings";
 import { sameKeys, sameSessions } from "./lib/snapshot";
@@ -35,28 +36,37 @@ import {
   getNetworkSettings,
   getUpdateStatus,
   hasWailsBindings,
+  emptySSHDesk,
+  getSSHDesk,
   listKeys,
   listSessions,
+  openSSHShell,
   onNotifyOpen,
   onTailcatEvent,
   onTrayNavigate,
   onUpdateStatus,
   resendChatFile,
+  removeSSHPeer,
   restartChatRoom,
   saveChatFile,
+  saveSSHPeer,
   sendChatFile,
   sendChatFileBytes,
   sendChatSignal,
   sendChatText,
   sendChatVoice,
   setNetworkSettings,
+  setSSHAllowAny,
+  setSSHEnabled,
   startChatRoom,
   startForward,
   startPortServe,
   stopChatRoom,
   stopSession,
+  writeSSHShell,
   type KeyInfo,
   type Session,
+  type SSHDeskState,
   type TailcatEvent,
   type UpdateStatus,
 } from "./lib/wails";
@@ -119,6 +129,13 @@ function AppShell() {
   const [mappings, setMappings] = useState<PortMappingRecord[]>(() => readMappings());
   const [links, setLinks] = useState<Record<string, string>>({});
   const [tunnelBusy, setTunnelBusy] = useState(false);
+  const [sshDesk, setSSHDesk] = useState<SSHDeskState>(() => emptySSHDesk());
+  const [sshBusy, setSSHBusy] = useState(false);
+  const [sshNote, setSSHNote] = useState("");
+  const [shell, setShell] = useState<SSHShell | null>(null);
+  const shellRef = useRef<SSHShell | null>(null);
+  shellRef.current = shell;
+  const shellBuf = useRef<Record<string, string>>({});
   const [liveSignal, setLiveSignal] = useState<{ seq: number; data: string } | null>(null);
   const roomsRef = useRef(rooms);
   const mappingsRef = useRef(mappings);
@@ -380,6 +397,63 @@ function AppShell() {
     }
   }, []);
 
+  const refreshSSH = useCallback(async () => {
+    try {
+      setSSHDesk(await getSSHDesk());
+    } catch {
+      // Keep the last SSH desk snapshot.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (page === "tunnel") {
+      void refreshSSH();
+    }
+  }, [page, refreshSSH]);
+
+  async function withSSH(action: () => Promise<SSHDeskState>): Promise<void> {
+    setSSHBusy(true);
+    setSSHNote("");
+    try {
+      setSSHDesk(await action());
+    } catch (err) {
+      pushError(showError(err));
+    } finally {
+      setSSHBusy(false);
+    }
+  }
+
+  async function openShell(addr: string, system: boolean): Promise<void> {
+    setSSHBusy(true);
+    setSSHNote("");
+    try {
+      const sess = await openSSHShell(addr, system);
+      await refreshSSH();
+      const errText = (sess.Err || "").trim();
+      if (errText) {
+        pushError(showError(errText));
+        return;
+      }
+      if (system) {
+        shellRef.current = null;
+        setShell(null);
+        setSSHNote(t("sshOpenedTerminal"));
+        setPage("tunnel");
+        return;
+      }
+      const output = shellBuf.current[sess.ID] || sess.Progress || "";
+      shellBuf.current[sess.ID] = output;
+      const next = { id: sess.ID, address: addr, output };
+      shellRef.current = next;
+      setShell(next);
+      setPage("tunnel");
+    } catch (err) {
+      pushError(showError(err));
+    } finally {
+      setSSHBusy(false);
+    }
+  }
+
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -468,6 +542,17 @@ function AppShell() {
     void refresh();
     const off = onTailcatEvent((ev) => {
       const id = ev.SessionID;
+      if (ev.Kind === "data" && id && ev.Data) {
+        const prev = shellBuf.current[id] ?? "";
+        const nextOut = (prev + ev.Data).slice(-20000);
+        shellBuf.current[id] = nextOut;
+        const open = shellRef.current;
+        if (open && open.id === id) {
+          const nextShell = { ...open, output: nextOut };
+          shellRef.current = nextShell;
+          setShell(nextShell);
+        }
+      }
       if (ev.Kind === "signal") {
         if (pageRef.current === "chat" && !lobbyRef.current && focusRef.current === id && ev.Data) {
           const data = ev.Data;
@@ -1023,6 +1108,7 @@ function AppShell() {
             <ChatPage
               key={chatRoom.id}
               address={chatRoom.address}
+              onSSH={(addr) => void openShell(addr, false)}
               peer={chatRoom.peer}
               caps={chatRoom.caps}
               messages={chatRoom.messages}
@@ -1059,6 +1145,31 @@ function AppShell() {
             sessions={sessions}
             links={links}
             busy={tunnelBusy}
+            ssh={{
+              desk: sshDesk,
+              busy: sshBusy,
+              note: sshNote,
+              shell,
+              onToggle: (enabled) => void withSSH(() => setSSHEnabled(enabled)),
+              onAllowAny: (allow) => void withSSH(() => setSSHAllowAny(allow, allow)),
+              onAddPeer: (name, address) => void withSSH(() => saveSSHPeer(name, address)),
+              onRemovePeer: (address) => void withSSH(() => removeSSHPeer(address)),
+              onShell: (address, system) => void openShell(address, system),
+              onShellInput: (data) => {
+                const current = shellRef.current;
+                if (current) {
+                  void writeSSHShell(current.id, data);
+                }
+              },
+              onShellClose: () => {
+                const current = shellRef.current;
+                shellRef.current = null;
+                setShell(null);
+                if (current) {
+                  void stopSession(current.id);
+                }
+              },
+            }}
             onAdd={addMapping}
             onStart={(id) => void startMapping(id)}
             onStop={(id) => void stopMapping(id)}

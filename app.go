@@ -23,6 +23,7 @@ import (
 	"github.com/mushroom11s/tailcat-box/internal/service"
 	"github.com/mushroom11s/tailcat-box/internal/session"
 	"github.com/mushroom11s/tailcat-box/internal/settings"
+	"github.com/mushroom11s/tailcat-box/internal/sshdesk"
 	"github.com/mushroom11s/tailcat-box/internal/store"
 	"github.com/mushroom11s/tailcat-box/internal/sysinfo"
 	"github.com/mushroom11s/tailcat-box/internal/tray"
@@ -63,6 +64,9 @@ type App struct {
 	tray       *tray.Controller
 	trayIcon   []byte
 	settings   *settings.Store
+	ssh        *sshdesk.Store
+	sshMu      sync.Mutex
+	sshSession string
 	updates    *update.Checker
 	updateMu   sync.Mutex
 	uiLocale   string
@@ -219,9 +223,23 @@ func NewApp() *App {
 		miao:       shares,
 		keys:       keys,
 		settings:   newSettingsStore(),
+		ssh:        newSSHStore(),
 		trayIcon:   tray.DefaultIcon,
 		startedAt:  time.Now(),
 	}
+}
+
+func newSSHStore() *sshdesk.Store {
+	dir := os.Getenv("TAILCAT_SETTINGS_DIR")
+	if dir == "" {
+		root, _, err := appConfigDir()
+		if err != nil {
+			dir = "settings"
+		} else {
+			dir = root
+		}
+	}
+	return sshdesk.New(dir)
 }
 
 func chatDataDir() string {
@@ -263,6 +281,7 @@ func (a *App) startup(ctx context.Context) {
 	a.tray.Start(a.trayIcon)
 	go a.forwardEvents()
 	go a.maybeRecordDailyUpdateCheck()
+	go a.restoreSSH()
 }
 
 func (a *App) shutdown(ctx context.Context) {

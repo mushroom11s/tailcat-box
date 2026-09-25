@@ -765,6 +765,145 @@ func TestChatVoiceWireFormatIsBase64(t *testing.T) {
 	}
 }
 
+func TestSSHDeskPersistsAllowlistAndOpensShell(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("TAILCAT_ADAPTER", "fake")
+	t.Setenv("TAILCAT_SETTINGS_DIR", dir)
+	t.Setenv("TAILCAT_KEYS_DIR", t.TempDir())
+	a := NewApp()
+
+	st, err := a.GetSSHDesk()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Enabled || st.AllowAny || st.Address != "" || len(st.Peers) != 0 {
+		t.Fatalf("default %+v", st)
+	}
+	if _, err := a.SetSSHAllowAny(true, false); err == nil {
+		t.Fatal("expected allow-any confirmation error")
+	}
+	if _, err := a.SaveSSHPeer("laptop", "not-an-address"); err == nil {
+		t.Fatal("expected invalid address")
+	}
+	st, err = a.SaveSSHPeer("laptop", "tc:laptop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Peers) != 1 || st.Peers[0].Name != "laptop" {
+		t.Fatalf("peers %+v", st.Peers)
+	}
+	st, err = a.SetSSHEnabled(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st.Enabled || st.AllowAny || !strings.HasPrefix(st.Address, "tc:fake-noauth-ssh-desk-") || st.Status != string(session.StatusRunning) {
+		t.Fatalf("%+v", st)
+	}
+
+	denied, err := a.OpenSSHShell(st.Address, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.After(2 * time.Second)
+	for {
+		var found bool
+		for _, item := range a.ListSessions() {
+			if item.ID == denied.ID && item.Status == session.StatusError {
+				if !strings.Contains(item.Err, "allowlist") {
+					t.Fatalf("err=%q", item.Err)
+				}
+				found = true
+			}
+		}
+		if found {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("stranger shell never failed: %+v", a.ListSessions())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+
+	st, err = a.SetSSHAllowAny(true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st.AllowAny {
+		t.Fatal("allow any not set")
+	}
+	shell, err := a.OpenSSHShell(st.Address, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitAppRunning(t, a, shell.ID)
+	if err := a.WriteSSHShell(shell.ID, "hi"); err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.After(2 * time.Second)
+	for {
+		for _, item := range a.ListSessions() {
+			if item.ID == shell.ID && strings.Contains(item.Progress, "hi") {
+				goto persisted
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("shell progress %+v", a.ListSessions())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+persisted:
+	b := NewApp()
+	again, err := b.GetSSHDesk()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !again.Enabled || !again.AllowAny || again.Address != st.Address {
+		t.Fatalf("reloaded %+v", again)
+	}
+	foundLaptop := false
+	foundSelf := false
+	for _, p := range again.Peers {
+		if p.Address == "tc:laptop" && p.Name == "laptop" {
+			foundLaptop = true
+		}
+		if p.Address == st.Address {
+			foundSelf = true
+		}
+	}
+	if !foundLaptop || !foundSelf {
+		t.Fatalf("peers %+v", again.Peers)
+	}
+	if _, err := b.SetSSHEnabled(false); err != nil {
+		t.Fatal(err)
+	}
+	off, err := NewApp().GetSSHDesk()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if off.Enabled {
+		t.Fatal("expected SSH to stay off")
+	}
+}
+
+func waitAppRunning(t *testing.T, a *App, id string) {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for {
+		for _, item := range a.ListSessions() {
+			if item.ID == id && item.Status == session.StatusRunning {
+				return
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("session %s not running: %+v", id, a.ListSessions())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+}
+
 func chatHas(a *App, roomID, direction, body string) bool {
 	msgs, err := a.rooms.Messages(roomID)
 	if err != nil {

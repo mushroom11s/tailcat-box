@@ -29,6 +29,8 @@ export function GetClientInfo():Promise<main.ClientInfo>;
 
 export function GetNetworkSettings():Promise<store.Settings>;
 
+export function GetSSHDesk():Promise<Record<string, unknown>>;
+
 export function GetSystemInfo():Promise<main.SystemInfo>;
 
 export function GetUpdateStatus():Promise<main.UpdateStatus>;
@@ -113,9 +115,21 @@ export function StartRecv(arg1:string,arg2:boolean):Promise<session.Session>;
 
 export function StartSOCKS(arg1:string,arg2:string):Promise<session.Session>;
 
+export function OpenSSHShell(arg1:string,arg2:boolean):Promise<session.Session>;
+
+export function RemoveSSHPeer(arg1:string):Promise<Record<string, unknown>>;
+
+export function SaveSSHPeer(arg1:string,arg2:string):Promise<Record<string, unknown>>;
+
+export function SetSSHAllowAny(arg1:boolean,arg2:boolean):Promise<Record<string, unknown>>;
+
+export function SetSSHEnabled(arg1:boolean):Promise<Record<string, unknown>>;
+
 export function StartSSHClient(arg1:string,arg2:string,arg3:string,arg4:string):Promise<session.Session>;
 
 export function StartSSHServe(arg1:boolean,arg2:string,arg3:boolean):Promise<session.Session>;
+
+export function WriteSSHShell(arg1:string,arg2:string):Promise<void>;
 
 export function StopChatRoom(arg1:string):Promise<void>;
 

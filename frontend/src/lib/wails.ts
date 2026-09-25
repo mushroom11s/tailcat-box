@@ -42,6 +42,13 @@ import {
   SetNetworkSettings as bindSetNetworkSettings,
   StartSSHServe as bindStartSSHServe,
   StartSSHClient as bindStartSSHClient,
+  GetSSHDesk as bindGetSSHDesk,
+  SetSSHEnabled as bindSetSSHEnabled,
+  SetSSHAllowAny as bindSetSSHAllowAny,
+  SaveSSHPeer as bindSaveSSHPeer,
+  RemoveSSHPeer as bindRemoveSSHPeer,
+  OpenSSHShell as bindOpenSSHShell,
+  WriteSSHShell as bindWriteSSHShell,
   StartSOCKS as bindStartSOCKS,
   StartExitNode as bindStartExitNode,
   StartExec as bindStartExec,
@@ -1059,6 +1066,208 @@ export async function startSSHClient(addr: string, command: string, user: string
     return asSession(await bindStartSSHClient(addr, command, user, identity));
   }
   return fakeStartSSHClient(addr, command, user);
+}
+
+export type SSHPeer = {
+  Name: string;
+  Address: string;
+};
+
+export type SSHDeskState = {
+  Enabled: boolean;
+  AllowAny: boolean;
+  Address: string;
+  SessionID: string;
+  Peers: SSHPeer[];
+  RoomPeers: string[];
+  Status: string;
+  Err: string;
+};
+
+export function emptySSHDesk(): SSHDeskState {
+  return {
+    Enabled: false,
+    AllowAny: false,
+    Address: "",
+    SessionID: "",
+    Peers: [],
+    RoomPeers: [],
+    Status: "",
+    Err: "",
+  };
+}
+
+const fakeSSHIdentity = "desk";
+let fakeSSH: SSHDeskState = emptySSHDesk();
+
+function cloneSSH(state: SSHDeskState = fakeSSH): SSHDeskState {
+  return {
+    ...state,
+    Peers: state.Peers.map((peer) => ({ ...peer })),
+    RoomPeers: [...state.RoomPeers],
+  };
+}
+
+function asSSHDesk(raw: unknown): SSHDeskState {
+  const rec = (raw ?? {}) as Record<string, unknown>;
+  const peersRaw = rec.Peers ?? rec.peers;
+  const roomsRaw = rec.RoomPeers ?? rec.roomPeers;
+  const peers = Array.isArray(peersRaw)
+    ? peersRaw.map((item) => {
+        const peer = (item ?? {}) as Record<string, unknown>;
+        return {
+          Name: String(peer.Name ?? peer.name ?? ""),
+          Address: String(peer.Address ?? peer.address ?? ""),
+        };
+      })
+    : [];
+  const rooms = Array.isArray(roomsRaw) ? roomsRaw.map((item) => String(item)) : [];
+  return {
+    Enabled: Boolean(rec.Enabled ?? rec.enabled),
+    AllowAny: Boolean(rec.AllowAny ?? rec.allowAny),
+    Address: String(rec.Address ?? rec.address ?? ""),
+    SessionID: String(rec.SessionID ?? rec.sessionID ?? ""),
+    Peers: peers,
+    RoomPeers: rooms,
+    Status: String(rec.Status ?? rec.status ?? ""),
+    Err: String(rec.Err ?? rec.err ?? ""),
+  };
+}
+
+function fakeSSHAddress(): string {
+  return "tc:fake-noauth-ssh-desk-" + fakeSSHIdentity;
+}
+
+function fakeNodeKey(addr: string): string {
+  const raw = addr.trim();
+  if (raw.startsWith("nodekey:") && raw.length > "nodekey:".length) {
+    return raw;
+  }
+  if (raw.startsWith("tc:")) {
+    return "nodekey:" + raw;
+  }
+  throw new Error("invalid tailcat address");
+}
+
+function syncFakeSSHSession(): void {
+  if (fakeSSH.SessionID) {
+    const current = fake.sessions.find((item) => item.ID === fakeSSH.SessionID);
+    if (current && current.Status !== "stopped") {
+      current.Status = "stopped";
+    }
+  }
+  fakeSSH.SessionID = "";
+  fakeSSH.Status = "";
+  fakeSSH.Err = "";
+  if (!fakeSSH.Enabled) {
+    fakeSSH.Address = "";
+    return;
+  }
+  const sess = newSess("ssh_serve");
+  sess.Status = "running";
+  sess.Address = fakeSSHAddress();
+  sess.Dangerous = fakeSSH.AllowAny;
+  fake.peers.set(sess.ID, sess.Address);
+  upsertFake(sess);
+  fakeSSH.SessionID = sess.ID;
+  fakeSSH.Address = sess.Address;
+  fakeSSH.Status = "running";
+}
+
+export async function getSSHDesk(): Promise<SSHDeskState> {
+  if (hasWailsBindings()) {
+    return asSSHDesk(await bindGetSSHDesk());
+  }
+  return cloneSSH();
+}
+
+export async function setSSHEnabled(enabled: boolean): Promise<SSHDeskState> {
+  if (hasWailsBindings()) {
+    return asSSHDesk(await bindSetSSHEnabled(enabled));
+  }
+  fakeSSH.Enabled = enabled;
+  syncFakeSSHSession();
+  return cloneSSH();
+}
+
+export async function setSSHAllowAny(allowAny: boolean, confirm: boolean): Promise<SSHDeskState> {
+  if (hasWailsBindings()) {
+    return asSSHDesk(await bindSetSSHAllowAny(allowAny, confirm));
+  }
+  if (allowAny && !confirm) {
+    throw new Error("allow any SSH requires explicit confirmation: anyone with the address gets a shell");
+  }
+  fakeSSH.AllowAny = allowAny;
+  if (fakeSSH.Enabled) {
+    syncFakeSSHSession();
+  }
+  return cloneSSH();
+}
+
+export async function saveSSHPeer(name: string, address: string): Promise<SSHDeskState> {
+  if (hasWailsBindings()) {
+    return asSSHDesk(await bindSaveSSHPeer(name, address));
+  }
+  const addr = address.trim();
+  fakeNodeKey(addr);
+  const existing = fakeSSH.Peers.find((peer) => peer.Address === addr);
+  if (existing) {
+    existing.Name = name.trim();
+  } else {
+    fakeSSH.Peers.push({ Name: name.trim(), Address: addr });
+  }
+  if (fakeSSH.Enabled && !fakeSSH.AllowAny) {
+    syncFakeSSHSession();
+  }
+  return cloneSSH();
+}
+
+export async function removeSSHPeer(address: string): Promise<SSHDeskState> {
+  if (hasWailsBindings()) {
+    return asSSHDesk(await bindRemoveSSHPeer(address));
+  }
+  fakeSSH.Peers = fakeSSH.Peers.filter((peer) => peer.Address !== address.trim());
+  if (fakeSSH.Enabled && !fakeSSH.AllowAny) {
+    syncFakeSSHSession();
+  }
+  return cloneSSH();
+}
+
+export async function openSSHShell(addr: string, systemTerminal: boolean): Promise<Session> {
+  if (hasWailsBindings()) {
+    return asSession(await bindOpenSSHShell(addr, systemTerminal));
+  }
+  const address = addr.trim();
+  fakeNodeKey(address);
+  if (!fakeSSH.Peers.some((peer) => peer.Address === address)) {
+    fakeSSH.Peers.push({ Name: "", Address: address });
+    if (fakeSSH.Enabled && !fakeSSH.AllowAny) {
+      syncFakeSSHSession();
+    }
+  }
+  const sess = newSess("ssh_client", address);
+  const allow = new Set(fakeSSH.Peers.map((peer) => fakeNodeKey(peer.Address)));
+  const desk = fakeSSH.Address || fakeSSHAddress();
+  if (fakeSSH.Enabled && !fakeSSH.AllowAny && address === desk && !allow.has("nodekey:fake-self")) {
+    sess.Status = "error";
+    sess.Err = "peer is not on the SSH allowlist";
+    upsertFake(sess);
+    return sess;
+  }
+  sess.Status = "running";
+  if (!systemTerminal) {
+    sess.Progress = "connected\r\n";
+  }
+  upsertFake(sess);
+  return sess;
+}
+
+export async function writeSSHShell(sessionID: string, data: string): Promise<void> {
+  if (hasWailsBindings()) {
+    await bindWriteSSHShell(sessionID, data);
+    return;
+  }
+  emitFake({ SessionID: sessionID, Kind: "data", Data: data });
 }
 
 export async function startSOCKS(addr: string, listen: string): Promise<Session> {

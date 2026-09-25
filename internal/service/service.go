@@ -158,6 +158,30 @@ func (s *Service) StartSSHClient(addr string, opts adapter.SSHClientOpts) (sessi
 	})
 }
 
+// StartSSHDesk serves Tailcat's built-in no-auth shell. AllowAny is the wide-open
+// mode and is marked dangerous. Otherwise RestrictClients is on, including when
+// the allowlist is empty.
+func (s *Service) StartSSHDesk(opts adapter.SSHServeOpts) (session.Session, error) {
+	opts.NoAuth = true
+	opts.AuthorizedKeys = ""
+	if opts.AllowAny {
+		opts.RestrictClients = false
+		opts.AllowedNodeKeys = nil
+	} else {
+		opts.RestrictClients = true
+	}
+	return s.startWith(session.KindSSHServe, "", opts.AllowAny, func(ctx context.Context, id string) (<-chan adapter.Event, error) {
+		return s.ad.StartSSHServe(ctx, id, opts)
+	})
+}
+
+func (s *Service) WriteSSH(sessionID, data string) error {
+	if strings.TrimSpace(sessionID) == "" {
+		return fmt.Errorf("session is required")
+	}
+	return s.ad.WriteSSH(sessionID, data)
+}
+
 func (s *Service) StartSOCKS(addr string, listen string) (session.Session, error) {
 	if strings.TrimSpace(addr) == "" {
 		return session.Session{}, fmt.Errorf("address is required")
