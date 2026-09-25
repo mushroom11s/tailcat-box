@@ -248,9 +248,9 @@ jobs:
           "$PY" scripts/package-wails-artifact.py --version "${VERSION}" --os-slug "${OS_SLUG}" --arch "${ARCH}"
           if [ "${OS_SLUG}" = "windows" ]; then
             test -f "dist-upload/tailcat-box-windows-${ARCH}-installer-${VERSION}.exe"
-            test -f "dist-upload/tailcat-box-windows-${ARCH}-${VERSION}.zip"
-            if [ -e "dist-upload/tailcat-box-windows-${ARCH}-${VERSION}.exe" ]; then
-              echo "refusing a bare portable exe; ship the zip and the installer" >&2
+            test -f "dist-upload/tailcat-box-windows-${ARCH}-${VERSION}.exe"
+            if [ -e "dist-upload/tailcat-box-windows-${ARCH}-${VERSION}.zip" ]; then
+              echo "refusing a Windows portable zip; ship the bare portable exe and the installer" >&2
               exit 1
             fi
           else
@@ -364,10 +364,11 @@ jobs:
           tag_name: ${{ needs.meta.outputs.version }}
           name: ${{ needs.meta.outputs.version }}
           body_path: release-notes.md
+          # Windows portable is a bare .exe (no zip). macOS ships .dmg only.
+          # collected/*.zip would be unmatched and fail this step.
           files: |
             collected/*.exe
             collected/*.dmg
-            collected/*.zip
           fail_on_unmatched_files: true
           draft: false
           make_latest: true

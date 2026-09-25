@@ -92,6 +92,24 @@ func TestSelectAsset(t *testing.T) {
 			want: "tailcat-box-windows-amd64-installer-v1.1.1.exe",
 		},
 		{
+			name: "prefers labeled installer over portable bare exe",
+			assets: assetsFor(
+				"tailcat-box-windows-amd64-v1.1.2.exe",
+				"tailcat-box-windows-amd64-installer-v1.1.2.exe",
+			),
+			goos: "windows", goarch: "amd64", tag: "v1.1.2",
+			want: "tailcat-box-windows-amd64-installer-v1.1.2.exe",
+		},
+		{
+			name: "arm64 prefers labeled installer over portable bare exe",
+			assets: assetsFor(
+				"tailcat-box-windows-arm64-installer-v1.1.2.exe",
+				"tailcat-box-windows-arm64-v1.1.2.exe",
+			),
+			goos: "windows", goarch: "arm64", tag: "v1.1.2",
+			want: "tailcat-box-windows-arm64-installer-v1.1.2.exe",
+		},
+		{
 			name: "arm64 labeled installer",
 			assets: assetsFor(
 				"tailcat-box-windows-arm64-v1.1.1.zip",
