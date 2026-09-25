@@ -2669,8 +2669,57 @@ textarea {
   margin-bottom: 0;
 }
 
+.qr-shot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.qr-copy {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.qr-copy svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.qr-copy:hover:not(:disabled),
+.qr-copy:focus-visible {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.qr-copy:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, white);
+  outline-offset: 2px;
+}
+
+.qr-copy:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .qr-modal-figure {
-  margin: 0 auto 12px;
+  margin: 0;
   padding: 12px;
   width: fit-content;
   background: #fff;
@@ -2959,13 +3008,26 @@ textarea {
 
 .miao-qr {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   min-height: 200px;
   padding: 8px;
   border-radius: var(--radius-sm);
   background: white;
   overflow: visible;
+}
+
+.miao-qr .qr-copy {
+  color: #636366;
+  border-color: rgba(28, 28, 30, 0.16);
+}
+
+.miao-qr .qr-copy:hover:not(:disabled),
+.miao-qr .qr-copy:focus-visible {
+  color: #1c1c1e;
+  background: rgba(28, 28, 30, 0.05);
 }
 
 .miao-qr > img {
@@ -3171,6 +3233,18 @@ textarea {
 .toast-dismiss:hover {
   background: var(--icon-bg-hover);
   color: var(--text);
+}
+
+.toast.toast-ok {
+  border-color: color-mix(in srgb, var(--ok) 46%, var(--glass-border));
+}
+
+.toast.toast-ok .toast-badge {
+  background: var(--ok);
+}
+
+.toast.toast-ok .toast-label {
+  color: var(--ok);
 }
 
 .status-pill.bad {

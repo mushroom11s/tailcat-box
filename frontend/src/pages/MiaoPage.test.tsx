@@ -177,6 +177,23 @@ describe("Mew Share page", () => {
     const aspect = (box.maxY - box.minY + 1) / (box.maxX - box.minX + 1);
     expect(aspect).toBeGreaterThan(1.12);
     expect(aspect).toBeLessThan(1.35);
+
+    const write = vi.fn().mockResolvedValue(undefined);
+    setClipboard({ write, writeText: async () => undefined });
+    const copyQr = screen.getByRole("button", { name: "Copy" });
+    expect(copyQr.classList.contains("qr-copy")).toBe(true);
+    expect(copyQr.closest(".miao-qr")?.querySelector("img")).toBeTruthy();
+    expect(copyQr.hasAttribute("disabled")).toBe(false);
+    await user.click(copyQr);
+    await waitFor(() => {
+      expect(write).toHaveBeenCalledTimes(1);
+    });
+    const copied = write.mock.calls[0][0] as ClipboardItem[];
+    const blob = await copied[0].getType("image/png");
+    expect(blob.type).toBe("image/png");
+    expect(blob.size).toBeGreaterThan(8);
+    expect(screen.getByText("QR code copied.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy code" })).toBeTruthy();
   });
 
   it("tells the host when a large share stays on the original path", async () => {

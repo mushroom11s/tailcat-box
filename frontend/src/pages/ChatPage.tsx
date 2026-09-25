@@ -5,7 +5,9 @@ import QrShareButton from "../components/QrShareButton";
 import VoiceNote from "../components/VoiceNote";
 import iconUrl from "../assets/icon.png";
 import roomQrMark from "../assets/room-qr-cat.png?inline";
-import { useI18n } from "../i18n";
+import { useI18n, type MessageKey } from "../i18n";
+import { useClipboardFieldPaste, type PasteFailure } from "../lib/clipboardPaste";
+import { extractShareableAddress } from "../lib/qr";
 import { highlightParts, matchesQuery } from "../lib/chatSearch";
 import { localizeChatError, systemText } from "../lib/chatText";
 import { purgeDiscardIds } from "../lib/chatPurge";
@@ -79,6 +81,22 @@ type Props = {
 };
 
 const noRemarks: RemarkMap = {};
+
+function peerPasteKey(reason: PasteFailure): MessageKey {
+  if (reason === "empty") {
+    return "qrPasteEmpty";
+  }
+  if (reason === "unusable") {
+    return "qrPasteUnusable";
+  }
+  if (reason === "denied") {
+    return "qrPasteDenied";
+  }
+  if (reason === "no-qr") {
+    return "qrNotFound";
+  }
+  return "chatAddrError";
+}
 
 async function copyText(text: string): Promise<void> {
   try {
@@ -211,6 +229,15 @@ export default function ChatPage({
   const remarkAddr = remarkAddress(peer, draftPeer);
   const [draft, setDraft] = useState(initialComposer ?? "");
   const [inline, setInline] = useState("");
+  const onPeerPaste = useClipboardFieldPaste(
+    draftPeer,
+    (value) => {
+      setInline("");
+      setDraftPeer(value);
+    },
+    extractShareableAddress,
+    (reason) => setInline(t(peerPasteKey(reason))),
+  );
   const [notice, setNotice] = useState("");
   const [burnOn, setBurnOn] = useState(initialBurn ?? false);
   const draftSink = useRef(onRoomDraft);
@@ -1103,7 +1130,13 @@ export default function ChatPage({
             id="chat-peer"
             ref={peerRef}
             value={draftPeer}
-            onChange={(e) => setDraftPeer(e.target.value)}
+            onChange={(e) => {
+              setInline("");
+              setDraftPeer(e.target.value);
+            }}
+            onPaste={onPeerPaste}
+            placeholder={t("chatPeerPlaceholder")}
+            aria-describedby="chat-peer-help"
             autoComplete="off"
           />
           <QrScanButton
@@ -1117,7 +1150,7 @@ export default function ChatPage({
             {t("chatConnect")}
           </button>
         </div>
-        <p className="chat-quiet chat-help">
+        <p id="chat-peer-help" className="chat-quiet chat-help">
           {peer ? <span>{t("chatPeerConnected")}</span> : null}
           {peer ? " · " : null}
           {t("chatPeerHelper")}
@@ -1146,7 +1179,7 @@ export default function ChatPage({
         <p id="chat-remark-help" className="chat-quiet chat-help">{t("chatRemarkHelp")}</p>
         </>
         ) : null}
-        {inline ? <p className="err">{inline}</p> : null}
+        {inline ? <p className="err" role="alert">{inline}</p> : null}
       </div>
       <div className="chat-stage">
       <div className="chat-transcript-column">

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { ClipboardSetText, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import LoadingCat from "../components/LoadingCat";
+import QrCopyButton from "../components/QrCopyButton";
 import QrScanButton from "../components/QrScanButton";
+import { useToasts } from "../components/toasts";
 import { useI18n, type MessageKey } from "../i18n";
 import miaoQrMark from "../assets/miao-qr-cat.png?inline";
 import runningCatGif from "../assets/running-cat.gif";
 import runningCatWebp from "../assets/running-cat.webp";
 import { useClipboardFieldPaste, type PasteFailure } from "../lib/clipboardPaste";
+import { copyQrImage } from "../lib/copyQrImage";
 import { encodeQrDataURL } from "../lib/qr";
 import {
   acceptMiaoCode,
@@ -131,8 +134,11 @@ function ShareCard({
   onEnd: (id: string) => void;
 }) {
   const { t } = useI18n();
+  const { push, note } = useToasts();
   const [qrSrc, setQrSrc] = useState("");
   const [qrFailed, setQrFailed] = useState(false);
+  const [copyNote, setCopyNote] = useState("");
+  const [copyError, setCopyError] = useState("");
   const left = downloadsLeft(share.maxDownloads, share.downloads);
   const ttl = remainingTTL(share.expiresAt, share.forever, now);
   const expiring = expiresSoon(share.expiresAt, share.forever, now);
@@ -223,6 +229,25 @@ function ShareCard({
           ) : (
             <LoadingCat size="lg" layout="block" label={t("miaoPacking")} />
           )}
+          {qrSrc ? (
+            <QrCopyButton
+              onClick={() => {
+                setCopyNote("");
+                setCopyError("");
+                void copyQrImage(qrSrc)
+                  .then(() => {
+                    setCopyNote(t("qrCopied"));
+                    note(t("qrCopied"));
+                  })
+                  .catch(() => {
+                    setCopyError(t("qrCopyFailed"));
+                    push(t("qrCopyFailed"));
+                  });
+              }}
+            />
+          ) : null}
+          {copyNote ? <p className="chat-quiet" role="status">{copyNote}</p> : null}
+          {copyError ? <p className="err" role="alert">{copyError}</p> : null}
         </div>
       </div>
     </article>
