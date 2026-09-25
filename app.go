@@ -607,8 +607,9 @@ type MiaoFileInput struct {
 	DataBase64 string `json:"dataBase64"`
 }
 
-// StartMiaoShare copies files into app temp, listens on Tailcat, and returns the join payload.
-// forever ignores ttlDays. maxDownloads 0 means unlimited.
+// StartMiaoShare listens on Tailcat and returns the join payload.
+// Shares up to 300 MiB are copied into app temp. Larger path-backed shares
+// stay on the original files. forever ignores ttlDays. maxDownloads 0 means unlimited.
 func (a *App) StartMiaoShare(files []MiaoFileInput, ttlDays int, forever bool, maxDownloads int) (miao.Snapshot, error) {
 	if a.miao == nil {
 		return miao.Snapshot{}, fmt.Errorf("share storage is not configured")

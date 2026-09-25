@@ -5,13 +5,13 @@
 
 ## 中文摘要
 
-侧栏在「聊天」上面加一项 **喵传**。把文件拖进右侧虚线区域（或点一下选择），猫砂盆把文件复制到自己管理的临时目录里，磁盘上的文件名会换成随机名，界面仍显示原来的名字。然后给出一个二维码和可复制的口令。对方也用猫砂盆，扫码或粘贴口令后，通过 Tailcat 点对点把这一包文件下载下来。没有中转服务器。分享的人必须一直在线。
+侧栏在「聊天」上面加一项 **喵传**。把文件拖进右侧虚线区域（或点一下选择）。合计不超过 **300 MiB** 时，猫砂盆把文件复制到自己管理的临时目录里，磁盘上的文件名会换成随机名，界面仍显示原来的名字。更大的一份不复制，直接从用户选中的原路径发送，分享期间这些文件不能移动。然后给出一个二维码和可复制的口令。对方也用猫砂盆，扫码或粘贴口令后，通过 Tailcat 点对点把这一包文件下载下来。没有中转服务器。分享的人必须一直在线。
 
-同一份口令可以给多个人用，直到**这一份**分享结束。结束条件是到达有效期、下载次数用完，或手动结束。结束时只删掉这一份的临时副本。可以同时开多份分享，每份有自己的文件包、二维码、口令、有效期、下载次数和结束按钮。单份合计不超过 **300 MiB**。
+同一份口令可以给多个人用，直到**这一份**分享结束。结束条件是到达有效期、下载次数用完，或手动结束。结束时只删掉这一份的临时副本；按原路径分享的文件留在原地。可以同时开多份分享，每份有自己的文件包、二维码、口令、有效期、下载次数和结束按钮。
 
 ## Goal
 
-Sidebar entry **above Chat**: drop files → host copies into app temp → QR + copyable token → peer joins with 猫砂盆 and downloads over Tailcat P2P. No relay server. Host must stay online.
+Sidebar entry **above Chat**: drop files → host copies shares up to 300 MiB into app temp, and leaves larger path-backed shares on the original files → QR + copyable token → peer joins with 猫砂盆 and downloads over Tailcat P2P. No relay server. Host must stay online.
 
 ## Scope (v1)
 
@@ -19,8 +19,9 @@ Sidebar entry **above Chat**: drop files → host copies into app temp → QR + 
 - Nav: left rail, above 聊天 / Chat
 - Right pane: dashed drop zone stays available; click to pick or drag-drop multi-file
 - The host can run **several shares at once**. Each share has its own package, QR/token, TTL, download limit, and End control
-- Max total payload **300 MiB per share**; reject oversize with a clear error
-- On accept: copy into an app-managed temp dir with **renamed** files (keep original display names in the UI); delete that share's copies when **that** share ends
+- Totals **at or under 300 MiB** are copied into an app-managed temp dir with **renamed** files (keep original display names in the UI); delete that share's copies when **that** share ends
+- Totals **over 300 MiB** whose files all have original paths are not copied. The whole share is served from those paths. If a file is moved, renamed, or deleted, the download fails with a clear error instead of hanging
+- In-memory drops with no path still cannot exceed 300 MiB
 - Bundle multi-file as **one share package** (one QR / one token)
 - After drop: the new share joins the active list. The drop zone stays so another share can start. Each card shows file list, size, QR, token (copy), TTL, remaining downloads, End share
 - The same QR/token is reusable by multiple peers until that share closes. A peer joins one token
@@ -71,12 +72,12 @@ A partial whose length or declared size does not match is deleted and fetched ag
 - HTTP short links / browser download from a public URL
 - Official Tailcat QR compatibility
 - Offline store-and-forward when the host has quit
-- Payloads over 300 MiB
+- Copying a share over 300 MiB into app temp
 - Folders
 
 ## Tests
 
-- Oversize reject before any temp copy; renamed storage plus display names; TTL and download-cap end delete that share's copies
+- Shares over 300 MiB stay on the original paths; a move, rename, or delete fails clearly; renamed storage plus display names for copied shares; TTL and download-cap end delete that share's copies and leave by-reference originals in place
 - Concurrent shares stay independent: ending or exhausting one leaves the others and their temp files
 - Browser fake: drop zone stays beside the active list, each share has its own QR/token, join targets one token, and cap cleanup removes only that share
 - Receive jobs: progress events advance bytes, a second pull of the same share is queued, and a different share downloads without waiting

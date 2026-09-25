@@ -3,6 +3,7 @@ package miao
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,6 +31,7 @@ type shareFile struct {
 	StorageName string `json:"storage"`
 	Size        int64  `json:"size"`
 	SHA256      string `json:"sha256"`
+	OriginPath  string `json:"originPath,omitempty"`
 }
 
 // shareRecord is the on-disk copy of one active share. The room key stays here
@@ -49,6 +51,7 @@ type shareRecord struct {
 	Downloads    int         `json:"downloads"`
 	Total        int64       `json:"total"`
 	Files        []shareFile `json:"files"`
+	ByRef        bool        `json:"byRef,omitempty"`
 	Region       string      `json:"region,omitempty"`
 	DERPMapURL   string      `json:"derpMapUrl,omitempty"`
 }
@@ -85,6 +88,7 @@ func (h *host) writeStateLocked() error {
 		MaxDownloads: h.lim.MaxDownloads,
 		Downloads:    h.downloads,
 		Total:        h.total,
+		ByRef:        h.byRef,
 		Region:       h.region,
 		DERPMapURL:   h.derpURL,
 	}
@@ -98,6 +102,7 @@ func (h *host) writeStateLocked() error {
 			StorageName: file.StorageName,
 			Size:        file.Size,
 			SHA256:      file.SHA256,
+			OriginPath:  file.OriginPath,
 		})
 	}
 	return writeShareRecord(h.dir, rec)
@@ -144,6 +149,9 @@ func (rec *shareRecord) finished(now time.Time) bool {
 }
 
 func (rec *shareRecord) stagedFiles(dir string) ([]StagedFile, error) {
+	if rec.ByRef {
+		return rec.referencedFiles()
+	}
 	if len(rec.Files) == 0 {
 		return nil, ErrShareMissing
 	}
@@ -173,15 +181,51 @@ func (rec *shareRecord) stagedFiles(dir string) ([]StagedFile, error) {
 	return out, nil
 }
 
+func (rec *shareRecord) referencedFiles() ([]StagedFile, error) {
+	if len(rec.Files) == 0 {
+		return nil, ErrShareMissing
+	}
+	out := make([]StagedFile, 0, len(rec.Files))
+	var total int64
+	for _, file := range rec.Files {
+		if strings.TrimSpace(file.SHA256) == "" || strings.TrimSpace(file.OriginPath) == "" {
+			return nil, ErrOriginGone
+		}
+		checked, err := checkOrigin(file.OriginPath, file.Size, file.SHA256)
+		if err != nil {
+			return nil, err
+		}
+		if file.Name == "" || file.StorageName == "" {
+			return nil, ErrShareMissing
+		}
+		checked.Name = file.Name
+		checked.StorageName = file.StorageName
+		out = append(out, checked)
+		total += checked.Size
+	}
+	if rec.Total > 0 && rec.Total != total {
+		return nil, ErrOriginGone
+	}
+	return out, nil
+}
+
+func restoreNote(err error) string {
+	if errors.Is(err, ErrOriginGone) {
+		return ErrOriginGone.Error()
+	}
+	return ErrShareMissing.Error()
+}
+
 func (s *Service) restore() {
 	entries, err := os.ReadDir(s.root)
 	if err != nil {
 		return
 	}
 	type item struct {
-		dir string
-		rec *shareRecord
-		at  time.Time
+		dir   string
+		rec   *shareRecord
+		at    time.Time
+		files []StagedFile
 	}
 	var ready []item
 	for _, entry := range entries {
@@ -202,13 +246,14 @@ func (s *Service) restore() {
 			_ = os.RemoveAll(path)
 			continue
 		}
-		if _, err := rec.stagedFiles(path); err != nil {
-			s.note(ErrShareMissing.Error())
+		files, err := rec.stagedFiles(path)
+		if err != nil {
+			s.note(restoreNote(err))
 			_ = os.RemoveAll(path)
 			continue
 		}
 		created, _ := parseRecordTime(rec.CreatedAt)
-		ready = append(ready, item{dir: path, rec: rec, at: created})
+		ready = append(ready, item{dir: path, rec: rec, at: created, files: files})
 	}
 	sort.Slice(ready, func(i, j int) bool {
 		if ready[i].at.Equal(ready[j].at) {
@@ -217,7 +262,7 @@ func (s *Service) restore() {
 		return ready[i].at.After(ready[j].at)
 	})
 	for _, item := range ready {
-		if err := s.resume(item.rec, item.dir); err != nil {
+		if err := s.resume(item.rec, item.dir, item.files); err != nil {
 			s.note(err.Error())
 		}
 	}
@@ -233,9 +278,8 @@ func (s *Service) note(msg string) {
 	s.mu.Unlock()
 }
 
-func (s *Service) resume(rec *shareRecord, dir string) error {
-	files, err := rec.stagedFiles(dir)
-	if err != nil {
+func (s *Service) resume(rec *shareRecord, dir string, files []StagedFile) error {
+	if len(files) == 0 {
 		s.note(ErrShareMissing.Error())
 		_ = os.RemoveAll(dir)
 		return nil
@@ -265,6 +309,7 @@ func (s *Service) resume(rec *shareRecord, dir string) error {
 		keyJSON:   rec.KeyJSON,
 		dir:       dir,
 		files:     files,
+		byRef:     rec.ByRef,
 		total:     total,
 		lim:       Limits{TTLDays: rec.TTLDays, MaxDownloads: rec.MaxDownloads},
 		forever:   rec.Forever,

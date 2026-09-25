@@ -148,6 +148,7 @@ describe("Mew Share page", () => {
     renderPage();
     expect(screen.getByRole("heading", { name: "Mew Share" })).toBeTruthy();
     expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
+    expect(screen.getByText(/must not be moved/)).toBeTruthy();
 
     const input = screen.getByLabelText("Choose files") as HTMLInputElement;
     const file = new File(["hello miao"], "notes.txt", { type: "text/plain" });
@@ -178,6 +179,35 @@ describe("Mew Share page", () => {
     expect(aspect).toBeLessThan(1.35);
   });
 
+  it("tells the host when a large share stays on the original path", async () => {
+    const user = userEvent.setup();
+    installGoApp({
+      StartChatRoom: () => Promise.resolve({}),
+      SetUILocale: () => Promise.resolve(),
+      ListMiaoReceives: () => Promise.resolve([]),
+      MiaoRestoreNotes: () => Promise.resolve([]),
+      EndMiaoShare: () => Promise.resolve(),
+      MiaoShareStatus: () =>
+        Promise.resolve([
+          {
+            id: "share-big",
+            status: "active",
+            payload: "mw1.big-share",
+            forever: true,
+            total: 9,
+            byRef: true,
+            warning: "The original file was moved or deleted. Put it back in the same place, or end this share and start again.",
+            files: [{ name: "big.bin", size: 9 }],
+          },
+        ]),
+    });
+    renderPage();
+    expect(await screen.findByText("These files stay at their original path. Do not move or rename them while this share is active.")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("moved or deleted");
+    await user.click(screen.getByRole("button", { name: "End share" }));
+    expect(await screen.findByText("Share ended. The original files were left where they are.")).toBeTruthy();
+  });
+
   it("rejects an oversize drop before staging", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -185,7 +215,7 @@ describe("Mew Share page", () => {
     const file = new File(["x"], "big.bin", { type: "application/octet-stream" });
     Object.defineProperty(file, "size", { value: MAX_SHARE_BYTES + 1 });
     await user.upload(input, file);
-    expect((await screen.findByRole("alert")).textContent).toContain("This share is larger than 300 MiB.");
+    expect((await screen.findByRole("alert")).textContent).toContain("A copied share cannot be larger than 300 MiB.");
     expect(screen.queryByRole("button", { name: "End share" })).toBeNull();
   });
 

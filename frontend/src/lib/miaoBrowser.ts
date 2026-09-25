@@ -208,6 +208,7 @@ export async function browserStartMiao(files: MiaoFileInput[], ttlDays: number, 
     total += size;
     decoded.push({ name: file.name || "file", size, dataBase64 });
   }
+  // Browser drops have no original path, so they are copied and stay under 300 MiB.
   if (shareTooLarge(decoded.map((file) => file.size)) || total > 300 * 1024 * 1024) {
     throw new Error("This share is larger than 300 MiB.");
   }
