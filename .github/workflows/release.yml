@@ -229,6 +229,7 @@ jobs:
             MSYS_NO_PATHCONV=1 makensis /VERSION
             # This runner built one arch. Wails passes only that binary to
             # makensis, so the setup exe is single-arch (amd64 or arm64).
+            # -nsis also leaves the runnable tailcat-box.exe in build/bin.
             wails build -trimpath -ldflags "${extra_ldflags}" -nsis
           else
             wails build -trimpath -ldflags "${extra_ldflags}"
@@ -241,9 +242,20 @@ jobs:
           OS_SLUG: ${{ matrix.slug }}
           ARCH: ${{ matrix.arch }}
         run: |
+          set -euo pipefail
           PY=python3
           command -v python3 >/dev/null 2>&1 || PY=python
           "$PY" scripts/package-wails-artifact.py --version "${VERSION}" --os-slug "${OS_SLUG}" --arch "${ARCH}"
+          if [ "${OS_SLUG}" = "windows" ]; then
+            test -f "dist-upload/tailcat-box-windows-${ARCH}-installer-${VERSION}.exe"
+            test -f "dist-upload/tailcat-box-windows-${ARCH}-${VERSION}.zip"
+            if [ -e "dist-upload/tailcat-box-windows-${ARCH}-${VERSION}.exe" ]; then
+              echo "refusing a bare portable exe; ship the zip and the installer" >&2
+              exit 1
+            fi
+          else
+            test -f "dist-upload/tailcat-box-macos-${ARCH}-${VERSION}.dmg"
+          fi
 
       - name: Verify macOS privacy usage descriptions
         if: matrix.slug == 'macos'
@@ -294,7 +306,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tailcat-box-${{ matrix.slug }}-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
-          path: dist-upload/tailcat-box-${{ matrix.slug }}-${{ matrix.arch }}-${{ needs.meta.outputs.version }}.*
+          path: dist-upload/tailcat-box-*
           if-no-files-found: error
           retention-days: 14
 
@@ -355,6 +367,7 @@ jobs:
           files: |
             collected/*.exe
             collected/*.dmg
+            collected/*.zip
           fail_on_unmatched_files: true
           draft: false
           make_latest: true

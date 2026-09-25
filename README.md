@@ -156,14 +156,16 @@ The Keys page also lists the Tailcat CLI key directory (`~/.config/tailcat/keys`
 
 ## Releases
 
-Pushing a `v*` tag builds unsigned installers and attaches them to a GitHub Release. Download the file and open it:
+Pushing a `v*` tag builds unsigned installers, plus a Windows portable zip, and attaches them to a GitHub Release. Download the file and open it:
 
 | File | How to install |
 | --- | --- |
 | `tailcat-box-macos-arm64-vX.Y.Z.dmg` | Apple Silicon. Open the disk image and drag Tailcat Box to Applications. |
 | `tailcat-box-macos-amd64-vX.Y.Z.dmg` | Intel Mac. Same drag-to-Applications disk image. |
-| `tailcat-box-windows-amd64-vX.Y.Z.exe` | Windows x64 NSIS setup. Run it. |
-| `tailcat-box-windows-arm64-vX.Y.Z.exe` | Windows ARM64 NSIS setup. Run it. |
+| `tailcat-box-windows-amd64-installer-vX.Y.Z.exe` | Windows x64 NSIS setup. Run it. |
+| `tailcat-box-windows-arm64-installer-vX.Y.Z.exe` | Windows ARM64 NSIS setup. Run it. |
+| `tailcat-box-windows-amd64-vX.Y.Z.zip` | Windows x64 portable build. Unzip and run `tailcat-box.exe`. No setup program. |
+| `tailcat-box-windows-arm64-vX.Y.Z.zip` | Windows ARM64 portable build. Unzip and run `tailcat-box.exe`. No setup program. |
 
 The version in the filename is the git tag, including the leading `v`. These builds are unsigned, so Gatekeeper and SmartScreen warnings are expected. macOS: System Settings → Privacy & Security → Open Anyway, or right-click → Open. Windows: More info → Run anyway. Notes for that tag live under `docs/releases/`.
 

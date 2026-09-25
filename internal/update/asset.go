@@ -39,8 +39,12 @@ func PlatformSlug(goos, goarch string) (slug, arch string, err error) {
 }
 
 // SelectAsset picks the installer for goos/goarch from a release's assets.
-// macOS prefers .dmg and Windows prefers .exe. Older .zip assets still match
-// so releases published before the installer switch keep downloading.
+// macOS prefers .dmg. Windows prefers the NSIS setup whose public name
+// includes "installer" (tailcat-box-windows-<arch>-installer-<tag>.exe), then
+// the v1.0.0 / v1.1.0 name that omitted that word. A portable or older .zip
+// still matches when the release has no installer, so v0.3.0 archives keep
+// downloading. The portable zip uses the same basename as that older exe, so
+// the installer name is checked first.
 // tag is the release tag, usually vX.Y.Z, matching the workflow file name.
 func SelectAsset(assets []Asset, goos, goarch, tag string) (Asset, error) {
 	slug, arch, err := PlatformSlug(goos, goarch)
@@ -87,13 +91,24 @@ func candidateNames(slug, arch, tag string, exts []string) []string {
 		}
 		names = append(names, name)
 	}
-	for _, ext := range exts {
-		if tag != "" {
-			add(fmt.Sprintf("tailcat-box-%s-%s-%s%s", slug, arch, tag, ext))
+	var versions []string
+	if tag != "" {
+		versions = append(versions, tag)
+	}
+	if bare != "" {
+		versions = append(versions, "v"+bare)
+		versions = append(versions, bare)
+	}
+	// Checked before the legacy "...-<version>.exe" name and before the
+	// portable zip, which reuses that basename.
+	if containsExt(exts, ".exe") {
+		for _, version := range versions {
+			add(fmt.Sprintf("tailcat-box-%s-%s-installer-%s.exe", slug, arch, version))
 		}
-		if bare != "" {
-			add(fmt.Sprintf("tailcat-box-%s-%s-v%s%s", slug, arch, bare, ext))
-			add(fmt.Sprintf("tailcat-box-%s-%s-%s%s", slug, arch, bare, ext))
+	}
+	for _, ext := range exts {
+		for _, version := range versions {
+			add(fmt.Sprintf("tailcat-box-%s-%s-%s%s", slug, arch, version, ext))
 		}
 	}
 	return names
