@@ -97,7 +97,7 @@ export const zhCN = {
   tailcatVersion: "Tailcat 版本",
   lastUpdateCheck: "上次检查更新",
   never: "尚未检查",
-  checkNow: "现在检查",
+  checkNow: "检查更新",
   updateNew: "NEW!",
   updateNewBadge: "NEW! 有新版本",
   latestVersion: "最新版本",
