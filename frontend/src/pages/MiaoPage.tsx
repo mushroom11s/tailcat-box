@@ -134,7 +134,7 @@ function ShareCard({
   onEnd: (id: string) => void;
 }) {
   const { t } = useI18n();
-  const { push, note } = useToasts();
+  const { push } = useToasts();
   const [qrSrc, setQrSrc] = useState("");
   const [qrFailed, setQrFailed] = useState(false);
   const [copyNote, setCopyNote] = useState("");
@@ -237,7 +237,6 @@ function ShareCard({
                 void copyQrImage(qrSrc)
                   .then(() => {
                     setCopyNote(t("qrCopied"));
-                    note(t("qrCopied"));
                   })
                   .catch(() => {
                     setCopyError(t("qrCopyFailed"));

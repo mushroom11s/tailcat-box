@@ -11,7 +11,7 @@ function Probe() {
       <button type="button" onClick={() => push('fetching DERPMap for region -1: Get "https://tailcat.dev/derpmap.json": EOF')}>
         push error
       </button>
-      <button type="button" onClick={() => note("QR code copied.")}>
+      <button type="button" onClick={() => note("Saved.")}>
         push note
       </button>
     </>
@@ -107,14 +107,14 @@ describe("toast stack", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("renders a success toast for a copied QR code", () => {
+  it("renders a success toast", () => {
     vi.useFakeTimers();
     renderToasts();
     fireEvent.click(screen.getByRole("button", { name: "push note" }));
     const status = screen.getByRole("status");
     expect(status.classList.contains("toast-ok")).toBe(true);
     expect(status.querySelector(".toast-label")?.textContent).toBe("Copied");
-    expect(status.querySelector(".toast-message")?.textContent).toBe("QR code copied.");
+    expect(status.querySelector(".toast-message")?.textContent).toBe("Saved.");
     expect(status.querySelector(".toast-badge")?.textContent?.trim()).toBe("✓");
     act(() => {
       vi.advanceTimersByTime(OK_TOAST_MS);
