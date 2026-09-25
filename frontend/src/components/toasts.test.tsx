@@ -2,14 +2,19 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../i18n";
 import css from "../styles/glass.css?inline";
-import { ERROR_TOAST_MS, ToastProvider, useToasts } from "./toasts";
+import { ERROR_TOAST_MS, OK_TOAST_MS, ToastProvider, useToasts } from "./toasts";
 
 function Probe() {
-  const { push } = useToasts();
+  const { push, note } = useToasts();
   return (
-    <button type="button" onClick={() => push('fetching DERPMap for region -1: Get "https://tailcat.dev/derpmap.json": EOF')}>
-      push error
-    </button>
+    <>
+      <button type="button" onClick={() => push('fetching DERPMap for region -1: Get "https://tailcat.dev/derpmap.json": EOF')}>
+        push error
+      </button>
+      <button type="button" onClick={() => note("QR code copied.")}>
+        push note
+      </button>
+    </>
   );
 }
 
@@ -100,6 +105,21 @@ describe("toast stack", () => {
       vi.advanceTimersByTime(1);
     });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("renders a success toast for a copied QR code", () => {
+    vi.useFakeTimers();
+    renderToasts();
+    fireEvent.click(screen.getByRole("button", { name: "push note" }));
+    const status = screen.getByRole("status");
+    expect(status.classList.contains("toast-ok")).toBe(true);
+    expect(status.querySelector(".toast-label")?.textContent).toBe("Copied");
+    expect(status.querySelector(".toast-message")?.textContent).toBe("QR code copied.");
+    expect(status.querySelector(".toast-badge")?.textContent?.trim()).toBe("✓");
+    act(() => {
+      vi.advanceTimersByTime(OK_TOAST_MS);
+    });
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("uses 关闭 for the dismiss control in zh-CN", () => {

@@ -104,6 +104,8 @@ describe("lobby peer paste", () => {
     const user = userEvent.setup();
     render(<PeerField locale="zh-CN" onConnect={onConnect} />);
     const peer = screen.getByLabelText("对方地址（可选）") as HTMLInputElement;
+    expect(peer.placeholder).toBe("粘贴地址或二维码");
+    expect(screen.getByText("可以直接把二维码粘贴到上面。连接会新建一个临时房间。")).toBeTruthy();
     await user.click(peer);
 
     await user.paste("  tc:room\n");

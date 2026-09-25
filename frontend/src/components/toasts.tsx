@@ -12,26 +12,31 @@ import { createPortal } from "react-dom";
 import { useI18n } from "../i18n";
 
 export const ERROR_TOAST_MS = 7000;
+export const OK_TOAST_MS = 3200;
+
+type ToastTone = "error" | "ok";
 
 type ToastItem = {
   id: number;
   message: string;
+  tone: ToastTone;
 };
 
 type ToastApi = {
   push: (message: string) => void;
+  note: (message: string) => void;
 };
 
 const ToastContext = createContext<ToastApi | null>(null);
 
-const noopToast: ToastApi = { push: () => undefined };
+const noopToast: ToastApi = { push: () => undefined, note: () => undefined };
 
 let toastSeq = 1;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const push = useCallback((message: string) => {
+  const add = useCallback((message: string, tone: ToastTone) => {
     const text = message.trim();
     if (!text) {
       return;
@@ -41,15 +46,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       if (prev.some((item) => item.message === text)) {
         return prev;
       }
-      return [...prev, { id, message: text }].slice(-4);
+      return [...prev, { id, message: text, tone }].slice(-4);
     });
   }, []);
+
+  const push = useCallback((message: string) => add(message, "error"), [add]);
+  const note = useCallback((message: string) => add(message, "ok"), [add]);
 
   const dismiss = useCallback((id: number) => {
     setToasts((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
-  const api = useMemo<ToastApi>(() => ({ push }), [push]);
+  const api = useMemo<ToastApi>(() => ({ push, note }), [push, note]);
 
   return (
     <ToastContext.Provider value={api}>
@@ -71,7 +79,7 @@ function ToastStack({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id
         <ToastCard
           key={item.id}
           item={item}
-          label={t("toastError")}
+          label={item.tone === "ok" ? t("toastOk") : t("toastError")}
           dismissLabel={t("toastDismiss")}
           onDismiss={onDismiss}
         />
@@ -95,7 +103,7 @@ function ToastCard({
   dismissLabel: string;
   onDismiss: (id: number) => void;
 }) {
-  const duration = ERROR_TOAST_MS;
+  const duration = item.tone === "ok" ? OK_TOAST_MS : ERROR_TOAST_MS;
   const endsAt = useRef(0);
   const leftMs = useRef(duration);
   const timer = useRef<number | null>(null);
@@ -126,8 +134,8 @@ function ToastCard({
 
   return (
     <div
-      className="toast"
-      role="alert"
+      className={item.tone === "ok" ? "toast toast-ok" : "toast"}
+      role={item.tone === "ok" ? "status" : "alert"}
       onMouseEnter={() => {
         leftMs.current = Math.max(0, endsAt.current - Date.now());
         clearTimer();
@@ -137,7 +145,7 @@ function ToastCard({
       }}
     >
       <span className="toast-badge" aria-hidden="true">
-        !
+        {item.tone === "ok" ? "✓" : "!"}
       </span>
       <div className="toast-copy">
         <p className="toast-label">{label}</p>

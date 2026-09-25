@@ -3173,6 +3173,18 @@ textarea {
   color: var(--text);
 }
 
+.toast.toast-ok {
+  border-color: color-mix(in srgb, var(--ok) 46%, var(--glass-border));
+}
+
+.toast.toast-ok .toast-badge {
+  background: var(--ok);
+}
+
+.toast.toast-ok .toast-label {
+  color: var(--ok);
+}
+
 .status-pill.bad {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 16%, transparent);

@@ -57,6 +57,18 @@ describe("qr share and scan", () => {
     });
     await user.click(within(dialog).getByRole("button", { name: "Copy" }));
     expect(writeText).toHaveBeenCalledWith(payload);
+
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText, write }, configurable: true });
+    await user.click(within(dialog).getByRole("button", { name: "Copy QR code" }));
+    await waitFor(() => {
+      expect(write).toHaveBeenCalledTimes(1);
+    });
+    const copied = write.mock.calls[0][0] as ClipboardItem[];
+    expect(await copied[0].getType("image/png")).toBeInstanceOf(Blob);
+    expect(within(dialog).getByRole("status").textContent).toBe("QR code copied.");
+    expect(document.querySelector(".toast-ok .toast-message")?.textContent).toBe("QR code copied.");
+    expect(writeText).toHaveBeenCalledTimes(1);
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
 

@@ -191,7 +191,7 @@ describe("phase A multi-room lobby", () => {
     expect(screen.getByRole("button", { name: "+ 新房间" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "新建临时房间" })).toBeTruthy();
     expect(screen.getByText("对方地址可以留空，先开房间，稍后再把地址发给对方。")).toBeTruthy();
-    expect(screen.getByText("连接会新建一个临时房间。")).toBeTruthy();
+    expect(screen.getByText("可以直接把二维码粘贴到上面。连接会新建一个临时房间。")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "固定密钥" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "保存密钥" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "重启房间" })).toBeTruthy();

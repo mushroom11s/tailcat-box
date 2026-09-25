@@ -172,7 +172,8 @@ export default function LobbyPage({
               }}
               onPaste={onPeerPaste}
               onKeyDown={onKeyDown}
-              placeholder="tc…"
+              placeholder={t("lobbyPeerPlaceholder")}
+              aria-describedby="lobby-peer-hint"
               autoComplete="off"
             />
             <QrScanButton
@@ -192,7 +193,7 @@ export default function LobbyPage({
             </p>
           ) : null}
         </div>
-        <p className="chat-quiet">{t("lobbyConnectHint")}</p>
+        <p id="lobby-peer-hint" className="chat-quiet">{t("lobbyConnectHint")}</p>
         {busy === "connect" ? null : (
           <button className="btn btn-ghost" type="button" disabled={pending} onClick={onConnect}>
             {t("chatConnect")}
