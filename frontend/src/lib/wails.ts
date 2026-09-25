@@ -148,6 +148,12 @@ export type SystemInfo = {
 
 const TAILCAT_EVENT = "tailcat:event";
 export const TRAY_NAVIGATE_EVENT = "tailcat:navigate";
+export const NOTIFY_OPEN_EVENT = "tailcat:notify-open";
+
+export type NotifyOpen = {
+  page: "chat" | "miao";
+  room: string;
+};
 export const UPDATE_EVENT = "tailcat:update";
 export const UPDATE_PROGRESS_EVENT = "tailcat:update-progress";
 
@@ -206,6 +212,7 @@ type FakeState = {
   keys: KeyInfo[];
   listeners: Array<(ev: TailcatEvent) => void>;
   navListeners: Array<(page: string) => void>;
+  notifyOpenListeners: Array<(target: NotifyOpen) => void>;
   updateListeners: Array<(status: UpdateStatus) => void>;
   progressListeners: Array<(progress: UpdateProgress) => void>;
   serveStops: Map<string, () => void>;
@@ -243,6 +250,7 @@ const fake: FakeState = {
   keys: [],
   listeners: [],
   navListeners: [],
+  notifyOpenListeners: [],
   updateListeners: [],
   progressListeners: [],
   serveStops: new Map(),
@@ -1474,6 +1482,41 @@ export function onTrayNavigate(callback: (page: string) => void): () => void {
 export function emitTrayNavigate(page: string): void {
   for (const listener of [...fake.navListeners]) {
     listener(page);
+  }
+}
+
+function asNotifyOpen(raw: unknown): NotifyOpen | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const rec = raw as Record<string, unknown>;
+  const page = typeof rec.page === "string" ? rec.page : typeof rec.Page === "string" ? rec.Page : "";
+  const roomRaw = rec.room ?? rec.Room;
+  const room = typeof roomRaw === "string" ? roomRaw : "";
+  if (page !== "chat" && page !== "miao") {
+    return null;
+  }
+  return { page, room };
+}
+
+export function onNotifyOpen(callback: (target: NotifyOpen) => void): () => void {
+  if (hasWailsBindings() && goWindow().runtime) {
+    return EventsOn(NOTIFY_OPEN_EVENT, (payload: unknown) => {
+      const target = asNotifyOpen(payload);
+      if (target) {
+        callback(target);
+      }
+    });
+  }
+  fake.notifyOpenListeners.push(callback);
+  return () => {
+    fake.notifyOpenListeners = fake.notifyOpenListeners.filter((l) => l !== callback);
+  };
+}
+
+export function emitNotifyOpen(target: NotifyOpen): void {
+  for (const listener of [...fake.notifyOpenListeners]) {
+    listener(target);
   }
 }
 

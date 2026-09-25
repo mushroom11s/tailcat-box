@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { LocaleProvider } from "./i18n";
-import { emitBrowserEvent, listSessions, resetBrowserRooms, sendChatText } from "./lib/wails";
+import { DESKTOP_NOTIFY_KEY, resetDesktopNotifyCoalesceForTests } from "./lib/desktopNotify";
+import { emitBrowserEvent, emitNotifyOpen, listSessions, resetBrowserRooms, sendChatText } from "./lib/wails";
 import { resetOsNotificationsForTests } from "./lib/osNotify";
 
 type RuntimeMocks = {
@@ -42,9 +43,11 @@ async function renderApp() {
 beforeEach(() => {
   resetBrowserRooms();
   localStorage.setItem("tailcat-locale", "en");
+  localStorage.removeItem(DESKTOP_NOTIFY_KEY);
   focused = true;
   hidden = false;
   resetOsNotificationsForTests();
+  resetDesktopNotifyCoalesceForTests();
   vi.spyOn(document, "hasFocus").mockImplementation(() => focused);
   Object.defineProperty(document, "visibilityState", {
     configurable: true,
@@ -81,13 +84,15 @@ describe("inbound OS notifications", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("echo");
     await waitFor(() => {
-      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls.some((call) => call[0].body === "echo")).toBe(true);
     });
-    expect(send.mock.calls[0][0]).toMatchObject({
+    const preview = send.mock.calls.find((call) => call[0].body === "echo");
+    expect(preview?.[0]).toMatchObject({
       title: "tc:fake-echo",
       body: "echo",
+      data: { page: "chat" },
     });
-    expect(JSON.stringify(send.mock.calls[0][0])).not.toContain("audio");
+    expect(JSON.stringify(preview?.[0])).not.toContain("audio");
   });
 
   it("stays quiet while the focused window is already on the chat transcript", async () => {
@@ -124,7 +129,7 @@ describe("inbound OS notifications", () => {
     await user.type(screen.getByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => {
-      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -148,12 +153,120 @@ describe("inbound OS notifications", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("does not notify when a peer connects without an inbound message", async () => {
+  it("notifies once when a peer joins in the background and ignores a quick reconnect", async () => {
     const { send } = installRuntime();
     focused = false;
     const user = userEvent.setup();
     await renderApp();
     await connectEcho(user);
+    await waitFor(() => {
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+    expect(send.mock.calls[0][0].body).toBe("tc:fake-echo joined the room");
+    expect(send.mock.calls[0][0].data).toMatchObject({ page: "chat" });
+    const id = await chatRoomId();
+    emitBrowserEvent({
+      SessionID: id,
+      Kind: "peer",
+      Data: JSON.stringify({ address: "" }),
+    });
+    emitBrowserEvent({
+      SessionID: id,
+      Kind: "peer",
+      Data: JSON.stringify({ address: "tc:fake-echo", caps: ["resume"] }),
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays quiet about a peer join while this room is in front", async () => {
+    const { send } = installRuntime();
+    const user = userEvent.setup();
+    await renderApp();
+    await connectEcho(user);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("notifies when a Mew Share starts and finishes in the background, once each", async () => {
+    const { send } = installRuntime();
+    focused = false;
+    render(
+      <LocaleProvider>
+        <App />
+      </LocaleProvider>,
+    );
+    expect(await screen.findByRole("heading", { name: "Mew Share" })).toBeTruthy();
+    const base = {
+      id: "job-1",
+      bytesDone: 0,
+      bytesTotal: 10,
+      files: [{ name: "notes.txt", size: 10 }],
+      dest: "/tmp",
+    };
+    emitBrowserEvent({
+      SessionID: "job-1",
+      Kind: "miao-receive",
+      Data: JSON.stringify({ ...base, status: "connecting" }),
+    });
+    await waitFor(() => {
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+    expect(send.mock.calls[0][0].body).toBe("Mew Share started · notes.txt");
+    expect(send.mock.calls[0][0].data).toEqual({ page: "miao" });
+    emitBrowserEvent({
+      SessionID: "job-1",
+      Kind: "miao-receive",
+      Data: JSON.stringify({ ...base, status: "downloading", bytesDone: 4 }),
+    });
+    emitBrowserEvent({
+      SessionID: "job-1",
+      Kind: "miao-receive",
+      Data: JSON.stringify({ ...base, status: "downloading", bytesDone: 8 }),
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    emitBrowserEvent({
+      SessionID: "job-1",
+      Kind: "miao-receive",
+      Data: JSON.stringify({ ...base, status: "done", bytesDone: 10 }),
+    });
+    await waitFor(() => {
+      expect(send).toHaveBeenCalledTimes(2);
+    });
+    expect(send.mock.calls[1][0].body).toBe("Mew Share download finished · notes.txt");
+  });
+
+  it("opens the chat room when a notification click arrives", async () => {
+    const show = vi.fn();
+    const unmin = vi.fn();
+    installRuntime();
+    (window as unknown as { runtime: { WindowShow: typeof show; WindowUnminimise: typeof unmin } }).runtime.WindowShow = show;
+    (window as unknown as { runtime: { WindowUnminimise: typeof unmin } }).runtime.WindowUnminimise = unmin;
+    const user = userEvent.setup();
+    await renderApp();
+    await connectEcho(user);
+    const id = await chatRoomId();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
+    emitNotifyOpen({ page: "chat", room: id });
+    expect(show).toHaveBeenCalled();
+    expect(unmin).toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: "Show room details" })).toBeTruthy();
+  });
+
+  it("turns desktop notifications off from Settings", async () => {
+    const { send } = installRuntime();
+    focused = false;
+    const user = userEvent.setup();
+    await renderApp();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    const toggle = screen.getByRole("button", { name: "Desktop notifications" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    await user.click(document.querySelector(".nav-chat > .nav-btn") as HTMLElement);
+    await connectEcho(user);
+    await user.type(screen.getByLabelText("Message"), "hi");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("echo");
     expect(send).not.toHaveBeenCalled();
   });
 

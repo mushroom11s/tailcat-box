@@ -39,6 +39,8 @@ type Props = {
   onCreate: (name: string, client: boolean, region: string) => void | Promise<void>;
   onDelete: (name: string) => void | Promise<void>;
   onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
+  desktopNotifications: boolean;
+  onDesktopNotifications: (enabled: boolean) => void;
 };
 
 function formatUptime(startedAt: string): string {
@@ -87,6 +89,21 @@ function SunIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="3.25" fill="none" stroke="currentColor" strokeWidth="1.75" />
       <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" d="M12 3.5v2M12 18.5v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M3.5 12h2M18.5 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+        d="M6.5 16.5h11l-1.2-2.1V10a4.3 4.3 0 0 0-8.6 0v4.4L6.5 16.5z"
+      />
+      <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" d="M10 16.5a2 2 0 0 0 4 0" />
     </svg>
   );
 }
@@ -168,6 +185,8 @@ export default function SettingsPage({
   onCreate,
   onDelete,
   onSaveNetwork,
+  desktopNotifications,
+  onDesktopNotifications,
 }: Props) {
   const { locale, setLocale, t } = useI18n();
   const [client, setClient] = useState<ClientInfo | null>(null);
@@ -365,6 +384,22 @@ export default function SettingsPage({
             ))}
           </div>
         </div>
+        <div className="setting-row">
+          <div className="setting-label">
+            <BellIcon />
+            <span id="settings-desktop-notify">{t("desktopNotifications")}</span>
+          </div>
+          <button
+            type="button"
+            className={`chip-toggle${desktopNotifications ? " on" : ""}`}
+            aria-pressed={desktopNotifications}
+            aria-labelledby="settings-desktop-notify"
+            onClick={() => onDesktopNotifications(!desktopNotifications)}
+          >
+            {desktopNotifications ? t("on") : t("off")}
+          </button>
+        </div>
+        <p className="setting-help">{t("desktopNotificationsHelp")}</p>
       </section>
 
       <section className="glass settings-panel">

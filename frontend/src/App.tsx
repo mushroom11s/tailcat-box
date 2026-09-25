@@ -7,12 +7,20 @@ import SettingsPage from "./pages/SettingsPage";
 import TunnelPage from "./pages/TunnelPage";
 import { readMappings, toPortMapping, writeMappings, type PortMappingRecord } from "./lib/portMappings";
 import { sameKeys, sameSessions } from "./lib/snapshot";
-import { translate, useI18n } from "./i18n";
+import { translate, useI18n, type MessageKey } from "./i18n";
 import iconUrl from "./assets/icon.png";
-import { inboundAlertBody, inboundAlertTitle, isInboundAlert, readingOpenTranscript } from "./lib/chatNotify";
+import { abbrevPeerLabel, inboundAlertBody, inboundAlertTitle, isInboundAlert, readingOpenTranscript } from "./lib/chatNotify";
 import { localizeChatError } from "./lib/chatText";
+import {
+  MIAO_NOTIFY_WINDOW_MS,
+  appInBackground,
+  claimNotifySlot,
+  readDesktopNotifications,
+  writeDesktopNotifications,
+} from "./lib/desktopNotify";
+import { parseReceiveJob } from "./lib/miao";
 import { NICKNAME_KEY, readNickname } from "./lib/nickname";
-import { ensureOsNotifications, sendOsNotification } from "./lib/osNotify";
+import { ensureOsNotifications, focusAppWindow, sendOsNotification, type NotifyData } from "./lib/osNotify";
 import { applyRemark, readRemarks, writeRemarks, type RemarkMap } from "./lib/remark";
 import { remarkIsShared, roomPrimaryLabel, roomTooltip } from "./lib/roomLabel";
 import { applyRoomEvent, emptyRoom, type RoomSlice } from "./lib/roomState";
@@ -26,6 +34,7 @@ import {
   hasWailsBindings,
   listKeys,
   listSessions,
+  onNotifyOpen,
   onTailcatEvent,
   onTrayNavigate,
   onUpdateStatus,
@@ -120,6 +129,9 @@ function AppShell() {
   const appliedChatErr = useRef<Record<string, string>>({});
   const appliedTunnelErr = useRef<Record<string, string>>({});
   const [notifyDenied, setNotifyDenied] = useState(false);
+  const [desktopNotify, setDesktopNotify] = useState(() => readDesktopNotifications());
+  const desktopNotifyRef = useRef(desktopNotify);
+  desktopNotifyRef.current = desktopNotify;
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [updateFocus, setUpdateFocus] = useState(0);
   mappingsRef.current = mappings;
@@ -181,6 +193,90 @@ function AppShell() {
     return queued;
   }
 
+  function tr(key: MessageKey): string {
+    return translate(localeRef.current, key);
+  }
+
+  function setDesktopNotifications(enabled: boolean): void {
+    writeDesktopNotifications(enabled);
+    desktopNotifyRef.current = enabled;
+    setDesktopNotify(enabled);
+    if (enabled) {
+      void ensureOsNotifications();
+    }
+  }
+
+  function deliverNotification(options: { id: string; title: string; body?: string; data?: NotifyData }): void {
+    if (!desktopNotifyRef.current) {
+      return;
+    }
+    void sendOsNotification(options).then((result) => {
+      if (result === "denied") {
+        setNotifyDenied(true);
+      }
+    });
+  }
+
+  function notePeerJoined(prev: RoomSlice, next: RoomSlice): void {
+    const addr = next.peer.trim();
+    if (!addr || addr === prev.peer.trim()) {
+      return;
+    }
+    if (!claimNotifySlot(`peer:${next.id}:${addr}`)) {
+      return;
+    }
+    if (!appInBackground(document)) {
+      return;
+    }
+    deliverNotification({
+      id: `peer:${next.id}:${addr}`,
+      title: tr("productName"),
+      body: tr("notifyPeerJoined").replace("{peer}", abbrevPeerLabel(addr)),
+      data: { page: "chat", room: next.id },
+    });
+  }
+
+  function noteMiao(ev: TailcatEvent): void {
+    if (!ev.Data) {
+      return;
+    }
+    const job = parseReceiveJob(ev.Data);
+    if (!job) {
+      return;
+    }
+    const name = job.files?.map((file) => file.name.trim()).find(Boolean) || tr("notifyFileFallback");
+    if (job.status === "connecting" || job.status === "queued" || job.status === "downloading") {
+      if (!claimNotifySlot(`miao-start:${job.id}`, Date.now(), MIAO_NOTIFY_WINDOW_MS)) {
+        return;
+      }
+      if (!appInBackground(document)) {
+        return;
+      }
+      deliverNotification({
+        id: `miao-start:${job.id}`,
+        title: tr("productName"),
+        body: tr("notifyMiaoStarted").replace("{name}", name),
+        data: { page: "miao" },
+      });
+      return;
+    }
+    if (job.status !== "done") {
+      return;
+    }
+    if (!claimNotifySlot(`miao-done:${job.id}`, Date.now(), MIAO_NOTIFY_WINDOW_MS)) {
+      return;
+    }
+    if (!appInBackground(document)) {
+      return;
+    }
+    deliverNotification({
+      id: `miao-done:${job.id}`,
+      title: tr("productName"),
+      body: tr("notifyMiaoDone").replace("{name}", name),
+      data: { page: "miao" },
+    });
+  }
+
   function noteInbound(room: RoomSlice, ev: TailcatEvent): void {
     if (ev.Kind !== "message" || !ev.Data) {
       return;
@@ -200,16 +296,11 @@ function AppShell() {
     if (readingOpenTranscript(document, viewingThisRoom)) {
       return;
     }
-    const loc = localeRef.current;
-    const tr = (key: Parameters<typeof translate>[1]) => translate(loc, key);
-    void sendOsNotification({
+    deliverNotification({
       id: msg.id,
       title: inboundAlertTitle(room.peer, tr("productName")),
       body: inboundAlertBody(msg, tr),
-    }).then((result) => {
-      if (result === "denied") {
-        setNotifyDenied(true);
-      }
+      data: { page: "chat", room: room.id },
     });
   }
 
@@ -338,7 +429,27 @@ function AppShell() {
   }, []);
 
   useEffect(() => {
-    void ensureOsNotifications();
+    if (readDesktopNotifications()) {
+      void ensureOsNotifications();
+    }
+  }, []);
+
+  useEffect(() => {
+    return onNotifyOpen((target) => {
+      focusAppWindow();
+      if (target.page === "miao") {
+        setPage("miao");
+        return;
+      }
+      setPage("chat");
+      const room = target.room.trim();
+      if (room && roomsRef.current[room]) {
+        commitLobby(false);
+        commitFocus(room);
+        return;
+      }
+      openChat();
+    });
   }, []);
 
   useEffect(() => {
@@ -353,6 +464,11 @@ function AppShell() {
         void refresh();
         return;
       }
+      if (ev.Kind === "miao-receive") {
+        noteMiao(ev);
+        void refresh();
+        return;
+      }
       if (!id || !roomsRef.current[id]) {
         if (id && CHAT_KINDS.has(ev.Kind)) {
           pendingRef.current.push(ev);
@@ -360,8 +476,10 @@ function AppShell() {
         void refresh();
         return;
       }
-      const room = applyRoomEvent(roomsRef.current[id], ev);
+      const prev = roomsRef.current[id];
+      const room = applyRoomEvent(prev, ev);
       commitRooms({ ...roomsRef.current, [id]: room });
+      notePeerJoined(prev, room);
       noteInbound(room, ev);
       void refresh();
     });
@@ -935,6 +1053,8 @@ function AppShell() {
             onCreate={(name, client, keyRegion) => run(() => createKey(name, client, keyRegion))}
             onDelete={(name) => run(() => deleteKey(name))}
             onSaveNetwork={(nextRegion, nextDERP) => run(() => setNetworkSettings(nextRegion, nextDERP))}
+            desktopNotifications={desktopNotify}
+            onDesktopNotifications={setDesktopNotifications}
           />
         )}
       </main>
