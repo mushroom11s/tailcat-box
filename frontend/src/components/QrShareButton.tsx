@@ -3,6 +3,7 @@ import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
 import { useI18n } from "../i18n";
 import { copyQrImage } from "../lib/copyQrImage";
 import { encodeQrDataURL } from "../lib/qr";
+import QrCopyButton from "./QrCopyButton";
 import { useToasts } from "./toasts";
 import QrDialog from "./QrDialog";
 
@@ -101,9 +102,7 @@ export default function QrShareButton({ value, disabled = false, centerMark }: P
                 <img src={src} alt={text} width={240} height={240} />
               </div>
             ) : null}
-            <button className="btn btn-ghost" type="button" disabled={!src} onClick={() => void copyImage()}>
-              {t("copy")}
-            </button>
+            <QrCopyButton disabled={!src} onClick={() => void copyImage()} />
           </div>
           <code className="qr-payload">{text}</code>
           {copyNote ? <p className="chat-quiet" role="status">{copyNote}</p> : null}

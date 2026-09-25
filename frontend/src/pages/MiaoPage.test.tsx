@@ -181,6 +181,7 @@ describe("Mew Share page", () => {
     const write = vi.fn().mockResolvedValue(undefined);
     setClipboard({ write, writeText: async () => undefined });
     const copyQr = screen.getByRole("button", { name: "Copy" });
+    expect(copyQr.classList.contains("qr-copy")).toBe(true);
     expect(copyQr.closest(".miao-qr")?.querySelector("img")).toBeTruthy();
     expect(copyQr.hasAttribute("disabled")).toBe(false);
     await user.click(copyQr);

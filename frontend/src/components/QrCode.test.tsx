@@ -56,6 +56,8 @@ describe("qr share and scan", () => {
       expect(within(dialog).getByRole("img", { name: payload }).getAttribute("src")?.startsWith("data:image/png")).toBe(true);
     });
     const copyImage = within(dialog).getByRole("button", { name: "Copy" });
+    expect(copyImage.classList.contains("qr-copy")).toBe(true);
+    expect(copyImage.querySelector("svg")).toBeTruthy();
     expect(copyImage.closest(".qr-shot")?.querySelector("img")).toBeTruthy();
     await user.click(within(dialog).getByRole("button", { name: "Copy address" }));
     expect(writeText).toHaveBeenCalledWith(payload);

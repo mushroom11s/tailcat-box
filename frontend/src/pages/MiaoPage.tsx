@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { ClipboardSetText, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import LoadingCat from "../components/LoadingCat";
+import QrCopyButton from "../components/QrCopyButton";
 import QrScanButton from "../components/QrScanButton";
 import { useToasts } from "../components/toasts";
 import { useI18n, type MessageKey } from "../i18n";
@@ -229,25 +230,21 @@ function ShareCard({
             <LoadingCat size="lg" layout="block" label={t("miaoPacking")} />
           )}
           {qrSrc ? (
-          <button
-            className="btn btn-ghost"
-            type="button"
-            onClick={() => {
-              setCopyNote("");
-              setCopyError("");
-              void copyQrImage(qrSrc)
-                .then(() => {
-                  setCopyNote(t("qrCopied"));
-                  note(t("qrCopied"));
-                })
-                .catch(() => {
-                  setCopyError(t("qrCopyFailed"));
-                  push(t("qrCopyFailed"));
-                });
-            }}
-          >
-            {t("copy")}
-          </button>
+            <QrCopyButton
+              onClick={() => {
+                setCopyNote("");
+                setCopyError("");
+                void copyQrImage(qrSrc)
+                  .then(() => {
+                    setCopyNote(t("qrCopied"));
+                    note(t("qrCopied"));
+                  })
+                  .catch(() => {
+                    setCopyError(t("qrCopyFailed"));
+                    push(t("qrCopyFailed"));
+                  });
+              }}
+            />
           ) : null}
           {copyNote ? <p className="chat-quiet" role="status">{copyNote}</p> : null}
           {copyError ? <p className="err" role="alert">{copyError}</p> : null}
