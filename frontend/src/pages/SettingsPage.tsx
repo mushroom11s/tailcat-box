@@ -41,6 +41,7 @@ type Props = {
   onSaveNetwork: (region: string, derpMapURL: string) => void | Promise<void>;
   desktopNotifications: boolean;
   onDesktopNotifications: (enabled: boolean) => void;
+  onShowGuide: () => void;
 };
 
 function formatUptime(startedAt: string): string {
@@ -187,6 +188,7 @@ export default function SettingsPage({
   onSaveNetwork,
   desktopNotifications,
   onDesktopNotifications,
+  onShowGuide,
 }: Props) {
   const { locale, setLocale, t } = useI18n();
   const [client, setClient] = useState<ClientInfo | null>(null);
@@ -465,6 +467,9 @@ export default function SettingsPage({
           ) : null}
           {downloadError ? <p className="err">{downloadError}</p> : null}
           <div className="update-actions">
+            <button className="btn-link" type="button" onClick={onShowGuide}>
+              {t("onboardingOpen")}
+            </button>
             {canDownload && !downloaded ? (
               <button className="btn btn-small" type="button" disabled={localBusy} onClick={() => void onDownload()}>
                 {downloading ? t("downloadingUpdate") : t("downloadUpdate")}

@@ -50,6 +50,21 @@ export const zhCN = {
   on: "开",
   desktopNotifications: "桌面通知",
   desktopNotificationsHelp: "窗口最小化或在后台时，有人进房间、喵传开始或下载完成，会发一条系统通知。",
+  onboardingOpen: "使用引导",
+  onboardingProgress: "{n} / {total}",
+  onboardingStep1Title: "把我的地址发给对方",
+  onboardingStep1Body:
+    "打开聊天，新建一个房间。复制地址，或它的二维码，发给对方。对方靠这个地址进这个房间。想下次还用同一个地址，就保存一把密钥。",
+  onboardingStep2Title: "加入或新建房间",
+  onboardingStep2Body: "点「+ 新房间」可以开一个临时房间，也可以粘贴对方的地址再连接。侧栏里能同时留着几个房间，点一下就切换。",
+  onboardingStep3Title: "喵传的取件码",
+  onboardingStep3Body:
+    "喵传用来传文件。把文件放进去会得到一个取件码，发给对方。对方在「下载」里粘贴这个码。两边都要开着猫砂盆，这台设备也要在线。取件码不是聊天地址。",
+  onboardingNext: "下一步",
+  onboardingBack: "上一步",
+  onboardingDone: "知道了",
+  onboardingSkip: "跳过",
+  onboardingDismiss: "不再显示",
   off: "关",
 
   tunnelTitle: "穿透",
