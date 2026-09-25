@@ -62,6 +62,9 @@ export default function SSHDesk({
   const [confirmAny, setConfirmAny] = useState(false);
   const [phrase, setPhrase] = useState("");
   const liveKey = shareableAddress(desk.Address);
+  const live = desk.Enabled && Boolean(desk.Address);
+  const status = desk.AllowAny && desk.Enabled ? t("sshStatusAny") : desk.Enabled ? t("sshStatusAllow") : t("sshStatusOff");
+  const dotClass = desk.Err ? " bad" : desk.AllowAny && desk.Enabled ? " warn" : desk.Enabled ? "" : " idle";
 
   function submitPeer(e: FormEvent) {
     e.preventDefault();
@@ -108,24 +111,34 @@ export default function SSHDesk({
 
   return (
     <section className="glass ssh-desk" aria-label={t("sshDeskTitle")}>
-      <h3 className="kind">{t("sshDeskTitle")}</h3>
-      <p className="lede">{t("sshDeskLede")}</p>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={desk.Enabled}
-          disabled={busy}
-          onChange={(e) => onToggle(e.target.checked)}
-        />
-        {t("sshAllow")}
-      </label>
-      <p className="ssh-help">{t("sshAllowHelp")}</p>
+      <div className="ssh-head">
+        <div className="ssh-title">
+          <span className={`status-dot${dotClass}`} aria-hidden="true" />
+          <h3>{t("sshDeskTitle")}</h3>
+          <span className={`status-pill${desk.Err ? " bad" : desk.AllowAny && desk.Enabled ? " warn" : desk.Enabled ? "" : " quiet"}`}>
+            {status}
+          </span>
+        </div>
+        <label className="burn-switch">
+          <span>{t("sshAllow")}</span>
+          <input
+            className="switch"
+            type="checkbox"
+            role="switch"
+            checked={desk.Enabled}
+            aria-checked={desk.Enabled}
+            disabled={busy}
+            onChange={(e) => onToggle(e.target.checked)}
+          />
+        </label>
+      </div>
+      <p className="ssh-lede">{t("sshDeskLede")}</p>
       {desk.Err ? (
         <p className="err" role="alert">
           {desk.Err}
         </p>
       ) : null}
-      {desk.Enabled && desk.Address ? (
+      {live ? (
         <div className="ssh-address">
           <span className="ssh-address-label">{t("sshDeskAddress")}</span>
           <div className="tunnel-codeblock">
@@ -146,25 +159,32 @@ export default function SSHDesk({
           </div>
           {liveKey ? <QrShareButton value={liveKey} /> : null}
         </div>
-      ) : null}
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={desk.AllowAny}
-          disabled={busy}
-          onChange={(e) => {
-            if (e.target.checked) {
-              setPhrase("");
-              setConfirmAny(true);
-              return;
-            }
-            onAllowAny(false);
-          }}
-        />
-        {t("sshAllowAny")}
-      </label>
-      {desk.AllowAny ? <p className="ssh-warn">{t("sshAllowAnyWarn")}</p> : null}
-      {desk.RoomPeers.length > 0 ? <p className="ssh-help">{t("sshRoomPeers")}</p> : null}
+      ) : (
+        <p className="chat-quiet">{t("sshAllowHelp")}</p>
+      )}
+      <div className="ssh-any">
+        <label className="burn-switch">
+          <span>{t("sshAllowAny")}</span>
+          <input
+            className="switch"
+            type="checkbox"
+            role="switch"
+            checked={desk.AllowAny}
+            aria-checked={desk.AllowAny}
+            disabled={busy}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setPhrase("");
+                setConfirmAny(true);
+                return;
+              }
+              onAllowAny(false);
+            }}
+          />
+        </label>
+        {desk.AllowAny ? <p className="ssh-warn">{t("sshAllowAnyWarn")}</p> : null}
+        {desk.RoomPeers.length > 0 ? <p className="chat-quiet">{t("sshRoomPeers")}</p> : null}
+      </div>
       <form className="ssh-peer-form" onSubmit={submitPeer}>
         <div className="field">
           <label htmlFor="ssh-peer-name">{t("sshPeerName")}</label>
@@ -196,25 +216,26 @@ export default function SSHDesk({
             {formError}
           </p>
         ) : null}
-        <div className="row">
-          <button className="btn" type="submit" disabled={busy || !address.trim()}>
+        <div className="ssh-peer-save">
+          <button className="btn btn-small" type="submit" disabled={busy || !address.trim()}>
             {t("sshSavePeer")}
           </button>
         </div>
       </form>
-      <div className="stack ssh-peers">
+      <div className="ssh-peers" role="list">
         {desk.Peers.length === 0 ? <p className="empty">{t("sshEmptyPeers")}</p> : null}
         {desk.Peers.map((peer) => {
           const label = peer.Name.trim() || peer.Address;
           return (
-            <div key={peer.Address} className="ssh-peer">
+            <div key={peer.Address} className="ssh-peer" role="listitem">
+              <span className="status-dot" aria-hidden="true" />
               <div className="ssh-peer-label">
-                <span>{label}</span>
-                {peer.Name.trim() ? <code>{peer.Address}</code> : null}
+                <span className="nav-room-primary">{label}</span>
+                {peer.Name.trim() ? <span className="nav-room-key">{peer.Address}</span> : null}
               </div>
-              <div className="row">
+              <div className="ssh-peer-actions">
                 <button
-                  className="btn"
+                  className="btn btn-small"
                   type="button"
                   disabled={busy}
                   aria-label={`${t("sshOpenShellLabel")} ${label}`}
@@ -223,7 +244,7 @@ export default function SSHDesk({
                   {t("sshOpenShell")}
                 </button>
                 <button
-                  className="btn btn-ghost"
+                  className="btn btn-ghost btn-small"
                   type="button"
                   disabled={busy}
                   aria-label={`${t("sshOpenTerminalLabel")} ${label}`}
@@ -232,29 +253,34 @@ export default function SSHDesk({
                   {t("sshOpenTerminal")}
                 </button>
                 <button
-                  className="btn btn-ghost"
+                  className="ssh-icon-btn"
                   type="button"
                   disabled={busy}
                   aria-label={`${t("sshRemovePeer")} ${label}`}
+                  title={t("sshRemovePeer")}
                   onClick={() => onRemovePeer(peer.Address)}
                 >
-                  {t("sshRemovePeer")}
+                  <CloseIcon />
                 </button>
               </div>
             </div>
           );
         })}
       </div>
-      {note ? <p className="ssh-help">{note}</p> : null}
+      {note ? <p className="chat-quiet">{note}</p> : null}
       {shell ? (
         <div className="ssh-shell">
-          <div className="row ssh-shell-bar">
-            <span>{t("sshShell")}</span>
-            <button className="btn btn-ghost" type="button" onClick={onShellClose}>
+          <div className="ssh-shell-bar">
+            <div className="ssh-shell-title">
+              <span className="status-dot" aria-hidden="true" />
+              <span>{t("sshShell")}</span>
+              <code title={shell.address}>{shell.address}</code>
+            </div>
+            <button className="btn btn-ghost btn-small" type="button" onClick={onShellClose}>
               {t("sshShellClose")}
             </button>
           </div>
-          <p className="ssh-help">{t("sshShellHint")}</p>
+          <p className="chat-quiet">{t("sshShellHint")}</p>
           <textarea
             className="ssh-term"
             aria-label={t("sshShell")}
@@ -305,6 +331,14 @@ export default function SSHDesk({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg className="nav-room-close-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" d="M6 6l12 12M18 6 6 18" />
+    </svg>
   );
 }
 

@@ -25,7 +25,7 @@ describe("no-auth SSH desk", () => {
     );
     await user.click(screen.getByRole("button", { name: "Tunnel" }));
 
-    const allow = screen.getByRole("checkbox", { name: "Allow SSH" });
+    const allow = screen.getByRole("switch", { name: "Allow SSH" });
     expect((allow as HTMLInputElement).checked).toBe(false);
     expect(screen.getByText(/not an OS password or SSH key/)).toBeTruthy();
     expect(screen.queryByText("tc:fake-noauth-ssh-desk-desk")).toBeNull();
@@ -50,7 +50,7 @@ describe("no-auth SSH desk", () => {
     expect(await screen.findByText("Opened in the system terminal.")).toBeTruthy();
     expect(screen.queryByRole("textbox", { name: "Shell" })).toBeNull();
 
-    await user.click(screen.getByRole("checkbox", { name: "Allow any peer" }));
+    await user.click(screen.getByRole("switch", { name: "Allow any peer" }));
     const start = screen.getByRole("button", { name: "Allow any peer" });
     expect((start as HTMLButtonElement).disabled).toBe(true);
     await user.type(screen.getByLabelText("Confirmation"), "ALLOW");
