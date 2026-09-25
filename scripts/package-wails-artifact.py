@@ -5,9 +5,13 @@ Windows jobs publish two files from one ``wails build -nsis``:
 
 * NSIS setup, renamed so the public filename includes ``installer``:
   ``tailcat-box-windows-amd64-installer-v0.4.0.exe``
-* Portable zip in the v0.3.0 shape, containing the runnable
-  ``tailcat-box.exe`` (and any ``.dll`` Wails left beside it):
-  ``tailcat-box-windows-amd64-v0.4.0.zip``
+* Bare portable exe, a copy of the runnable ``tailcat-box.exe``:
+  ``tailcat-box-windows-amd64-v0.4.0.exe``
+
+The portable asset is that single file, not a zip. Current Wails output is
+the exe alone (the old portable zip contained only ``tailcat-box.exe``), so
+sidecar ``.dll`` files are not copied into ``dist-upload``. A future build
+that leaves a DLL beside the exe still publishes only this bare exe.
 
 macOS jobs build a compressed disk image that contains the ``.app`` and an
 Applications symlink (drag-to-Applications):
@@ -27,7 +31,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import zipfile
 from pathlib import Path
 
 
@@ -61,10 +64,12 @@ def artifact_name(os_slug: str, arch: str, version: str) -> str:
     raise SystemExit(f"unsupported os slug: {os_slug}")
 
 
-def portable_zip_name(os_slug: str, arch: str, version: str) -> str:
-    """Old-style archive name. Windows uses this for the runnable exe."""
+def portable_exe_name(os_slug: str, arch: str, version: str) -> str:
+    """Public Windows portable name. A bare runnable exe, not a zip."""
     arch = _require_arch(arch)
-    return f"tailcat-box-{os_slug}-{arch}-{version}.zip"
+    if os_slug != "windows":
+        raise SystemExit(f"portable exe is windows-only: {os_slug}")
+    return f"tailcat-box-windows-{arch}-{version}.exe"
 
 
 def detect_arch() -> str:
@@ -138,20 +143,6 @@ def find_windows_portable_exe(bin_dir: Path) -> Path:
     raise SystemExit(f"expected one portable exe in {bin_dir}, found: {names}")
 
 
-def windows_portable_sidecars(bin_dir: Path, app: Path) -> list[Path]:
-    """DLLs Wails may leave beside the exe. NSIS setup files stay out of the zip."""
-    app_resolved = app.resolve()
-    sidecars: list[Path] = []
-    for path in sorted(bin_dir.iterdir()):
-        if not path.is_file() or path.resolve() == app_resolved:
-            continue
-        if is_nsis_installer(path.name):
-            continue
-        if path.suffix.lower() == ".dll":
-            sidecars.append(path)
-    return sidecars
-
-
 def copy_bundle(src: Path, dest: Path) -> None:
     if shutil.which("ditto"):
         subprocess.run(["ditto", str(src), str(dest)], check=True)
@@ -207,15 +198,11 @@ def package_windows_installer(bin_dir: Path, dest: Path, arch: str) -> None:
 
 
 def package_windows_portable(bin_dir: Path, dest: Path) -> None:
+    """Copy the runnable exe to the public portable name. No zip."""
     app = find_windows_portable_exe(bin_dir)
-    extras = windows_portable_sidecars(bin_dir, app)
     if dest.exists():
         dest.unlink()
-    with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        # Root of the archive, same layout as the v0.3.0 portable zip.
-        zf.write(app, arcname=app.name)
-        for extra in extras:
-            zf.write(extra, arcname=extra.name)
+    shutil.copy2(app, dest)
 
 
 def main() -> int:
@@ -239,7 +226,7 @@ def main() -> int:
         find_windows_installer(bin_dir, arch)
         find_windows_portable_exe(bin_dir)
         installer = out_dir / artifact_name(args.os_slug, arch, args.version)
-        portable = out_dir / portable_zip_name(args.os_slug, arch, args.version)
+        portable = out_dir / portable_exe_name(args.os_slug, arch, args.version)
         package_windows_installer(bin_dir, installer, arch)
         package_windows_portable(bin_dir, portable)
         print(installer)

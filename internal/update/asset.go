@@ -10,7 +10,7 @@ import (
 // ErrUnsupportedPlatform means this GOOS/GOARCH has no release target.
 var ErrUnsupportedPlatform = errors.New("unsupported platform")
 
-// ErrNoAsset means the release has no installer (or legacy zip) for this GOOS/GOARCH.
+// ErrNoAsset means the release has no installer, portable exe, or legacy zip for this GOOS/GOARCH.
 var ErrNoAsset = errors.New("no matching asset")
 
 // Asset is one file attached to a GitHub release.
@@ -40,11 +40,12 @@ func PlatformSlug(goos, goarch string) (slug, arch string, err error) {
 
 // SelectAsset picks the installer for goos/goarch from a release's assets.
 // macOS prefers .dmg. Windows prefers the NSIS setup whose public name
-// includes "installer" (tailcat-box-windows-<arch>-installer-<tag>.exe), then
-// the v1.0.0 / v1.1.0 name that omitted that word. A portable or older .zip
-// still matches when the release has no installer, so v0.3.0 archives keep
-// downloading. The portable zip uses the same basename as that older exe, so
-// the installer name is checked first.
+// includes "installer" (tailcat-box-windows-<arch>-installer-<tag>.exe).
+// The bare portable exe (tailcat-box-windows-<arch>-<tag>.exe) and older
+// .zip archives are fallbacks only, so a release that publishes both the
+// labeled installer and the portable exe still downloads the installer.
+// That bare name is also what v1.0.0 / v1.1.0 used for the setup program,
+// so those releases still match when no labeled installer is attached.
 // tag is the release tag, usually vX.Y.Z, matching the workflow file name.
 func SelectAsset(assets []Asset, goos, goarch, tag string) (Asset, error) {
 	slug, arch, err := PlatformSlug(goos, goarch)
@@ -99,8 +100,8 @@ func candidateNames(slug, arch, tag string, exts []string) []string {
 		versions = append(versions, "v"+bare)
 		versions = append(versions, bare)
 	}
-	// Checked before the legacy "...-<version>.exe" name and before the
-	// portable zip, which reuses that basename.
+	// Checked before the bare "...-<version>.exe" portable (also the legacy
+	// unlabeled setup name) and before older .zip archives.
 	if containsExt(exts, ".exe") {
 		for _, version := range versions {
 			add(fmt.Sprintf("tailcat-box-%s-%s-installer-%s.exe", slug, arch, version))

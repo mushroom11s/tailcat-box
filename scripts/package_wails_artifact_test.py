@@ -8,7 +8,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-import zipfile
 from pathlib import Path
 
 
@@ -37,12 +36,12 @@ class ArtifactNameTest(unittest.TestCase):
             "tailcat-box-windows-arm64-installer-v0.4.0.exe",
         )
         self.assertEqual(
-            pkg.portable_zip_name("windows", "amd64", "v0.4.0"),
-            "tailcat-box-windows-amd64-v0.4.0.zip",
+            pkg.portable_exe_name("windows", "amd64", "v0.4.0"),
+            "tailcat-box-windows-amd64-v0.4.0.exe",
         )
         self.assertEqual(
-            pkg.portable_zip_name("windows", "arm64", "v0.4.0"),
-            "tailcat-box-windows-arm64-v0.4.0.zip",
+            pkg.portable_exe_name("windows", "arm64", "v0.4.0"),
+            "tailcat-box-windows-arm64-v0.4.0.exe",
         )
         self.assertEqual(
             pkg.artifact_name("macos", "arm64", "v0.4.0"),
@@ -63,13 +62,13 @@ class ArtifactNameTest(unittest.TestCase):
             "tailcat-box-windows-arm64-installer-dev-abc1234.exe",
         )
         self.assertEqual(
-            pkg.portable_zip_name("windows", "x64", "dev-abc1234"),
-            "tailcat-box-windows-amd64-dev-abc1234.zip",
+            pkg.portable_exe_name("windows", "x64", "dev-abc1234"),
+            "tailcat-box-windows-amd64-dev-abc1234.exe",
         )
 
 
 class WindowsPackageTest(unittest.TestCase):
-    def test_ships_labeled_installer_and_portable_zip(self) -> None:
+    def test_ships_labeled_installer_and_bare_portable_exe(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             bin_dir = root / "bin"
@@ -101,19 +100,16 @@ class WindowsPackageTest(unittest.TestCase):
                 text=True,
             )
             installer = out_dir / "tailcat-box-windows-amd64-installer-v0.4.0.exe"
-            portable = out_dir / "tailcat-box-windows-amd64-v0.4.0.zip"
+            portable = out_dir / "tailcat-box-windows-amd64-v0.4.0.exe"
             self.assertEqual(installer.read_bytes(), b"setup-amd64")
-            self.assertEqual(sorted(p.name for p in out_dir.iterdir()), [installer.name, portable.name])
-            with zipfile.ZipFile(portable) as zf:
-                self.assertEqual(
-                    zf.namelist(),
-                    ["tailcat-box.exe", "WebView2Loader.dll"],
-                )
-                self.assertEqual(zf.read("tailcat-box.exe"), b"app-exe")
-                self.assertEqual(zf.read("WebView2Loader.dll"), b"sidecar-dll")
-                self.assertFalse(any("installer" in name.lower() for name in zf.namelist()))
+            self.assertEqual(portable.read_bytes(), b"app-exe")
+            self.assertEqual(
+                sorted(p.name for p in out_dir.iterdir()),
+                [installer.name, portable.name],
+            )
+            self.assertEqual(list(out_dir.glob("*.zip")), [])
 
-    def test_arm64_installer_is_separate_from_the_portable_zip(self) -> None:
+    def test_arm64_installer_is_separate_from_the_portable_exe(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             bin_dir = root / "bin"
@@ -143,9 +139,10 @@ class WindowsPackageTest(unittest.TestCase):
                 text=True,
             )
             installer = out_dir / "tailcat-box-windows-arm64-installer-v0.4.0.exe"
+            portable = out_dir / "tailcat-box-windows-arm64-v0.4.0.exe"
             self.assertEqual(installer.read_bytes(), b"setup-arm64")
-            with zipfile.ZipFile(out_dir / "tailcat-box-windows-arm64-v0.4.0.zip") as zf:
-                self.assertEqual(zf.namelist(), ["tailcat-box.exe"])
+            self.assertEqual(portable.read_bytes(), b"app-exe")
+            self.assertEqual(list(out_dir.glob("*.zip")), [])
 
     def test_missing_portable_exe_fails(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
