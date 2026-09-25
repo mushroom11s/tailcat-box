@@ -5,12 +5,16 @@ import {
   downloadsLeft,
   encodeJoin,
   extractShareCode,
+  expiresSoon,
   MAX_SHARE_BYTES,
+  miaoErrorKey,
+  nextRetryDelay,
   parseJoin,
   parseReceiveJob,
   receivePercent,
   remainingTTL,
   shareTooLarge,
+  shouldAutoRetryDownload,
   upsertReceiveJob,
   type ReceiveJob,
 } from "./miao";
@@ -244,6 +248,24 @@ describe("miao share helpers", () => {
     expect(remainingTTL("", true, now)).toEqual({ kind: "forever" });
     expect(remainingTTL("2026-09-24T00:00:00Z", false, now)).toEqual({ kind: "expired" });
     expect(remainingTTL("2026-09-25T01:02:00Z", false, now)).toEqual({ kind: "left", days: 1, hours: 1, minutes: 2 });
+  });
+
+  it("warns only inside the last hour and retries transient failures with backoff", () => {
+    const now = Date.parse("2026-09-24T12:00:00Z");
+    expect(expiresSoon("2026-09-24T12:30:00Z", false, now)).toBe(true);
+    expect(expiresSoon("2026-09-24T13:30:00Z", false, now)).toBe(false);
+    expect(expiresSoon("2026-09-24T11:00:00Z", false, now)).toBe(false);
+    expect(expiresSoon("2026-09-24T12:10:00Z", true, now)).toBe(false);
+    expect(shouldAutoRetryDownload("failed", "Could not reach the host. They need to stay online.")).toBe(true);
+    expect(shouldAutoRetryDownload("failed", "The share is busy. Try again in a moment.")).toBe(true);
+    expect(shouldAutoRetryDownload("failed", "The share has ended.")).toBe(false);
+    expect(shouldAutoRetryDownload("interrupted", "Could not reach the host. They need to stay online.")).toBe(false);
+    expect(shouldAutoRetryDownload("cancelled", "")).toBe(false);
+    expect(nextRetryDelay(0)).toBe(1000);
+    expect(nextRetryDelay(1)).toBe(2000);
+    expect(nextRetryDelay(2)).toBe(4000);
+    expect(nextRetryDelay(3)).toBeNull();
+    expect(miaoErrorKey(new Error("share did not start listening"))).toBe("miaoListenFailed");
   });
 });
 

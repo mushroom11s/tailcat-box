@@ -97,6 +97,7 @@ type Snapshot struct {
 	Status       string     `json:"status"`
 	EndReason    string     `json:"endReason"`
 	CreatedAt    string     `json:"createdAt"`
+	Listening    bool       `json:"listening"`
 }
 
 // FileInfo is a display row. It does not include the storage path.
@@ -132,6 +133,7 @@ type ReceiveJob struct {
 	Dest       string      `json:"dest"`
 	Payload    string      `json:"payload,omitempty"`
 	Resumable  bool        `json:"resumable,omitempty"`
+	ExpiresAt  string      `json:"expiresAt,omitempty"`
 }
 
 // Service hosts any number of shares at once and can also join someone else's share.
@@ -701,6 +703,9 @@ func (s *Service) noteReceive(run *receiveRun, gen int, upd receiveUpdate) {
 	if upd.bytesTotal > 0 {
 		run.job.BytesTotal = upd.bytesTotal
 	}
+	if upd.expiresAt != "" {
+		run.job.ExpiresAt = upd.expiresAt
+	}
 	run.job.BytesDone = upd.bytesDone
 	if upd.status == receiveDownloading {
 		run.writing = true
@@ -1111,6 +1116,12 @@ func (h *host) sendPackage(reply string, files []StagedFile, resume map[string]i
 	defer func() {
 		callTransferHook("sent")
 	}()
+	h.mu.Lock()
+	expiresAt := ""
+	if !h.forever && !h.expires.IsZero() {
+		expiresAt = h.expires.UTC().Format(time.RFC3339)
+	}
+	h.mu.Unlock()
 	metaFiles := make([]map[string]any, 0, len(files))
 	for _, file := range files {
 		metaFiles = append(metaFiles, map[string]any{
@@ -1120,7 +1131,11 @@ func (h *host) sendPackage(reply string, files []StagedFile, resume map[string]i
 			"sha256": file.SHA256,
 		})
 	}
-	frame, err := chat.Pack(map[string]any{"type": "miao-manifest", "files": metaFiles}, nil)
+	manifest := map[string]any{"type": "miao-manifest", "files": metaFiles}
+	if expiresAt != "" {
+		manifest["expiresAt"] = expiresAt
+	}
+	frame, err := chat.Pack(manifest, nil)
 	if err != nil {
 		return err
 	}
@@ -1257,6 +1272,7 @@ func (h *host) snapshotLocked() Snapshot {
 		Status:       status,
 		EndReason:    h.reason,
 		CreatedAt:    created,
+		Listening:    h.room != nil && h.address != "",
 	}
 }
 
@@ -1359,6 +1375,7 @@ type receiveUpdate struct {
 	files      []FileInfo
 	bytesDone  int64
 	bytesTotal int64
+	expiresAt  string
 }
 
 type incomingFile struct {
@@ -1526,7 +1543,8 @@ func receivePackage(ctx context.Context, room adapter.Room, dest string, destFn 
 				if partialMode {
 					persist()
 				}
-				note(receiveUpdate{status: receiveDownloading, files: infos, bytesDone: bytesDone, bytesTotal: bytesTotal})
+				expiresAt, _ := meta["expiresAt"].(string)
+				note(receiveUpdate{status: receiveDownloading, files: infos, bytesDone: bytesDone, bytesTotal: bytesTotal, expiresAt: expiresAt})
 			case "miao-chunk":
 				id, _ := meta["id"].(string)
 				item := writers[id]

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Component, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -55,6 +55,7 @@ function clearGoApp(): void {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   clearGoApp();
   resetBrowserMiao();
   localStorage.removeItem("tailcat-locale");
@@ -535,6 +536,251 @@ describe("Mew Share page", () => {
     await waitFor(() => {
       expect((screen.getByRole("textbox", { name: "Share code" }) as HTMLTextAreaElement).value).toBe(code);
     });
+  });
+
+  it("retries a failed download from the button without a second automatic start", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem("tailcat-locale", "en");
+    const payload = encodeJoin("tc:host-retry", "token-retry");
+    if (!payload) {
+      throw new Error("missing code");
+    }
+    let starts = 0;
+    installGoApp({
+      StartChatRoom: () => Promise.resolve({}),
+      SetUILocale: () => Promise.resolve(),
+      MiaoShareStatus: () => Promise.resolve([]),
+      MiaoRestoreNotes: () => Promise.resolve([]),
+      ListMiaoReceives: () =>
+        Promise.resolve([
+          {
+            id: "job-retry",
+            status: "failed",
+            error: "Could not reach the host. They need to stay online.",
+            payload,
+            dest: "/tmp/in",
+            bytesDone: 0,
+            bytesTotal: 4,
+            files: [{ name: "notes.txt", size: 4 }],
+          },
+        ]),
+      StartMiaoReceive: () => {
+        starts += 1;
+        return Promise.resolve({
+          id: "job-retry",
+          status: "connecting",
+          payload,
+          dest: "/tmp/in",
+          bytesDone: 0,
+          bytesTotal: 4,
+          files: [{ name: "notes.txt", size: 4 }],
+        });
+      },
+    });
+
+    renderPage();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Download" }));
+    expect(screen.getByText("Could not reach the host. They need to stay online.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(starts).toBe(1);
+    expect(screen.getByText("Connecting…")).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(starts).toBe(1);
+  });
+
+  it("starts a transient download again after a short wait", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem("tailcat-locale", "en");
+    const payload = encodeJoin("tc:host-auto", "token-auto");
+    if (!payload) {
+      throw new Error("missing code");
+    }
+    let starts = 0;
+    installGoApp({
+      StartChatRoom: () => Promise.resolve({}),
+      SetUILocale: () => Promise.resolve(),
+      MiaoShareStatus: () => Promise.resolve([]),
+      MiaoRestoreNotes: () => Promise.resolve([]),
+      ListMiaoReceives: () =>
+        Promise.resolve([
+          {
+            id: "job-auto",
+            status: "failed",
+            error: "Could not reach the host. They need to stay online.",
+            payload,
+            dest: "/tmp/in",
+            bytesDone: 0,
+            bytesTotal: 4,
+            files: [{ name: "notes.txt", size: 4 }],
+          },
+        ]),
+      StartMiaoReceive: () => {
+        starts += 1;
+        return Promise.resolve({
+          id: "job-auto",
+          status: "connecting",
+          payload,
+          dest: "/tmp/in",
+          bytesDone: 0,
+          bytesTotal: 4,
+          files: [{ name: "notes.txt", size: 4 }],
+        });
+      },
+    });
+
+    renderPage();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Download" }));
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(screen.getByText("Retrying…")).toBeTruthy();
+    expect(starts).toBe(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(999);
+    });
+    expect(starts).toBe(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+      await Promise.resolve();
+    });
+    expect(starts).toBe(1);
+  });
+
+  it("keeps a Retry button when the share has ended, without retrying on its own", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem("tailcat-locale", "en");
+    const payload = encodeJoin("tc:host-ended", "token-ended");
+    if (!payload) {
+      throw new Error("missing code");
+    }
+    let starts = 0;
+    installGoApp({
+      StartChatRoom: () => Promise.resolve({}),
+      SetUILocale: () => Promise.resolve(),
+      MiaoShareStatus: () => Promise.resolve([]),
+      MiaoRestoreNotes: () => Promise.resolve([]),
+      ListMiaoReceives: () =>
+        Promise.resolve([
+          {
+            id: "job-ended",
+            status: "failed",
+            error: "The share has ended.",
+            payload,
+            dest: "/tmp/in",
+            bytesDone: 0,
+            bytesTotal: 4,
+            files: [{ name: "notes.txt", size: 4 }],
+          },
+        ]),
+      StartMiaoReceive: () => {
+        starts += 1;
+        return Promise.resolve({ id: "job-ended", status: "connecting", payload, dest: "/tmp/in", files: null });
+      },
+    });
+
+    renderPage();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Download" }));
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(screen.getByText("The share has ended.")).toBeTruthy();
+    expect(screen.queryByText("Retrying…")).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(starts).toBe(0);
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+
+  it("explains a share that is not listening and one that ends within an hour", async () => {
+    localStorage.setItem("tailcat-locale", "en");
+    const soon = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    installGoApp({
+      StartChatRoom: () => Promise.resolve({}),
+      SetUILocale: () => Promise.resolve(),
+      ListMiaoReceives: () => Promise.resolve([]),
+      MiaoRestoreNotes: () => Promise.resolve([]),
+      MiaoShareStatus: () =>
+        Promise.resolve([
+          {
+            id: "share-soon",
+            status: "active",
+            payload: "",
+            forever: false,
+            expiresAt: soon,
+            listening: false,
+            total: 4,
+            maxDownloads: 1,
+            downloads: 0,
+            files: [{ name: "notes.txt", size: 4 }],
+          },
+        ]),
+    });
+
+    renderPage();
+    expect(await screen.findByText("notes.txt")).toBeTruthy();
+    expect(screen.getAllByText("This share is not online yet. Tailcat Box will keep trying. The other person can download once this device is reachable.").length).toBeGreaterThan(0);
+    expect(screen.getByText("This share ends in less than an hour.")).toBeTruthy();
+    expect(screen.queryByText("Packing…")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Mew Share" })).toBeTruthy();
+  });
+
+  it("warns that a download's share ends soon", async () => {
+    localStorage.setItem("tailcat-locale", "en");
+    const soon = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+    installGoApp({
+      StartChatRoom: () => Promise.resolve({}),
+      SetUILocale: () => Promise.resolve(),
+      MiaoShareStatus: () => Promise.resolve([]),
+      MiaoRestoreNotes: () => Promise.resolve([]),
+      ListMiaoReceives: () =>
+        Promise.resolve([
+          {
+            id: "job-soon",
+            status: "downloading",
+            expiresAt: soon,
+            dest: "/tmp/in",
+            bytesDone: 1,
+            bytesTotal: 4,
+            files: [{ name: "notes.txt", size: 4 }],
+          },
+        ]),
+    });
+
+    renderPage();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Download" }));
+    expect(screen.getByText("This share ends in less than an hour.")).toBeTruthy();
+    expect(screen.getByRole("article", { name: "notes.txt" })).toBeTruthy();
+  });
+
+  it("shows an offline notice without hiding the share page", () => {
+    localStorage.setItem("tailcat-locale", "en");
+    const desc = Object.getOwnPropertyDescriptor(Navigator.prototype, "onLine");
+    Object.defineProperty(Navigator.prototype, "onLine", { configurable: true, get: () => false });
+    try {
+      renderPage();
+      expect(screen.getByRole("alert").textContent).toContain("You appear to be offline. Mew Share needs a network connection.");
+      expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Mew Share" })).toBeTruthy();
+    } finally {
+      if (desc) {
+        Object.defineProperty(Navigator.prototype, "onLine", desc);
+      }
+    }
   });
 });
 

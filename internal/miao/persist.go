@@ -305,6 +305,7 @@ func (s *Service) resume(rec *shareRecord, dir string) error {
 	// The share card is already listed. A room that is still down does not
 	// remove that record; listening retries until the share ends.
 	if err := h.listen(); err != nil {
+		h.publish(h.snapshot())
 		go h.retryListen()
 	}
 	return nil

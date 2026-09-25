@@ -106,6 +106,7 @@ function publicSnap(share: Stored, status = share.status, endReason = share.endR
     downloads: share.downloads,
     status,
     endReason,
+    listening: Boolean(share.payload),
   };
 }
 
@@ -330,6 +331,7 @@ export function browserStartReceive(raw: string, dest: string): ReceiveJob {
     payload: raw.trim(),
     resumable: bytesDone > 0,
     error: "",
+    expiresAt: current.expiresAt || undefined,
   };
   emitReceive(job);
   const generation = receiveGeneration;

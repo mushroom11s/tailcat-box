@@ -26,6 +26,7 @@ export type MiaoShare = {
   downloads: number;
   status: string;
   endReason?: string;
+  listening?: boolean;
 };
 
 export type MiaoSavedFile = {
@@ -53,6 +54,7 @@ export type ReceiveJob = {
   dest: string;
   payload?: string;
   resumable?: boolean;
+  expiresAt?: string;
 };
 
 const RECEIVE_RANK: Record<ReceiveStatus, number> = {
@@ -113,6 +115,7 @@ export function parseReceiveJob(raw: unknown): ReceiveJob | null {
     dest: readString(value, "dest", "Dest"),
     payload: readString(value, "payload", "Payload"),
     resumable: typeof resumable === "boolean" ? resumable : undefined,
+    expiresAt: readString(value, "expiresAt", "ExpiresAt") || undefined,
   };
 }
 
@@ -126,6 +129,7 @@ export function parseShare(raw: unknown): MiaoShare | null {
     return null;
   }
   const endReason = readString(value, "endReason", "EndReason");
+  const listening = readField(value, "listening", "Listening");
   return {
     id,
     address: readString(value, "address", "Address"),
@@ -140,6 +144,7 @@ export function parseShare(raw: unknown): MiaoShare | null {
     downloads: asCount(readField(value, "downloads", "Downloads")),
     status: readString(value, "status", "Status") || "active",
     endReason: endReason || undefined,
+    listening: typeof listening === "boolean" ? listening : undefined,
   };
 }
 
@@ -173,6 +178,7 @@ export function upsertReceiveJob(list: ReceiveJob[], job: ReceiveJob): ReceiveJo
     dest: incoming.dest || prev.dest,
     payload: incoming.payload || prev.payload,
     resumable: incoming.resumable ?? prev.resumable,
+    expiresAt: incoming.expiresAt || prev.expiresAt,
     error: incoming.status === "done" || incoming.status === "cancelled" ? "" : incoming.error || prev.error,
   };
   return next;
@@ -284,7 +290,7 @@ export type JoinPayload = {
   token: string;
 };
 
-const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode" | "miaoUnreachable" | "miaoEndedRemote" | "miaoBusyPeer" | "miaoCustomDaysInvalid" | "miaoCustomCountInvalid" | "miaoFolder" | "miaoPickFolder" | "miaoUnknownReceive" | "miaoReceiveStarted" | "miaoPartialMismatch" | "miaoMissingFile" | "miaoShareUnready"> = {
+const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode" | "miaoUnreachable" | "miaoEndedRemote" | "miaoBusyPeer" | "miaoCustomDaysInvalid" | "miaoCustomCountInvalid" | "miaoFolder" | "miaoPickFolder" | "miaoUnknownReceive" | "miaoReceiveStarted" | "miaoPartialMismatch" | "miaoMissingFile" | "miaoShareUnready" | "miaoListenFailed"> = {
   "This share is larger than 300 MiB.": "miaoTooBig",
   "Choose at least one file.": "miaoNeedFile",
   "Choose files, not folders.": "miaoFolder",
@@ -300,6 +306,7 @@ const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode"
   "The partial file did not match. The download will start over.": "miaoPartialMismatch",
   "A shared file is missing, so that share was not restored.": "miaoMissingFile",
   "A share could not be restored.": "miaoShareUnready",
+  "share did not start listening": "miaoListenFailed",
 };
 
 export type MiaoErrorKey = (typeof KNOWN_ERRORS)[string];
@@ -552,6 +559,38 @@ export type Remaining =
   | { kind: "forever" }
   | { kind: "expired" }
   | { kind: "left"; days: number; hours: number; minutes: number };
+
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
+
+// expiresSoon is true when a share still has time, but less than an hour.
+export function expiresSoon(expiresAt: string, forever: boolean, now = Date.now(), windowMs = 60 * 60 * 1000): boolean {
+  if (forever || !expiresAt) {
+    return false;
+  }
+  const end = Date.parse(expiresAt);
+  if (!Number.isFinite(end)) {
+    return false;
+  }
+  const left = end - now;
+  return left > 0 && left < windowMs;
+}
+
+// shouldAutoRetryDownload is true only for a failed transfer that may succeed if tried again.
+export function shouldAutoRetryDownload(status: string, error: string): boolean {
+  if (status !== "failed") {
+    return false;
+  }
+  const key = miaoErrorKey(new Error(error));
+  return key === "miaoUnreachable" || key === "miaoBusyPeer" || key === "miaoListenFailed";
+}
+
+// nextRetryDelay is the backoff for attempt 0, 1, 2. Further attempts stop.
+export function nextRetryDelay(attempt: number): number | null {
+  if (!Number.isInteger(attempt) || attempt < 0 || attempt >= RETRY_DELAYS_MS.length) {
+    return null;
+  }
+  return RETRY_DELAYS_MS[attempt];
+}
 
 export function remainingTTL(expiresAt: string, forever: boolean, now = Date.now()): Remaining {
   if (forever || !expiresAt) {
