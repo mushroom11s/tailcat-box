@@ -4,7 +4,7 @@
 
 macOS 和 Windows 上的 [Tailscale Tailcat](https://github.com/tailscale/tailcat) 桌面客户端，用 [Wails](https://wails.io) v2 写的（Go + React + TypeScript）。
 
-[![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/mushroom11s/tailcat-box)](https://github.com/mushroom11s/tailcat-box/releases) [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey)
+[![CI](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml/badge.svg)](https://github.com/mushroom11s/tailcat-box/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/mushroom11s/tailcat-box)](https://github.com/mushroom11s/tailcat-box/releases) [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey) [![Telegram](https://img.shields.io/badge/Telegram-群聊-2CA5E0?logo=telegram&logoColor=white)](https://t.me/+YCUAoqBJ_ZIyZGVh)
 
 <p align="center">
   <img src="docs/assets/icon.png" alt="猫砂盆" width="160" />
