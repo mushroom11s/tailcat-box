@@ -2,17 +2,33 @@ import { FormEvent, useEffect, useState } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
 import QrScanButton from "../components/QrScanButton";
 import QrShareButton from "../components/QrShareButton";
+import SSHDesk, { type SSHShell } from "../components/SSHDesk";
 import LoadingCat from "../components/LoadingCat";
 import { statusMessageKey, useI18n } from "../i18n";
 import { draftMapping, mappingPrimary, type PortMappingRecord } from "../lib/portMappings";
 import { shareableAddress } from "../lib/qr";
-import type { Session } from "../lib/wails";
+import type { Session, SSHDeskState } from "../lib/wails";
+
+export type TunnelSSH = {
+  desk: SSHDeskState;
+  busy: boolean;
+  note: string;
+  shell: SSHShell | null;
+  onToggle: (enabled: boolean) => void;
+  onAllowAny: (allow: boolean) => void;
+  onAddPeer: (name: string, address: string) => void;
+  onRemovePeer: (address: string) => void;
+  onShell: (address: string, system: boolean) => void;
+  onShellInput: (data: string) => void;
+  onShellClose: () => void;
+};
 
 type Props = {
   mappings: PortMappingRecord[];
   sessions: Session[];
   links: Record<string, string>;
   busy: boolean;
+  ssh: TunnelSSH;
   onAdd: (record: PortMappingRecord) => void;
   onStart: (id: string) => void;
   onStop: (id: string) => void;
@@ -35,7 +51,7 @@ async function copyText(text: string): Promise<void> {
   }
 }
 
-export default function TunnelPage({ mappings, sessions, links, busy, onAdd, onStart, onStop, onDelete }: Props) {
+export default function TunnelPage({ mappings, sessions, links, busy, ssh, onAdd, onStart, onStop, onDelete }: Props) {
   const { t } = useI18n();
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState("");
@@ -104,6 +120,19 @@ export default function TunnelPage({ mappings, sessions, links, busy, onAdd, onS
         <h2>{t("tunnelTitle")}</h2>
         <p className="lede">{t("tunnelLede")}</p>
       </header>
+      <SSHDesk
+        desk={ssh.desk}
+        busy={ssh.busy}
+        note={ssh.note}
+        shell={ssh.shell}
+        onToggle={ssh.onToggle}
+        onAllowAny={ssh.onAllowAny}
+        onAddPeer={ssh.onAddPeer}
+        onRemovePeer={ssh.onRemovePeer}
+        onShell={ssh.onShell}
+        onShellInput={ssh.onShellInput}
+        onShellClose={ssh.onShellClose}
+      />
       {busy ? (
         <div className="glass tunnel-busy">
           <LoadingCat label={t("tunnelBusy")} />

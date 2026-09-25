@@ -485,3 +485,93 @@ func TestStartSSHClientSOCKSExitExec(t *testing.T) {
 	}
 	waitRunning(t, svc, execSess.ID)
 }
+
+func TestSSHDeskAllowlistRejectsStrangers(t *testing.T) {
+	svc := service.New(adapter.NewFake())
+	desk, err := svc.StartSSHDesk(adapter.SSHServeOpts{
+		IdentityJSON:    `{"fake":"desk"}`,
+		AllowedNodeKeys: []string{"nodekey:tc:laptop"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if desk.Dangerous {
+		t.Fatal("allowlist SSH should not be marked dangerous")
+	}
+	ready := waitRunning(t, svc, desk.ID)
+	if !strings.HasPrefix(ready.Address, "tc:fake-noauth-ssh-desk-") {
+		t.Fatalf("address=%q", ready.Address)
+	}
+
+	denied, err := svc.StartSSHClient(ready.Address, adapter.SSHClientOpts{
+		Interactive:   true,
+		NoClientAuth:  true,
+		ClientNodeKey: "nodekey:tc:other",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.After(2 * time.Second)
+	for {
+		for _, item := range svc.List() {
+			if item.ID == denied.ID && item.Status == session.StatusError {
+				if !strings.Contains(item.Err, "allowlist") {
+					t.Fatalf("err=%q", item.Err)
+				}
+				goto allowed
+			}
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("denied client never failed: %+v", svc.List())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+allowed:
+	client, err := svc.StartSSHClient(ready.Address, adapter.SSHClientOpts{
+		Interactive:   true,
+		NoClientAuth:  true,
+		ClientNodeKey: "nodekey:tc:laptop",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitRunning(t, svc, client.ID)
+	if err := svc.WriteSSH(client.ID, "hi"); err != nil {
+		t.Fatal(err)
+	}
+	prog := waitProgress(t, svc, client.ID)
+	if !strings.Contains(prog.Progress, "hi") && prog.Progress != "hi" {
+		// connected arrives first; keep reading until the echo lands
+		deadline = time.After(2 * time.Second)
+		for !strings.Contains(prog.Progress, "hi") {
+			select {
+			case <-deadline:
+				t.Fatalf("progress=%q", prog.Progress)
+			case <-time.After(20 * time.Millisecond):
+			}
+			for _, item := range svc.List() {
+				if item.ID == client.ID {
+					prog = item
+				}
+			}
+		}
+	}
+}
+
+func TestSSHDeskAllowAnyIsDangerous(t *testing.T) {
+	svc := service.New(adapter.NewFake())
+	sess, err := svc.StartSSHDesk(adapter.SSHServeOpts{AllowAny: true, IdentityJSON: `{"fake":"open"}`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sess.Dangerous {
+		t.Fatal("allow-any SSH should be marked dangerous")
+	}
+	ready := waitRunning(t, svc, sess.ID)
+	client, err := svc.StartSSHClient(ready.Address, adapter.SSHClientOpts{Interactive: true, NoClientAuth: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitRunning(t, svc, client.ID)
+}

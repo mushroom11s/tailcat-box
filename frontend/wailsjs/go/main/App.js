@@ -50,6 +50,10 @@ export function GetNetworkSettings() {
   return window['go']['main']['App']['GetNetworkSettings']();
 }
 
+export function GetSSHDesk() {
+  return window['go']['main']['App']['GetSSHDesk']();
+}
+
 export function GetSystemInfo() {
   return window['go']['main']['App']['GetSystemInfo']();
 }
@@ -218,12 +222,36 @@ export function StartSOCKS(arg1, arg2) {
   return window['go']['main']['App']['StartSOCKS'](arg1, arg2);
 }
 
+export function OpenSSHShell(arg1, arg2) {
+  return window['go']['main']['App']['OpenSSHShell'](arg1, arg2);
+}
+
+export function RemoveSSHPeer(arg1) {
+  return window['go']['main']['App']['RemoveSSHPeer'](arg1);
+}
+
+export function SaveSSHPeer(arg1, arg2) {
+  return window['go']['main']['App']['SaveSSHPeer'](arg1, arg2);
+}
+
+export function SetSSHAllowAny(arg1, arg2) {
+  return window['go']['main']['App']['SetSSHAllowAny'](arg1, arg2);
+}
+
+export function SetSSHEnabled(arg1) {
+  return window['go']['main']['App']['SetSSHEnabled'](arg1);
+}
+
 export function StartSSHClient(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['StartSSHClient'](arg1, arg2, arg3, arg4);
 }
 
 export function StartSSHServe(arg1, arg2, arg3) {
   return window['go']['main']['App']['StartSSHServe'](arg1, arg2, arg3);
+}
+
+export function WriteSSHShell(arg1, arg2) {
+  return window['go']['main']['App']['WriteSSHShell'](arg1, arg2);
 }
 
 export function StopChatRoom(arg1) {

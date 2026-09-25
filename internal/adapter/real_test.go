@@ -71,9 +71,27 @@ func TestRealPlan4Validation(t *testing.T) {
 	if _, err := r.StartExec(ctx, "s", nil); err == nil || !strings.Contains(err.Error(), "required") {
 		t.Fatalf("exec err=%v", err)
 	}
+	if _, err := r.StartSSHServe(ctx, "s", adapter.SSHServeOpts{NoAuth: true, RestrictClients: true, AllowedNodeKeys: []string{"not-a-key"}}); err == nil || !strings.Contains(err.Error(), "node key") {
+		t.Fatalf("bad allowlist err=%v", err)
+	}
+	raw, err := r.GeneratePrivateKeyJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := r.PublicNodeKey(raw)
+	if err != nil || !strings.HasPrefix(pub, "nodekey:") {
+		t.Fatalf("pub=%q err=%v", pub, err)
+	}
+	got, err := r.NodeKeyFromAddr(pub)
+	if err != nil || got != pub {
+		t.Fatalf("nodekey roundtrip %q err=%v", got, err)
+	}
+	if _, err := r.NodeKeyFromAddr("tc:not-a-real-address"); err == nil {
+		t.Fatal("expected parse error")
+	}
 	r.SetNetworkOpts(adapter.NetworkOpts{Region: "1", DERPMapURL: "https://example.test/derpmap.json"})
-	got := r.NetworkOpts()
-	if got.Region != "1" || got.DERPMapURL == "" {
-		t.Fatalf("%+v", got)
+	opts := r.NetworkOpts()
+	if opts.Region != "1" || opts.DERPMapURL == "" {
+		t.Fatalf("%+v", opts)
 	}
 }

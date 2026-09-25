@@ -8,12 +8,21 @@ import (
 	"time"
 )
 
+type sshGate struct {
+	restrict bool
+	allowAny bool
+	keys     map[string]bool
+}
+
 type Fake struct {
 	mu          sync.Mutex
 	stops       map[string]chan struct{}
 	ports       map[string]string // sessionID -> tc:fake-port-<id>
 	files       map[string]string // sessionID -> tc:fake-files-<id> or tc:fake-recv-<id>
 	peers       map[string]string // sessionID -> ssh/exit/exec fake address
+	sshGates    map[string]sshGate
+	sshInput    map[string]chan string
+	sshFan      map[string]*sshFan
 	drops       map[string]int
 	netOpts     NetworkOpts
 	chatRooms   map[string]*fakeRoom
@@ -31,11 +40,14 @@ type CapturedFrame struct {
 
 func NewFake() *Fake {
 	return &Fake{
-		stops: make(map[string]chan struct{}),
-		ports: make(map[string]string),
-		files: make(map[string]string),
-		peers: make(map[string]string),
-		drops: make(map[string]int),
+		stops:    make(map[string]chan struct{}),
+		ports:    make(map[string]string),
+		files:    make(map[string]string),
+		peers:    make(map[string]string),
+		sshGates: make(map[string]sshGate),
+		sshInput: make(map[string]chan string),
+		sshFan:   make(map[string]*sshFan),
+		drops:    make(map[string]int),
 	}
 }
 
@@ -269,6 +281,11 @@ func (f *Fake) Stop(sessionID string) error {
 	stop, ok := f.stops[sessionID]
 	if ok {
 		delete(f.stops, sessionID)
+	}
+	delete(f.sshInput, sessionID)
+	if fan := f.sshFan[sessionID]; fan != nil {
+		delete(f.sshFan, sessionID)
+		fan.close()
 	}
 	f.mu.Unlock()
 

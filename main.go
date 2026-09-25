@@ -2,9 +2,11 @@ package main
 
 import (
 	"embed"
+	"os"
 	goruntime "runtime"
 	"strings"
 
+	"github.com/mushroom11s/tailcat-box/internal/sshterm"
 	"github.com/mushroom11s/tailcat-box/internal/tray"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/menu"
@@ -19,6 +21,9 @@ import (
 var assets embed.FS
 
 func main() {
+	if sshterm.HandleArgs(os.Args[1:]) {
+		return
+	}
 	// Create an instance of the app structure
 	app := NewApp()
 

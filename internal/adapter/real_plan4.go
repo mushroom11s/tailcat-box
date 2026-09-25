@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/netip"
 	"os"
-	osuser "os/user"
 	"strconv"
 	"strings"
 	"sync"
@@ -90,6 +89,16 @@ func (r *Real) StartSSHServe(ctx context.Context, sessionID string, opts SSHServ
 	if !opts.NoAuth && strings.TrimSpace(opts.AuthorizedKeys) == "" {
 		return nil, fmt.Errorf("authorized keys are required for keyed SSH (or use no-auth with confirmation)")
 	}
+	if opts.IdentityJSON != "" {
+		if _, err := unmarshalTailcatKey(opts.IdentityJSON); err != nil {
+			return nil, err
+		}
+	}
+	if opts.RestrictClients && !opts.AllowAny {
+		if _, err := parseNodeKeys(opts.AllowedNodeKeys); err != nil {
+			return nil, err
+		}
+	}
 	ch := make(chan Event, 16)
 	stop := make(chan struct{})
 
@@ -127,6 +136,14 @@ func (r *Real) runSSHServe(ctx context.Context, sessionID string, opts SSHServeO
 
 	srv := &tailcat.Server{Logf: func(string, ...any) {}}
 	r.applyServerNet(ctx, srv)
+	if err := applySSHIdentity(srv, opts); err != nil {
+		send(Event{SessionID: sessionID, Kind: EventError, Err: err.Error()})
+		return
+	}
+	if err := applySSHAllowlist(srv, opts); err != nil {
+		send(Event{SessionID: sessionID, Kind: EventError, Err: err.Error()})
+		return
+	}
 	handler := srv.SSHConnHandler(sshOpts)
 	srv.OnTCP = func(port uint16) func(net.Conn) {
 		if port != SSHPort {
@@ -274,13 +291,29 @@ func (r *Real) StartSSHClient(ctx context.Context, sessionID string, serverAddr 
 	if strings.TrimSpace(serverAddr) == "" {
 		return nil, fmt.Errorf("address is required")
 	}
-	ch := make(chan Event, 16)
+	if opts.ClientKeyJSON != "" {
+		if _, err := unmarshalTailcatKey(opts.ClientKeyJSON); err != nil {
+			return nil, err
+		}
+	}
+	buf := 16
+	if opts.Interactive {
+		buf = 64
+	}
+	ch := make(chan Event, buf)
 	ctx, cancel := context.WithCancel(ctx)
+	fan := newSSHFan()
 	r.mu.Lock()
 	if prev, ok := r.cancels[sessionID]; ok {
 		prev()
 	}
 	r.cancels[sessionID] = cancel
+	if opts.Interactive {
+		if old := r.sshFan[sessionID]; old != nil {
+			old.close()
+		}
+		r.sshFan[sessionID] = fan
+	}
 	r.mu.Unlock()
 
 	go func() {
@@ -289,36 +322,47 @@ func (r *Real) StartSSHClient(ctx context.Context, sessionID string, serverAddr 
 		defer func() {
 			r.mu.Lock()
 			delete(r.cancels, sessionID)
+			if in, ok := r.sshIn[sessionID]; ok {
+				delete(r.sshIn, sessionID)
+				_ = in.Close()
+			}
+			if current := r.sshFan[sessionID]; current == fan {
+				delete(r.sshFan, sessionID)
+			}
 			r.mu.Unlock()
+			fan.close()
 		}()
 
 		cl := r.newClient(serverAddr)
 		defer cl.Close()
+		if opts.ClientKeyJSON != "" {
+			pk, err := unmarshalTailcatKey(opts.ClientKeyJSON)
+			if err != nil {
+				ch <- Event{SessionID: sessionID, Kind: EventError, Err: err.Error()}
+				return
+			}
+			cl.Key = pk.Private
+		}
 		conn, err := cl.DialTCPPort(ctx, SSHPort)
 		if err != nil {
 			ch <- Event{SessionID: sessionID, Kind: EventError, Err: err.Error()}
 			return
 		}
-		user := strings.TrimSpace(opts.User)
-		if user == "" {
-			if u, err := osuser.Current(); err == nil && u.Username != "" {
-				user = u.Username
-			} else {
-				user = "tailcat"
-			}
-		}
+		user := sshUser(opts.User)
 		cfg := &gossh.ClientConfig{
 			User:            user,
 			HostKeyCallback: gossh.InsecureIgnoreHostKey(),
 		}
-		if ident := strings.TrimSpace(opts.Identity); ident != "" {
-			signer, err := loadSSHIdentity(ident)
-			if err != nil {
-				_ = conn.Close()
-				ch <- Event{SessionID: sessionID, Kind: EventError, Err: err.Error()}
-				return
+		if !opts.NoClientAuth {
+			if ident := strings.TrimSpace(opts.Identity); ident != "" {
+				signer, err := loadSSHIdentity(ident)
+				if err != nil {
+					_ = conn.Close()
+					ch <- Event{SessionID: sessionID, Kind: EventError, Err: err.Error()}
+					return
+				}
+				cfg.Auth = []gossh.AuthMethod{gossh.PublicKeys(signer)}
 			}
-			cfg.Auth = []gossh.AuthMethod{gossh.PublicKeys(signer)}
 		}
 		sshConn, chans, reqs, err := gossh.NewClientConn(conn, "tailcat", cfg)
 		if err != nil {
@@ -335,6 +379,10 @@ func (r *Real) StartSSHClient(ctx context.Context, sessionID string, serverAddr 
 			return
 		}
 		defer sess.Close()
+		if opts.Interactive {
+			r.runSSHInteractive(ctx, sessionID, serverAddr, sess, fan, ch)
+			return
+		}
 		cmd := strings.TrimSpace(opts.Command)
 		if cmd == "" {
 			cmd = "whoami"

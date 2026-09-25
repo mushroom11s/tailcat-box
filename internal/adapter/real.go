@@ -23,6 +23,8 @@ type Real struct {
 	serves    map[string]*serveRun
 	forwards  map[string]*forwardRun
 	cancels   map[string]context.CancelFunc
+	sshIn     map[string]io.WriteCloser
+	sshFan    map[string]*sshFan
 	net       NetworkOpts
 	chatRooms map[string]*realRoom
 }
@@ -44,6 +46,8 @@ func NewReal() *Real {
 		serves:   make(map[string]*serveRun),
 		forwards: make(map[string]*forwardRun),
 		cancels:  make(map[string]context.CancelFunc),
+		sshIn:    make(map[string]io.WriteCloser),
+		sshFan:   make(map[string]*sshFan),
 	}
 }
 
@@ -229,6 +233,14 @@ func (r *Real) Stop(sessionID string) error {
 	if canceling {
 		delete(r.cancels, sessionID)
 	}
+	stdin, hasIn := r.sshIn[sessionID]
+	if hasIn {
+		delete(r.sshIn, sessionID)
+	}
+	fan := r.sshFan[sessionID]
+	if fan != nil {
+		delete(r.sshFan, sessionID)
+	}
 	r.mu.Unlock()
 
 	if ok {
@@ -259,6 +271,12 @@ func (r *Real) Stop(sessionID string) error {
 	}
 	if canceling && cancel != nil {
 		cancel()
+	}
+	if hasIn && stdin != nil {
+		_ = stdin.Close()
+	}
+	if fan != nil {
+		fan.close()
 	}
 	return nil
 }

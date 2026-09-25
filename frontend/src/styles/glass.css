@@ -3251,3 +3251,84 @@ textarea {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 16%, transparent);
 }
+
+.ssh-desk {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ssh-desk .lede,
+.ssh-help {
+  margin: 0;
+}
+
+.ssh-help,
+.ssh-warn {
+  color: var(--muted, var(--text-dim, inherit));
+  font-size: 0.92rem;
+}
+
+.ssh-warn {
+  margin: 0;
+  color: var(--danger);
+}
+
+.ssh-address {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ssh-address-label {
+  font-size: 0.85rem;
+}
+
+.ssh-peer-form .field {
+  margin-bottom: 8px;
+}
+
+.ssh-peer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.ssh-peer-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ssh-peer-label code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+
+.ssh-shell-bar {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ssh-term {
+  width: 100%;
+  min-height: 220px;
+  margin: 0;
+  padding: 12px;
+  border: 0;
+  border-radius: 8px;
+  resize: vertical;
+  background: #0c0c0c;
+  color: #cccccc;
+  font-family: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}

@@ -5,6 +5,7 @@ import App from "../App";
 import { LocaleProvider } from "../i18n";
 import { MAPPINGS_KEY } from "../lib/portMappings";
 import { decodeQrFromFile } from "../lib/qrImage";
+import { emptySSHDesk } from "../lib/wails";
 import SessionCard from "./SessionCard";
 import ChatPage from "../pages/ChatPage";
 import TunnelPage from "../pages/TunnelPage";
@@ -143,7 +144,8 @@ describe("qr share and scan", () => {
     await user.click(screen.getByRole("button", { name: "+ New mapping" }));
     await user.click(screen.getByRole("radio", { name: "Local forward" }));
     vi.mocked(decodeQrFromFile).mockResolvedValueOnce(addr);
-    await user.click(screen.getByRole("button", { name: "Scan QR" }));
+    const scanField = screen.getByLabelText("Address").closest(".qr-field") as HTMLElement;
+    await user.click(within(scanField).getByRole("button", { name: "Scan QR" }));
     const scan = await screen.findByRole("dialog", { name: "Scan QR code" });
     await user.upload(
       scan.querySelector('input[type="file"]') as HTMLInputElement,
@@ -198,6 +200,19 @@ describe("qr share and scan", () => {
           ]}
           links={{ serve: "port" }}
           busy={false}
+          ssh={{
+            desk: emptySSHDesk(),
+            busy: false,
+            note: "",
+            shell: null,
+            onToggle: vi.fn(),
+            onAllowAny: vi.fn(),
+            onAddPeer: vi.fn(),
+            onRemovePeer: vi.fn(),
+            onShell: vi.fn(),
+            onShellInput: vi.fn(),
+            onShellClose: vi.fn(),
+          }}
           onAdd={vi.fn()}
           onStart={vi.fn()}
           onStop={vi.fn()}
@@ -213,7 +228,8 @@ describe("qr share and scan", () => {
     expect(within(peerDetail).queryByRole("button", { name: "显示对方的二维码" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "+ 新映射" }));
     await user.click(screen.getByRole("radio", { name: "本地转发" }));
-    expect(screen.getByRole("button", { name: "扫码" })).toBeTruthy();
+    const scanField = screen.getByLabelText("地址").closest(".qr-field") as HTMLElement;
+    expect(within(scanField).getByRole("button", { name: "扫码" })).toBeTruthy();
   });
 
   it("offers QR for an owned listen address and not for a dialed peer", () => {

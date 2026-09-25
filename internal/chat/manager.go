@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -267,6 +268,30 @@ func (m *Manager) Messages(id string) ([]Message, error) {
 		return nil, err
 	}
 	return svc.Messages(), nil
+}
+
+// PeerAddresses lists distinct peer addresses of open rooms.
+func (m *Manager) PeerAddresses() []string {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	seen := map[string]bool{}
+	var out []string
+	for _, slot := range m.rooms {
+		if slot == nil || slot.svc == nil {
+			continue
+		}
+		addr := strings.TrimSpace(slot.svc.Peer())
+		if addr == "" || seen[addr] {
+			continue
+		}
+		seen[addr] = true
+		out = append(out, addr)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func (m *Manager) Peer(id string) (string, error) {
