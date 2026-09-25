@@ -27,6 +27,8 @@ export type MiaoShare = {
   status: string;
   endReason?: string;
   listening?: boolean;
+  byRef?: boolean;
+  warning?: string;
 };
 
 export type MiaoSavedFile = {
@@ -130,6 +132,8 @@ export function parseShare(raw: unknown): MiaoShare | null {
   }
   const endReason = readString(value, "endReason", "EndReason");
   const listening = readField(value, "listening", "Listening");
+  const byRef = readField(value, "byRef", "ByRef");
+  const warning = readString(value, "warning", "Warning");
   return {
     id,
     address: readString(value, "address", "Address"),
@@ -145,6 +149,8 @@ export function parseShare(raw: unknown): MiaoShare | null {
     status: readString(value, "status", "Status") || "active",
     endReason: endReason || undefined,
     listening: typeof listening === "boolean" ? listening : undefined,
+    byRef: byRef === true ? true : undefined,
+    warning: warning || undefined,
   };
 }
 
@@ -290,7 +296,7 @@ export type JoinPayload = {
   token: string;
 };
 
-const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode" | "miaoUnreachable" | "miaoEndedRemote" | "miaoBusyPeer" | "miaoCustomDaysInvalid" | "miaoCustomCountInvalid" | "miaoFolder" | "miaoPickFolder" | "miaoUnknownReceive" | "miaoReceiveStarted" | "miaoPartialMismatch" | "miaoMissingFile" | "miaoShareUnready" | "miaoListenFailed"> = {
+const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode" | "miaoUnreachable" | "miaoEndedRemote" | "miaoBusyPeer" | "miaoCustomDaysInvalid" | "miaoCustomCountInvalid" | "miaoFolder" | "miaoPickFolder" | "miaoUnknownReceive" | "miaoReceiveStarted" | "miaoPartialMismatch" | "miaoMissingFile" | "miaoShareUnready" | "miaoListenFailed" | "miaoOriginGone"> = {
   "This share is larger than 300 MiB.": "miaoTooBig",
   "Choose at least one file.": "miaoNeedFile",
   "Choose files, not folders.": "miaoFolder",
@@ -307,10 +313,13 @@ const KNOWN_ERRORS: Record<string, "miaoTooBig" | "miaoNeedFile" | "miaoBadCode"
   "A shared file is missing, so that share was not restored.": "miaoMissingFile",
   "A share could not be restored.": "miaoShareUnready",
   "share did not start listening": "miaoListenFailed",
+  "The original file was moved or deleted. Put it back in the same place, or end this share and start again.": "miaoOriginGone",
 };
 
 export type MiaoErrorKey = (typeof KNOWN_ERRORS)[string];
 
+// shareTooLarge is the ceiling for an in-memory drop, which has to be copied.
+// A path-backed share above this stays on the original files instead.
 export function shareTooLarge(sizes: number[]): boolean {
   let total = 0;
   for (const size of sizes) {

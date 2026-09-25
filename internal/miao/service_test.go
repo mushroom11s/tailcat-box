@@ -697,3 +697,115 @@ func waitEmpty(t *testing.T, root string) {
 	entries, _ := os.ReadDir(root)
 	t.Fatalf("share dir not removed: %v", names(entries))
 }
+
+func waitWarning(t *testing.T, svc *Service, want string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		listed := svc.List()
+		if len(listed) == 1 && listed[0].Warning == want {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("warning=%q listed=%+v", want, listed)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestByRefShareServesOriginalAndNoticesMoves(t *testing.T) {
+	setCopyLimit(t, 4)
+	root := t.TempDir()
+	srcDir := filepath.Join(t.TempDir(), "secret-origin")
+	if err := os.Mkdir(srcDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(srcDir, "note.txt")
+	body := []byte("hello")
+	if err := os.WriteFile(src, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	svc := New(adapter.NewFake(), root)
+	snap, err := svc.Start([]Source{{Name: "note.txt", Path: src}}, Limits{MaxDownloads: 4}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !snap.ByRef || snap.Warning != "" || len(snap.Files) != 1 || snap.Files[0].Name != "note.txt" {
+		t.Fatalf("snap=%+v", snap)
+	}
+	published, err := json.Marshal(snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(published), "secret-origin") || strings.Contains(string(published), src) {
+		t.Fatalf("origin path leaked: %s", published)
+	}
+	shareDir := filepath.Join(root, snap.ID)
+	entries, err := os.ReadDir(shareDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "share.json" {
+		t.Fatalf("share dir=%v", names(entries))
+	}
+	state, err := os.ReadFile(filepath.Join(shareDir, "share.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(state), `"byRef": true`) || !strings.Contains(string(state), src) {
+		t.Fatalf("state=%s", state)
+	}
+
+	dest := t.TempDir()
+	receipt, err := svc.Join(context.Background(), snap.Payload, dest, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(receipt.Files[0].Path)
+	if err != nil || string(got) != "hello" || receipt.Files[0].Name != "note.txt" {
+		t.Fatalf("got=%q receipt=%+v err=%v", got, receipt.Files, err)
+	}
+	if listed := svc.List(); len(listed) != 1 || listed[0].Downloads != 1 {
+		t.Fatalf("after download=%+v", listed)
+	}
+
+	moved := filepath.Join(srcDir, "moved.txt")
+	if err := os.Rename(src, moved); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Join(context.Background(), snap.Payload, t.TempDir(), adapter.NetworkOpts{}); !errors.Is(err, ErrOriginGone) {
+		t.Fatalf("moved err=%v", err)
+	}
+	waitWarning(t, svc, ErrOriginGone.Error())
+	if listed := svc.List(); len(listed) != 1 || listed[0].Downloads != 1 || listed[0].Status != "active" {
+		t.Fatalf("share changed after move: %+v", listed)
+	}
+	if err := os.Rename(moved, src); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Join(context.Background(), snap.Payload, t.TempDir(), adapter.NetworkOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	waitWarning(t, svc, "")
+	if listed := svc.List(); len(listed) != 1 || listed[0].Downloads != 2 {
+		t.Fatalf("after restore=%+v", listed)
+	}
+
+	if err := os.WriteFile(src, []byte("HELLO"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Join(context.Background(), snap.Payload, t.TempDir(), adapter.NetworkOpts{}); !errors.Is(err, ErrOriginGone) {
+		t.Fatalf("changed err=%v", err)
+	}
+	if err := os.WriteFile(src, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.End(snap.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitGone(t, shareDir)
+	kept, err := os.ReadFile(src)
+	if err != nil || string(kept) != "hello" {
+		t.Fatalf("ending the share changed the original: %q %v", kept, err)
+	}
+}

@@ -24,11 +24,17 @@ afterEach(() => {
 });
 
 describe("miao share helpers", () => {
-  it("rejects a total above 300 MiB", () => {
+  it("flags an in-memory total above 300 MiB", () => {
     expect(shareTooLarge([MAX_SHARE_BYTES])).toBe(false);
     expect(shareTooLarge([MAX_SHARE_BYTES + 1])).toBe(true);
     expect(shareTooLarge([200 * 1024 * 1024, 100 * 1024 * 1024 + 1])).toBe(true);
     expect(shareTooLarge([1024, 2048])).toBe(false);
+  });
+
+  it("maps a moved original to a translated error and does not retry it", () => {
+    const message = "The original file was moved or deleted. Put it back in the same place, or end this share and start again.";
+    expect(miaoErrorKey(new Error(message))).toBe("miaoOriginGone");
+    expect(shouldAutoRetryDownload("failed", message)).toBe(false);
   });
 
   it("parses a join payload and rejects a bare address", () => {

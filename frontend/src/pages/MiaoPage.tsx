@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
-import { ClipboardSetText } from "../../wailsjs/runtime/runtime";
+import { ClipboardSetText, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import LoadingCat from "../components/LoadingCat";
 import QrScanButton from "../components/QrScanButton";
 import { useI18n, type MessageKey } from "../i18n";
@@ -60,6 +60,16 @@ function ttlLabel(ttl: Remaining | null, t: (key: MessageKey) => string): string
     return t("miaoEndedRemote");
   }
   return t("miaoTimeLeft").replace("{d}", String(ttl.days)).replace("{h}", String(ttl.hours)).replace("{m}", String(ttl.minutes));
+}
+
+function localizedMiaoError(message: string, t: (key: MessageKey) => string): string {
+  const key = miaoErrorKey(new Error(message));
+  return key ? t(key) : message;
+}
+
+function nativeFileDrop(): boolean {
+  const runtime = (window as { runtime?: { OnFileDrop?: unknown; OnFileDropOff?: unknown } }).runtime;
+  return typeof runtime?.OnFileDrop === "function" && typeof runtime?.OnFileDropOff === "function";
 }
 
 function baseName(path: string): string {
@@ -176,6 +186,12 @@ function ShareCard({
           {expiring ? (
             <p className="miao-warn" role="status">
               {t("miaoExpiringSoon")}
+            </p>
+          ) : null}
+          {share.byRef ? <p className="chat-quiet">{t("miaoByRef")}</p> : null}
+          {share.warning ? (
+            <p className="err" role="alert">
+              {localizedMiaoError(share.warning, t)}
             </p>
           ) : null}
           <p className="chat-quiet">
@@ -349,6 +365,9 @@ export default function MiaoPage() {
   jobsRef.current = jobs;
   const endedRef = useRef(new Set<string>());
   const savedRef = useRef(new Set<string>());
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const beginRef = useRef<(files: Array<{ name: string; path: string; dataBase64: string }>) => Promise<void>>(async () => undefined);
   const ticking = shares.some((share) => !share.forever) || jobs.some((job) => Boolean(job.expiresAt));
 
   function sharePasteFailure(reason: PasteFailure): MessageKey {
@@ -455,7 +474,7 @@ export default function MiaoPage() {
       if (snap.status === "ended") {
         endedRef.current.add(snap.id);
         setShares((list) => list.filter((item) => item.id !== snap.id));
-        setNotice(t("miaoEnded"));
+        setNotice(t(snap.byRef ? "miaoEndedByRef" : "miaoEnded"));
         return;
       }
       if (snap.status === "active" && snap.id) {
@@ -536,6 +555,20 @@ export default function MiaoPage() {
       setBusy("");
     }
   }
+  beginRef.current = begin;
+
+  useEffect(() => {
+    if (!hasWailsBindings() || !nativeFileDrop()) {
+      return;
+    }
+    OnFileDrop((_x, _y, paths) => {
+      if (!paths?.length || busyRef.current) {
+        return;
+      }
+      void beginRef.current(paths.map((path) => ({ name: baseName(path), path, dataBase64: "" })));
+    }, true);
+    return () => OnFileDropOff();
+  }, []);
 
   async function acceptFileList(list: File[]): Promise<void> {
     if (!list.length || busy) {
@@ -593,16 +626,20 @@ export default function MiaoPage() {
   function onDrop(ev: DragEvent<HTMLButtonElement>): void {
     ev.preventDefault();
     setDragOver(false);
+    if (hasWailsBindings() && nativeFileDrop()) {
+      return;
+    }
     void acceptFileList(Array.from(ev.dataTransfer.files ?? []));
   }
 
   async function endShare(id: string): Promise<void> {
+    const byRef = shares.some((item) => item.id === id && item.byRef);
     endedRef.current.add(id);
     setError("");
     try {
       await endMiaoShare(id);
       setShares((list) => list.filter((item) => item.id !== id));
-      setNotice(t("miaoEnded"));
+      setNotice(t(byRef ? "miaoEndedByRef" : "miaoEnded"));
     } catch (err) {
       showError(err, "miaoEndedRemote");
     }

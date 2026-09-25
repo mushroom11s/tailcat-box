@@ -2849,6 +2849,7 @@ textarea {
 }
 
 .miao-drop {
+  --wails-drop-target: drop;
   flex: 1 0 auto;
   min-height: 160px;
   display: flex;

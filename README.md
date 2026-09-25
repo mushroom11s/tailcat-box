@@ -41,7 +41,7 @@ The window opens at 1100×860 on Mew Share. The active sidebar item keeps its fu
 
 ## Features
 
-- **Mew Share (喵传)** — the screen that opens. Drop files (up to 300 MiB per share) and keep several shares going at once. Each share has its own QR code, with the cut-out packing cat in the center. A packing cat shows while the share is prepared, and a running cat follows the download. Paste a share code, or scan a QR from the camera, an image, or the clipboard. Another Tailcat Box downloads one share over Tailcat while this device stays online
+- **Mew Share (喵传)** — the screen that opens. Drop files and keep several shares going at once. Shares up to 300 MiB are copied into the app; larger ones stay at the original path and must not be moved. Each share has its own QR code, with the cut-out packing cat in the center. A packing cat shows while the share is prepared, and a running cat follows the download. Paste a share code, or scan a QR from the camera, an image, or the clipboard. Another Tailcat Box downloads one share over Tailcat while this device stays online
 - **Chat** — open a room, exchange a Tailcat address (show a QR, or paste an image of one), and send text, files, voice notes, or a live voice, video, or screen share
 - **Tunnel** — serve TCP ports, forward them to this machine, or browse the peer’s web port
 - **Settings** — system / light / dark theme, English and 简体中文, keys and DERP, client and system info, launch at login

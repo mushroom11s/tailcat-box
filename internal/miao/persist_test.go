@@ -333,6 +333,73 @@ func TestNewDropsUntrackedShareDir(t *testing.T) {
 	}
 }
 
+func TestByRefShareRestoredAfterRestart(t *testing.T) {
+	setCopyLimit(t, 4)
+	root := t.TempDir()
+	src := filepath.Join(t.TempDir(), "笔记.txt")
+	if err := os.WriteFile(src, []byte("hello"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	first := New(adapter.NewFake(), root)
+	snap, err := first.Start([]Source{{Name: "笔记.txt", Path: src}}, Limits{TTL: 48 * time.Hour, TTLDays: 2, MaxDownloads: 3}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !snap.ByRef {
+		t.Fatal("expected a by-reference share")
+	}
+	first.Close()
+
+	again := New(adapter.NewFake(), root)
+	t.Cleanup(again.Close)
+	listed := again.List()
+	if len(listed) != 1 || listed[0].ID != snap.ID || !listed[0].ByRef || listed[0].Payload != snap.Payload {
+		t.Fatalf("restored=%+v", listed)
+	}
+	receipt, err := again.Join(context.Background(), snap.Payload, t.TempDir(), adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(receipt.Files[0].Path)
+	if err != nil || string(body) != "hello" || receipt.Files[0].Name != "笔记.txt" {
+		t.Fatalf("body=%q receipt=%+v err=%v", body, receipt.Files, err)
+	}
+}
+
+func TestByRefRestartReportsMovedFile(t *testing.T) {
+	setCopyLimit(t, 4)
+	root := t.TempDir()
+	src := filepath.Join(t.TempDir(), "gone.txt")
+	if err := os.WriteFile(src, []byte("hello"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	first := New(adapter.NewFake(), root)
+	snap, err := first.Start([]Source{{Name: "gone.txt", Path: src}}, Limits{MaxDownloads: 2}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Close()
+	moved := src + ".moved"
+	if err := os.Rename(src, moved); err != nil {
+		t.Fatal(err)
+	}
+
+	again := New(adapter.NewFake(), root)
+	if len(again.List()) != 0 {
+		t.Fatalf("moved file still shared: %+v", again.List())
+	}
+	notes := again.RestoreNotes()
+	if len(notes) != 1 || notes[0] != ErrOriginGone.Error() {
+		t.Fatalf("notes=%v", notes)
+	}
+	if _, err := os.Stat(moved); err != nil {
+		t.Fatalf("restart removed the original: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, snap.ID)); !os.IsNotExist(err) {
+		t.Fatalf("broken by-ref share kept: %v", err)
+	}
+}
+
 func rewriteShareState(t *testing.T, path string, mutate func(map[string]any)) {
 	t.Helper()
 	body, err := os.ReadFile(path)

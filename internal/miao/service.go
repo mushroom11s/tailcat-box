@@ -98,6 +98,8 @@ type Snapshot struct {
 	EndReason    string     `json:"endReason"`
 	CreatedAt    string     `json:"createdAt"`
 	Listening    bool       `json:"listening"`
+	ByRef        bool       `json:"byRef,omitempty"`
+	Warning      string     `json:"warning,omitempty"`
 }
 
 // FileInfo is a display row. It does not include the storage path.
@@ -219,6 +221,7 @@ func (s *Service) Start(sources []Source, lim Limits, net adapter.NetworkOpts) (
 		readySig:  sig,
 		life:      life,
 		stopLife:  stopLife,
+		byRef:     pkg.ByRef,
 		forever:   lim.TTL <= 0,
 		expires:   time.Time{},
 		createdAt: sess.CreatedAt,
@@ -930,6 +933,8 @@ type host struct {
 	address   string
 	dir       string
 	files     []StagedFile
+	byRef     bool
+	warning   string
 	total     int64
 	lim       Limits
 	forever   bool
@@ -1037,11 +1042,16 @@ func (h *host) handlePull(token, reply string, resume map[string]int64) {
 		return
 	}
 	if err := h.sendPackage(reply, files, resume); err != nil {
+		if errors.Is(err, ErrOriginGone) {
+			h.noteOriginGone()
+			h.sendDeny(reply, "origin")
+		}
 		return
 	}
 	h.mu.Lock()
 	if !h.ended {
 		h.downloads++
+		h.warning = ""
 		_ = h.writeStateLocked()
 	}
 	downloads := h.downloads
@@ -1112,10 +1122,29 @@ func (h *host) sendFrame(ctx context.Context, reply string, frame []byte) error 
 	return dial(ctx, h.room, frame)
 }
 
+func (h *host) noteOriginGone() {
+	h.mu.Lock()
+	if h.ended {
+		h.mu.Unlock()
+		return
+	}
+	h.warning = ErrOriginGone.Error()
+	snap := h.snapshotLocked()
+	h.mu.Unlock()
+	h.publish(snap)
+}
+
 func (h *host) sendPackage(reply string, files []StagedFile, resume map[string]int64) error {
 	defer func() {
 		callTransferHook("sent")
 	}()
+	if originBacked(files) {
+		checked, err := recheckOrigins(files)
+		if err != nil {
+			return err
+		}
+		files = checked
+	}
 	h.mu.Lock()
 	expiresAt := ""
 	if !h.forever && !h.expires.IsZero() {
@@ -1152,6 +1181,9 @@ func (h *host) sendPackage(reply string, files []StagedFile, resume map[string]i
 		}
 		if start < 0 || start > file.Size {
 			start = 0
+		}
+		if err := originReady(file); err != nil {
+			return err
 		}
 		if err := sendFile(h.ctx, func(frame []byte) error {
 			return h.sendFrame(h.ctx, reply, frame)
@@ -1208,6 +1240,8 @@ func (h *host) end(reason string) {
 	if room != nil {
 		_ = room.Close()
 	}
+	// dir is only this share's metadata and temp copies. By-reference
+	// originals live outside it and are left where the user put them.
 	if !keep {
 		_ = os.RemoveAll(dir)
 	}
@@ -1273,6 +1307,8 @@ func (h *host) snapshotLocked() Snapshot {
 		EndReason:    h.reason,
 		CreatedAt:    created,
 		Listening:    h.room != nil && h.address != "",
+		ByRef:        h.byRef,
+		Warning:      h.warning,
 	}
 }
 
@@ -1315,11 +1351,17 @@ func sendFile(ctx context.Context, send func([]byte) error, file StagedFile, sta
 	}
 	in, err := os.Open(file.Path)
 	if err != nil {
+		if file.OriginPath != "" {
+			return ErrOriginGone
+		}
 		return err
 	}
 	defer in.Close()
 	if start > 0 {
 		if _, err := in.Seek(start, io.SeekStart); err != nil {
+			if file.OriginPath != "" {
+				return ErrOriginGone
+			}
 			return err
 		}
 	}
@@ -1351,6 +1393,9 @@ func sendFile(ctx context.Context, send func([]byte) error, file StagedFile, sta
 			return nil
 		}
 		if err != nil {
+			if file.OriginPath != "" {
+				return ErrOriginGone
+			}
 			return err
 		}
 	}
@@ -1466,11 +1511,14 @@ func receivePackage(ctx context.Context, room adapter.Room, dest string, destFn 
 			switch typ {
 			case "miao-deny":
 				reason, _ := meta["reason"].(string)
-				if reason == "bad-token" {
+				switch reason {
+				case "bad-token":
 					fail(ErrBadCode)
-				} else if reason == "busy" {
+				case "busy":
 					fail(ErrBusy)
-				} else {
+				case "origin":
+					fail(ErrOriginGone)
+				default:
 					fail(ErrEnded)
 				}
 				return
