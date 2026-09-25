@@ -447,6 +447,58 @@ textarea {
   padding-right: 28px;
 }
 
+.nav-room-row.has-pin .nav-btn.nav-child {
+  padding-right: 50px;
+}
+
+.nav-room-pin {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 26px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.nav-room-pin.on {
+  opacity: 1;
+  color: var(--warn);
+}
+
+.nav-room-row:hover .nav-room-pin,
+.nav-room-row:focus-within .nav-room-pin {
+  opacity: 1;
+}
+
+.nav-room-row:has(.nav-btn.active) .nav-room-pin {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.nav-room-row:has(.nav-btn.active) .nav-room-pin.on {
+  color: #ffd60a;
+}
+
+.nav-room-pin:hover,
+.nav-room-pin:focus-visible {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.nav-room-pin:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, white);
+  outline-offset: 1px;
+}
+
 .nav-room-close {
   position: absolute;
   z-index: 1;
@@ -1756,6 +1808,27 @@ textarea {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.chat-search {
+  display: block;
+  margin: 8px 0 0;
+}
+
+.chat-search input {
+  width: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--inset-bg);
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.chat-hit {
+  background: color-mix(in srgb, var(--warn) 42%, transparent);
+  color: inherit;
+  border-radius: 3px;
 }
 .chat-select-bar {
   display: flex;

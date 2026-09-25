@@ -24,6 +24,7 @@ import { NICKNAME_KEY, readNickname } from "./lib/nickname";
 import { shouldAutoShowOnboarding, writeOnboardingSeen } from "./lib/onboarding";
 import { ensureOsNotifications, focusAppWindow, sendOsNotification, type NotifyData } from "./lib/osNotify";
 import { applyRemark, readRemarks, writeRemarks, type RemarkMap } from "./lib/remark";
+import { forgetRoomPin, orderWithPins, readRoomPins, renameRoomPin, toggleRoomPin, writeRoomPins } from "./lib/roomPins";
 import { remarkIsShared, roomPrimaryLabel, roomTooltip } from "./lib/roomLabel";
 import { applyRoomEvent, emptyRoom, type RoomSlice } from "./lib/roomState";
 import {
@@ -105,6 +106,7 @@ function AppShell() {
   const [derpMapURL, setDerpMapURL] = useState("");
   const [rooms, setRooms] = useState<Record<string, RoomSlice>>({});
   const [order, setOrder] = useState<string[]>([]);
+  const [pins, setPins] = useState<string[]>(() => readRoomPins());
   const [focus, setFocus] = useState("");
   const [lobby, setLobby] = useState(true);
   const [lobbyPeer, setLobbyPeer] = useState("");
@@ -123,6 +125,7 @@ function AppShell() {
   const linksRef = useRef(links);
   const tunnelBusyRef = useRef(false);
   const orderRef = useRef(order);
+  const pinsRef = useRef(pins);
   const focusRef = useRef(focus);
   const lobbyRef = useRef(lobby);
   const pageRef = useRef(page);
@@ -166,6 +169,12 @@ function AppShell() {
   function commitOrder(next: string[]): void {
     orderRef.current = next;
     setOrder(next);
+  }
+
+  function commitPins(next: string[]): void {
+    pinsRef.current = next;
+    setPins(next);
+    writeRoomPins(next);
   }
 
   function commitFocus(id: string): void {
@@ -651,6 +660,7 @@ function AppShell() {
     commitRooms(next);
     const remaining = orderRef.current.filter((item) => item !== id && next[item]);
     commitOrder(remaining);
+    commitPins(forgetRoomPin(pinsRef.current, id));
     if (focusRef.current === id) {
       if (remaining.length === 0) {
         commitFocus("");
@@ -819,6 +829,9 @@ function AppShell() {
       next[sess.ID] = room;
       commitRooms(next);
       commitOrder(orderRef.current.map((item) => (item === id ? sess.ID : item)));
+      if (sess.ID !== id) {
+        commitPins(renameRoomPin(pinsRef.current, id, sess.ID));
+      }
       // Only move focus when the user is still on the room that was restarted.
       if (focusRef.current === id) {
         commitFocus(sess.ID);
@@ -917,7 +930,7 @@ function AppShell() {
                     {t("navNewRoom")}
                   </button>
                   <div className="nav-room-list">
-                    {order.map((id) => {
+                    {orderWithPins(order, pins).map((id) => {
                       const room = rooms[id];
                       if (!room) {
                         return null;
@@ -931,8 +944,9 @@ function AppShell() {
                         remarkIsShared(room.peer, peers, remarks),
                       );
                       const selected = page === "chat" && !showLobby && focus === id;
+                      const pinned = pins.includes(id);
                       return (
-                        <div key={id} className="nav-room-row">
+                        <div key={id} className={`nav-room-row has-pin${pinned ? " is-pinned" : ""}`}>
                           <button
                             type="button"
                             className={`nav-btn nav-child ${selected ? "active" : ""}`}
@@ -943,6 +957,15 @@ function AppShell() {
                               <span className="nav-room-primary">{label}</span>
                               {room.keyName ? <span className="nav-room-key">{room.keyName}</span> : null}
                             </span>
+                          </button>
+                          <button
+                            type="button"
+                            className={`nav-room-pin${pinned ? " on" : ""}`}
+                            aria-pressed={pinned}
+                            aria-label={`${pinned ? t("roomUnpin") : t("roomPin")} ${label}`}
+                            onClick={() => commitPins(toggleRoomPin(pinsRef.current, id))}
+                          >
+                            <RoomPinIcon />
                           </button>
                           <button
                             type="button"
@@ -1102,6 +1125,21 @@ export default function App() {
     <ToastProvider>
       <AppShell />
     </ToastProvider>
+  );
+}
+
+function RoomPinIcon() {
+  return (
+    <svg className="nav-room-close-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8 4.5h8l-1.2 6.2 2.7 2.3H6.5l2.7-2.3L8 4.5zM12 13v6.5"
+      />
+    </svg>
   );
 }
 

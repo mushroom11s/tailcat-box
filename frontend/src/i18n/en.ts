@@ -22,6 +22,8 @@ export const en = {
   roomStarting: "Starting…",
   roomCap: "You can keep 8 rooms open. Close one to start another.",
   roomClose: "Close",
+  roomPin: "Pin",
+  roomUnpin: "Unpin",
   roomCloseTitle: "Close room",
   roomCloseConfirm:
     "Close this room? It stops listening and this device's transcript is discarded. Your peer is not notified.",
@@ -304,6 +306,9 @@ export const en = {
   chatRemarkHelp: "Only on this device, for this address. The other person never sees it. This is not your nickname.",
   chatConnect: "Connect",
   chatEmptyLede: "Messages stay on this device until you quit.",
+  chatSearch: "Search messages",
+  chatSearchPlaceholder: "Search this room",
+  chatSearchEmpty: "No messages match.",
   chatYou: "You",
   chatPeerName: "Peer",
   chatPeerChanged: "Peer changed",
