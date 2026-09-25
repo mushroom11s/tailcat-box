@@ -29,7 +29,7 @@ build with `wails build`.
 - `icon.ico` - The icon used for the application. This is used when building using `wails build`. If you wish to
   use a different icon, simply replace this file with your own. If it is missing, a new `icon.ico` file
   will be created using the `appicon.png` file in the build directory.
-- `installer/*` - NSIS script for the Windows setup. Release builds run `wails build -nsis` and upload that `.exe`.
+- `installer/*` - NSIS script for the Windows setup. Release builds run `wails build -nsis`, upload that setup as `tailcat-box-windows-<arch>-installer-<tag>.exe`, and also zip the runnable `tailcat-box.exe`.
 - `info.json` - Application details used for Windows builds. The data here will be used by the Windows installer,
   as well as the application itself (right click the exe -> properties -> details)
 - `wails.exe.manifest` - The main application manifest file.

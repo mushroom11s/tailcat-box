@@ -83,6 +83,40 @@ func TestSelectAsset(t *testing.T) {
 			want: "tailcat-box-windows-amd64-v0.4.0.exe",
 		},
 		{
+			name: "prefers labeled installer over portable zip",
+			assets: assetsFor(
+				"tailcat-box-windows-amd64-v1.1.1.zip",
+				"tailcat-box-windows-amd64-installer-v1.1.1.exe",
+			),
+			goos: "windows", goarch: "amd64", tag: "v1.1.1",
+			want: "tailcat-box-windows-amd64-installer-v1.1.1.exe",
+		},
+		{
+			name: "arm64 labeled installer",
+			assets: assetsFor(
+				"tailcat-box-windows-arm64-v1.1.1.zip",
+				"tailcat-box-windows-arm64-installer-v1.1.1.exe",
+			),
+			goos: "windows", goarch: "arm64", tag: "v1.1.1",
+			want: "tailcat-box-windows-arm64-installer-v1.1.1.exe",
+		},
+		{
+			name:   "labeled installer only",
+			assets: assetsFor("tailcat-box-windows-amd64-installer-v1.1.1.exe"),
+			goos:   "windows", goarch: "amd64", tag: "v1.1.1",
+			want: "tailcat-box-windows-amd64-installer-v1.1.1.exe",
+		},
+		{
+			name: "labeled installer beats legacy exe and portable zip",
+			assets: assetsFor(
+				"tailcat-box-windows-amd64-v1.1.1.zip",
+				"tailcat-box-windows-amd64-v1.1.1.exe",
+				"tailcat-box-windows-amd64-installer-v1.1.1.exe",
+			),
+			goos: "windows", goarch: "amd64", tag: "v1.1.1",
+			want: "tailcat-box-windows-amd64-installer-v1.1.1.exe",
+		},
+		{
 			name:   "dmg only",
 			assets: assetsFor("tailcat-box-macos-amd64-v0.4.0.dmg"),
 			goos:   "darwin", goarch: "amd64", tag: "v0.4.0",
@@ -132,6 +166,7 @@ func TestSafeAssetName(t *testing.T) {
 		"tailcat-box-macos-arm64-v0.1.0.zip",
 		"tailcat-box-macos-arm64-v0.4.0.dmg",
 		"tailcat-box-windows-amd64-v0.4.0.exe",
+		"tailcat-box-windows-amd64-installer-v1.1.1.exe",
 	} {
 		got, err := SafeAssetName(name)
 		if err != nil || got != name {

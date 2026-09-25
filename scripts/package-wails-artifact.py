@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Package a Wails build as a GitHub Release installer.
+"""Package a Wails build for a GitHub Release.
 
-Windows jobs copy the NSIS setup produced by ``wails build -nsis``.
+Windows jobs publish two files from one ``wails build -nsis``:
+
+* NSIS setup, renamed so the public filename includes ``installer``:
+  ``tailcat-box-windows-amd64-installer-v0.4.0.exe``
+* Portable zip in the v0.3.0 shape, containing the runnable
+  ``tailcat-box.exe`` (and any ``.dll`` Wails left beside it):
+  ``tailcat-box-windows-amd64-v0.4.0.zip``
+
 macOS jobs build a compressed disk image that contains the ``.app`` and an
-Applications symlink (drag-to-Applications). The release asset is the
-installer itself, not a zip of it.
+Applications symlink (drag-to-Applications):
 
-Names follow the old zip basename, with the extension changed:
-
-    tailcat-box-windows-amd64-v0.4.0.exe
-    tailcat-box-windows-arm64-v0.4.0.exe
     tailcat-box-macos-arm64-v0.4.0.dmg
     tailcat-box-macos-amd64-v0.4.0.dmg
 
@@ -25,10 +27,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
 
 VOLUME_NAME = "Tailcat Box"
+PORTABLE_EXE_NAME = "tailcat-box.exe"
 
 
 def normalize_arch(raw: str) -> str:
@@ -40,12 +44,27 @@ def normalize_arch(raw: str) -> str:
     return value or "unknown"
 
 
-def artifact_name(os_slug: str, arch: str, version: str) -> str:
+def _require_arch(arch: str) -> str:
     arch = normalize_arch(arch)
     if arch not in {"arm64", "amd64"}:
         raise SystemExit(f"unsupported arch: {arch}")
-    ext = {"windows": ".exe", "macos": ".dmg"}[os_slug]
-    return f"tailcat-box-{os_slug}-{arch}-{version}{ext}"
+    return arch
+
+
+def artifact_name(os_slug: str, arch: str, version: str) -> str:
+    """Public installer name. Windows keeps the word installer in the filename."""
+    arch = _require_arch(arch)
+    if os_slug == "windows":
+        return f"tailcat-box-windows-{arch}-installer-{version}.exe"
+    if os_slug == "macos":
+        return f"tailcat-box-macos-{arch}-{version}.dmg"
+    raise SystemExit(f"unsupported os slug: {os_slug}")
+
+
+def portable_zip_name(os_slug: str, arch: str, version: str) -> str:
+    """Old-style archive name. Windows uses this for the runnable exe."""
+    arch = _require_arch(arch)
+    return f"tailcat-box-{os_slug}-{arch}-{version}.zip"
 
 
 def detect_arch() -> str:
@@ -75,6 +94,10 @@ def is_arch_installer(name: str, arch: str) -> bool:
     return lower.endswith(suffix) and not lower.endswith(f"_{arch}-installer.exe")
 
 
+def is_nsis_installer(name: str) -> bool:
+    return name.lower().endswith("-installer.exe")
+
+
 def find_windows_installer(bin_dir: Path, arch: str) -> Path:
     if not bin_dir.is_dir():
         raise SystemExit(f"missing build output directory: {bin_dir}")
@@ -91,6 +114,42 @@ def find_windows_installer(bin_dir: Path, arch: str) -> Path:
         )
     names = ", ".join(p.name for p in matches)
     raise SystemExit(f"expected one {arch} NSIS installer in {bin_dir}, found: {names}")
+
+
+def find_windows_portable_exe(bin_dir: Path) -> Path:
+    """The double-clickable app, not the NSIS setup sitting next to it."""
+    if not bin_dir.is_dir():
+        raise SystemExit(f"missing build output directory: {bin_dir}")
+    exes = sorted(
+        p
+        for p in bin_dir.iterdir()
+        if p.is_file() and p.suffix.lower() == ".exe" and not is_nsis_installer(p.name)
+    )
+    preferred = [p for p in exes if p.name.lower() == PORTABLE_EXE_NAME]
+    chosen = preferred or exes
+    if len(chosen) == 1:
+        return chosen[0]
+    if not exes:
+        raise SystemExit(
+            f"no portable .exe in {bin_dir}. "
+            "`wails build -nsis` leaves tailcat-box.exe next to the NSIS setup."
+        )
+    names = ", ".join(p.name for p in exes)
+    raise SystemExit(f"expected one portable exe in {bin_dir}, found: {names}")
+
+
+def windows_portable_sidecars(bin_dir: Path, app: Path) -> list[Path]:
+    """DLLs Wails may leave beside the exe. NSIS setup files stay out of the zip."""
+    app_resolved = app.resolve()
+    sidecars: list[Path] = []
+    for path in sorted(bin_dir.iterdir()):
+        if not path.is_file() or path.resolve() == app_resolved:
+            continue
+        if is_nsis_installer(path.name):
+            continue
+        if path.suffix.lower() == ".dll":
+            sidecars.append(path)
+    return sidecars
 
 
 def copy_bundle(src: Path, dest: Path) -> None:
@@ -147,6 +206,18 @@ def package_windows_installer(bin_dir: Path, dest: Path, arch: str) -> None:
     shutil.copy2(installer, dest)
 
 
+def package_windows_portable(bin_dir: Path, dest: Path) -> None:
+    app = find_windows_portable_exe(bin_dir)
+    extras = windows_portable_sidecars(bin_dir, app)
+    if dest.exists():
+        dest.unlink()
+    with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        # Root of the archive, same layout as the v0.3.0 portable zip.
+        zf.write(app, arcname=app.name)
+        for extra in extras:
+            zf.write(extra, arcname=extra.name)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
@@ -162,13 +233,21 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     arch = args.arch or detect_arch()
-    dest = out_dir / artifact_name(args.os_slug, arch, args.version)
     if args.os_slug == "windows":
-        package_windows_installer(bin_dir, dest, arch)
+        # Resolve both inputs before writing, so a missing file does not leave
+        # a half-published dist-upload directory.
+        find_windows_installer(bin_dir, arch)
+        find_windows_portable_exe(bin_dir)
+        installer = out_dir / artifact_name(args.os_slug, arch, args.version)
+        portable = out_dir / portable_zip_name(args.os_slug, arch, args.version)
+        package_windows_installer(bin_dir, installer, arch)
+        package_windows_portable(bin_dir, portable)
+        print(installer)
+        print(portable)
     else:
+        dest = out_dir / artifact_name(args.os_slug, arch, args.version)
         package_macos_dmg(find_macos_app(bin_dir), dest, args.volume_name)
-
-    print(dest)
+        print(dest)
     return 0
 
 

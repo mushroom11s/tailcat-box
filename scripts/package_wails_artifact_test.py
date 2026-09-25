@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 
@@ -29,11 +30,19 @@ class ArtifactNameTest(unittest.TestCase):
     def test_release_names(self) -> None:
         self.assertEqual(
             pkg.artifact_name("windows", "amd64", "v0.4.0"),
-            "tailcat-box-windows-amd64-v0.4.0.exe",
+            "tailcat-box-windows-amd64-installer-v0.4.0.exe",
         )
         self.assertEqual(
             pkg.artifact_name("windows", "arm64", "v0.4.0"),
-            "tailcat-box-windows-arm64-v0.4.0.exe",
+            "tailcat-box-windows-arm64-installer-v0.4.0.exe",
+        )
+        self.assertEqual(
+            pkg.portable_zip_name("windows", "amd64", "v0.4.0"),
+            "tailcat-box-windows-amd64-v0.4.0.zip",
+        )
+        self.assertEqual(
+            pkg.portable_zip_name("windows", "arm64", "v0.4.0"),
+            "tailcat-box-windows-arm64-v0.4.0.zip",
         )
         self.assertEqual(
             pkg.artifact_name("macos", "arm64", "v0.4.0"),
@@ -51,18 +60,23 @@ class ArtifactNameTest(unittest.TestCase):
         )
         self.assertEqual(
             pkg.artifact_name("windows", "aarch64", "dev-abc1234"),
-            "tailcat-box-windows-arm64-dev-abc1234.exe",
+            "tailcat-box-windows-arm64-installer-dev-abc1234.exe",
+        )
+        self.assertEqual(
+            pkg.portable_zip_name("windows", "x64", "dev-abc1234"),
+            "tailcat-box-windows-amd64-dev-abc1234.zip",
         )
 
 
 class WindowsPackageTest(unittest.TestCase):
-    def test_copies_single_arch_installer_not_the_app_exe(self) -> None:
+    def test_ships_labeled_installer_and_portable_zip(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             bin_dir = root / "bin"
             out_dir = root / "out"
             bin_dir.mkdir()
             (bin_dir / "tailcat-box.exe").write_bytes(b"app-exe")
+            (bin_dir / "WebView2Loader.dll").write_bytes(b"sidecar-dll")
             (bin_dir / "tailcat-box-amd64-installer.exe").write_bytes(b"setup-amd64")
             (bin_dir / "tailcat-box-arm64-installer.exe").write_bytes(b"setup-arm64")
             (bin_dir / "tailcat-box-amd64_arm64-installer.exe").write_bytes(b"combined")
@@ -83,11 +97,83 @@ class WindowsPackageTest(unittest.TestCase):
                     str(out_dir),
                 ],
                 check=True,
+                capture_output=True,
+                text=True,
             )
-            dest = out_dir / "tailcat-box-windows-amd64-v0.4.0.exe"
-            self.assertEqual(dest.read_bytes(), b"setup-amd64")
-            self.assertEqual(list(out_dir.glob("*.zip")), [])
-            self.assertEqual(list(out_dir.iterdir()), [dest])
+            installer = out_dir / "tailcat-box-windows-amd64-installer-v0.4.0.exe"
+            portable = out_dir / "tailcat-box-windows-amd64-v0.4.0.zip"
+            self.assertEqual(installer.read_bytes(), b"setup-amd64")
+            self.assertEqual(sorted(p.name for p in out_dir.iterdir()), [installer.name, portable.name])
+            with zipfile.ZipFile(portable) as zf:
+                self.assertEqual(
+                    zf.namelist(),
+                    ["tailcat-box.exe", "WebView2Loader.dll"],
+                )
+                self.assertEqual(zf.read("tailcat-box.exe"), b"app-exe")
+                self.assertEqual(zf.read("WebView2Loader.dll"), b"sidecar-dll")
+                self.assertFalse(any("installer" in name.lower() for name in zf.namelist()))
+
+    def test_arm64_installer_is_separate_from_the_portable_zip(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            bin_dir = root / "bin"
+            out_dir = root / "out"
+            bin_dir.mkdir()
+            (bin_dir / "tailcat-box.exe").write_bytes(b"app-exe")
+            (bin_dir / "tailcat-box-amd64-installer.exe").write_bytes(b"setup-amd64")
+            (bin_dir / "tailcat-box-arm64-installer.exe").write_bytes(b"setup-arm64")
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--version",
+                    "v0.4.0",
+                    "--os-slug",
+                    "windows",
+                    "--arch",
+                    "arm64",
+                    "--bin-dir",
+                    str(bin_dir),
+                    "--out-dir",
+                    str(out_dir),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            installer = out_dir / "tailcat-box-windows-arm64-installer-v0.4.0.exe"
+            self.assertEqual(installer.read_bytes(), b"setup-arm64")
+            with zipfile.ZipFile(out_dir / "tailcat-box-windows-arm64-v0.4.0.zip") as zf:
+                self.assertEqual(zf.namelist(), ["tailcat-box.exe"])
+
+    def test_missing_portable_exe_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            (bin_dir / "tailcat-box-amd64-installer.exe").write_bytes(b"setup-amd64")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--version",
+                    "v0.4.0",
+                    "--os-slug",
+                    "windows",
+                    "--arch",
+                    "amd64",
+                    "--bin-dir",
+                    str(bin_dir),
+                    "--out-dir",
+                    str(root / "out"),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("portable", result.stderr + result.stdout)
+            self.assertEqual(list((root / "out").glob("*")), [])
 
     def test_missing_installer_fails(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

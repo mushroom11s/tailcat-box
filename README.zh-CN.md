@@ -156,14 +156,16 @@ go test -tags=integration ./internal/adapter/ -v -count=1
 
 ## 发布
 
-推送 `v*` 标签后，GitHub Actions 会构建未签名的安装包，并附到 GitHub Release 上。下载后直接打开：
+推送 `v*` 标签后，GitHub Actions 会构建未签名的安装包，以及 Windows 便携压缩包，并附到 GitHub Release 上。下载后直接打开：
 
 | 文件 | 怎么安装 |
 | --- | --- |
 | `tailcat-box-macos-arm64-vX.Y.Z.dmg` | Apple Silicon。打开磁盘映像，把 Tailcat Box 拖进「应用程序」。 |
 | `tailcat-box-macos-amd64-vX.Y.Z.dmg` | Intel Mac。同样是拖进「应用程序」的磁盘映像。 |
-| `tailcat-box-windows-amd64-vX.Y.Z.exe` | Windows x64 的 NSIS 安装程序。运行它。 |
-| `tailcat-box-windows-arm64-vX.Y.Z.exe` | Windows ARM64 的 NSIS 安装程序。运行它。 |
+| `tailcat-box-windows-amd64-installer-vX.Y.Z.exe` | Windows x64 的 NSIS 安装程序。运行它。文件名里有 `installer`。 |
+| `tailcat-box-windows-arm64-installer-vX.Y.Z.exe` | Windows ARM64 的 NSIS 安装程序。运行它。文件名里有 `installer`。 |
+| `tailcat-box-windows-amd64-vX.Y.Z.zip` | Windows x64 便携包。解压后运行 `tailcat-box.exe`，不用安装。 |
+| `tailcat-box-windows-arm64-vX.Y.Z.zip` | Windows ARM64 便携包。解压后运行 `tailcat-box.exe`，不用安装。 |
 
 文件名里的版本就是 git 标签，带前导 `v`。这些构建没有签名，所以 Gatekeeper 和 SmartScreen 会提示。macOS：系统设置 → 隐私与安全性 → 仍要打开，或右键 → 打开。Windows：更多信息 → 仍要运行。该标签的说明写在 `docs/releases/`。
 
