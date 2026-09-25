@@ -216,35 +216,10 @@ function ShareCard({
             <button className="btn btn-ghost" type="button" onClick={() => void copyText(share.payload)}>
               {t("miaoCopyCode")}
             </button>
-            <button
-              className="btn btn-ghost"
-              type="button"
-              disabled={!qrSrc}
-              onClick={() => {
-                if (!qrSrc) {
-                  return;
-                }
-                setCopyNote("");
-                setCopyError("");
-                void copyQrImage(qrSrc)
-                  .then(() => {
-                    setCopyNote(t("qrCopied"));
-                    note(t("qrCopied"));
-                  })
-                  .catch(() => {
-                    setCopyError(t("qrCopyFailed"));
-                    push(t("qrCopyFailed"));
-                  });
-              }}
-            >
-              {t("qrCopyImage")}
-            </button>
             <button className="btn btn-danger" type="button" onClick={() => onEnd(share.id)}>
               {t("miaoEnd")}
             </button>
           </div>
-          {copyNote ? <p className="chat-quiet" role="status">{copyNote}</p> : null}
-          {copyError ? <p className="err" role="alert">{copyError}</p> : null}
         </div>
         <div className="miao-qr">
           {qrFailed ? <p className="err">{t("qrEncodeFailed")}</p> : null}
@@ -253,6 +228,29 @@ function ShareCard({
           ) : (
             <LoadingCat size="lg" layout="block" label={t("miaoPacking")} />
           )}
+          {qrSrc ? (
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={() => {
+              setCopyNote("");
+              setCopyError("");
+              void copyQrImage(qrSrc)
+                .then(() => {
+                  setCopyNote(t("qrCopied"));
+                  note(t("qrCopied"));
+                })
+                .catch(() => {
+                  setCopyError(t("qrCopyFailed"));
+                  push(t("qrCopyFailed"));
+                });
+            }}
+          >
+            {t("copy")}
+          </button>
+          ) : null}
+          {copyNote ? <p className="chat-quiet" role="status">{copyNote}</p> : null}
+          {copyError ? <p className="err" role="alert">{copyError}</p> : null}
         </div>
       </div>
     </article>

@@ -413,7 +413,6 @@ export const en = {
   qrInvalid: "That QR code is not a Tailcat address.",
   qrScanning: "Point the camera at a QR code.",
   qrEncodeFailed: "Could not build a QR code.",
-  qrCopyImage: "Copy QR code",
   qrCopied: "QR code copied.",
   qrCopyFailed: "Could not copy the QR code.",
   qrClose: "Close",

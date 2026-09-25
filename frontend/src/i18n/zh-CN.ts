@@ -411,7 +411,6 @@ export const zhCN = {
   qrInvalid: "这个二维码不是 Tailcat 地址。",
   qrScanning: "把二维码对准摄像头。",
   qrEncodeFailed: "没能生成二维码。",
-  qrCopyImage: "复制二维码",
   qrCopied: "二维码已复制。",
   qrCopyFailed: "没能复制二维码。",
   qrClose: "关闭",

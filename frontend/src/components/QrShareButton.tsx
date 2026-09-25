@@ -95,20 +95,22 @@ export default function QrShareButton({ value, disabled = false, centerMark }: P
       {open ? (
         <QrDialog titleId="qr-share-title" title={t("qrTitle")} onClose={() => setOpen(false)}>
           {failed ? <p className="err">{t("qrEncodeFailed")}</p> : null}
-          {src ? (
-            <div className="qr-modal-figure">
-              <img src={src} alt={text} width={240} height={240} />
-            </div>
-          ) : null}
+          <div className="qr-shot">
+            {src ? (
+              <div className="qr-modal-figure">
+                <img src={src} alt={text} width={240} height={240} />
+              </div>
+            ) : null}
+            <button className="btn btn-ghost" type="button" disabled={!src} onClick={() => void copyImage()}>
+              {t("copy")}
+            </button>
+          </div>
           <code className="qr-payload">{text}</code>
           {copyNote ? <p className="chat-quiet" role="status">{copyNote}</p> : null}
           {copyError ? <p className="err" role="alert">{copyError}</p> : null}
           <div className="row">
             <button className="btn btn-ghost" type="button" onClick={() => void copyText(text)}>
-              {t("copy")}
-            </button>
-            <button className="btn btn-ghost" type="button" disabled={!src} onClick={() => void copyImage()}>
-              {t("qrCopyImage")}
+              {t("tunnelCopyAddress")}
             </button>
             <button className="btn" type="button" onClick={() => setOpen(false)}>
               {t("qrClose")}

@@ -55,12 +55,14 @@ describe("qr share and scan", () => {
     await waitFor(() => {
       expect(within(dialog).getByRole("img", { name: payload }).getAttribute("src")?.startsWith("data:image/png")).toBe(true);
     });
-    await user.click(within(dialog).getByRole("button", { name: "Copy" }));
+    const copyImage = within(dialog).getByRole("button", { name: "Copy" });
+    expect(copyImage.closest(".qr-shot")?.querySelector("img")).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Copy address" }));
     expect(writeText).toHaveBeenCalledWith(payload);
 
     const write = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText, write }, configurable: true });
-    await user.click(within(dialog).getByRole("button", { name: "Copy QR code" }));
+    await user.click(copyImage);
     await waitFor(() => {
       expect(write).toHaveBeenCalledTimes(1);
     });
