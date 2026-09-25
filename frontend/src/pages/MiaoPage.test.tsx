@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { Component, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "../components/toasts";
 import { LocaleProvider } from "../i18n";
 import { encodeJoin, MAX_SHARE_BYTES, parseJoin } from "../lib/miao";
 import { decodeQrFromFile } from "../lib/qrImage";
@@ -68,7 +69,9 @@ function renderPage() {
   return render(
     <PageBoundary>
       <LocaleProvider>
-        <MiaoPage />
+        <ToastProvider>
+          <MiaoPage />
+        </ToastProvider>
       </LocaleProvider>
     </PageBoundary>,
   );
@@ -192,7 +195,8 @@ describe("Mew Share page", () => {
     const blob = await copied[0].getType("image/png");
     expect(blob.type).toBe("image/png");
     expect(blob.size).toBeGreaterThan(8);
-    expect(screen.getByText("QR code copied.")).toBeTruthy();
+    expect(screen.getAllByText("QR code copied.")).toHaveLength(1);
+    expect(document.querySelector(".toast-ok")).toBeNull();
     expect(screen.getByRole("button", { name: "Copy code" })).toBeTruthy();
   });
 

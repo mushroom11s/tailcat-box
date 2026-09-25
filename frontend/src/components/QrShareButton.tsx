@@ -32,7 +32,7 @@ async function copyText(text: string): Promise<void> {
 
 export default function QrShareButton({ value, disabled = false, centerMark }: Props) {
   const { t } = useI18n();
-  const { push, note } = useToasts();
+  const { push } = useToasts();
   const text = value.trim();
   const [open, setOpen] = useState(false);
   const [src, setSrc] = useState("");
@@ -72,7 +72,6 @@ export default function QrShareButton({ value, disabled = false, centerMark }: P
     try {
       await copyQrImage(src);
       setCopyNote(t("qrCopied"));
-      note(t("qrCopied"));
     } catch {
       setCopyError(t("qrCopyFailed"));
       push(t("qrCopyFailed"));
