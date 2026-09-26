@@ -469,7 +469,7 @@ export const zhCN = {
   miaoPathCaption: "当前到对方的路径",
   miaoPathChecking: "探测中",
   miaoPathDirect: "直连",
-  miaoPathDERP: "经中继 (DERP)",
+  miaoPathDERP: "中继",
   miaoStatusConnecting: "正在连接…",
   miaoStatusQueued: "排队中",
   miaoStatusDownloading: "正在下载…",

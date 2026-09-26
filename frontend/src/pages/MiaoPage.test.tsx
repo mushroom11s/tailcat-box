@@ -310,7 +310,7 @@ describe("Mew Share page", () => {
         expect(seen.has("Direct")).toBe(true);
       });
       expect(seen.has("Checking")).toBe(true);
-      expect(seen.has("Via DERP")).toBe(true);
+      expect(seen.has("Relay (DERP)")).toBe(true);
       expect(screen.getByText("Connecting…")).toBeTruthy();
       expect(screen.getByText("Direct")).toBeTruthy();
       await user.click(screen.getByRole("tab", { name: "Share" }));
@@ -356,7 +356,8 @@ describe("Mew Share page", () => {
         expect(seen.has("直连")).toBe(true);
       });
       expect(seen.has("探测中")).toBe(true);
-      expect(seen.has("经中继 (DERP)")).toBe(true);
+      expect(seen.has("中继")).toBe(true);
+      expect([...seen].some((label) => label.includes("DERP"))).toBe(false);
     } finally {
       observer.disconnect();
       setBrowserReceiveHold(false);

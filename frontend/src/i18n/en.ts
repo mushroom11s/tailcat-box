@@ -471,7 +471,7 @@ export const en = {
   miaoPathCaption: "Current path to peer",
   miaoPathChecking: "Checking",
   miaoPathDirect: "Direct",
-  miaoPathDERP: "Via DERP",
+  miaoPathDERP: "Relay (DERP)",
   miaoStatusConnecting: "Connecting…",
   miaoStatusQueued: "Queued",
   miaoStatusDownloading: "Downloading…",
