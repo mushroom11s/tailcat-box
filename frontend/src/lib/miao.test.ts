@@ -13,6 +13,7 @@ import {
   parseReceiveJob,
   parseShare,
   receivePercent,
+  pathAsideText,
   pathPrivacyText,
   relayAttributionText,
   remainingTTL,
@@ -297,6 +298,12 @@ describe("miao share helpers", () => {
     expect(pathPrivacyText("zh-CN", "direct")).toBe("直连传输，内容端到端加密");
     expect(pathPrivacyText("en", "direct")).toBe("Direct. Contents are end-to-end encrypted.");
     expect(pathPrivacyText("zh-CN", "checking")).toBe("");
+    expect(pathAsideText("zh-CN", "derp", "public", "tok")).toBe("Tailcat 官方中继 · 东京 · 端到端加密");
+    expect(pathAsideText("en", "derp", "public", "tok")).toBe("Tailcat official relay · Tokyo · End-to-end encrypted");
+    expect(pathAsideText("zh-CN", "derp", "custom", "derp.example.com")).toBe("自建中继 · derp.example.com · 端到端加密");
+    expect(pathAsideText("en", "direct")).toBe("End-to-end encrypted");
+    expect(pathAsideText("zh-CN", "direct")).toBe("端到端加密");
+    expect(pathAsideText("en", "checking")).toBe("");
     for (const line of [
       relayAttributionText("en", "public", "tok"),
       relayAttributionText("zh-CN", "public", ""),

@@ -479,6 +479,7 @@ export const en = {
   miaoPathOfficialEncrypted: "Forwarded via the official relay. Contents are end-to-end encrypted.",
   miaoPathCustomEncrypted: "Forwarded via a self-hosted relay. Contents are end-to-end encrypted.",
   miaoPathDirectEncrypted: "Direct. Contents are end-to-end encrypted.",
+  miaoPathEncryptedShort: "End-to-end encrypted",
   miaoStatusConnecting: "Connecting…",
   miaoStatusQueued: "Queued",
   miaoStatusDownloading: "Downloading…",

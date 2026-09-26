@@ -196,6 +196,14 @@ export function pathPrivacyText(locale: Locale, kind: TailcatPath, source?: stri
   return translate(locale, "miaoPathOfficialEncrypted");
 }
 
+export function pathAsideText(locale: Locale, kind: TailcatPath, source?: string, name?: string): string {
+  if (kind === "checking") {
+    return "";
+  }
+  const owner = kind === "derp" ? relayAttributionText(locale, source, name) : "";
+  return [owner, translate(locale, "miaoPathEncryptedShort")].filter(Boolean).join(" · ");
+}
+
 export function tailcatPathKey(path: TailcatPath): "miaoPathChecking" | "miaoPathDirect" | "miaoPathDERP" {
   switch (path) {
     case "direct":

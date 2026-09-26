@@ -477,6 +477,7 @@ export const zhCN = {
   miaoPathOfficialEncrypted: "经官方中继转发，内容端到端加密",
   miaoPathCustomEncrypted: "经自建中继转发，内容端到端加密",
   miaoPathDirectEncrypted: "直连传输，内容端到端加密",
+  miaoPathEncryptedShort: "端到端加密",
   miaoStatusConnecting: "正在连接…",
   miaoStatusQueued: "排队中",
   miaoStatusDownloading: "正在下载…",
