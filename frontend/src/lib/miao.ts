@@ -29,6 +29,7 @@ export type MiaoShare = {
   listening?: boolean;
   byRef?: boolean;
   warning?: string;
+  peerPath?: TailcatPath;
 };
 
 export type MiaoSavedFile = {
@@ -57,6 +58,7 @@ export type ReceiveJob = {
   payload?: string;
   resumable?: boolean;
   expiresAt?: string;
+  peerPath?: TailcatPath;
 };
 
 const RECEIVE_RANK: Record<ReceiveStatus, number> = {
@@ -68,6 +70,23 @@ const RECEIVE_RANK: Record<ReceiveStatus, number> = {
   cancelled: 3,
   interrupted: 3,
 };
+
+export type TailcatPath = "checking" | "direct" | "derp";
+
+export function isTailcatPath(value: unknown): value is TailcatPath {
+  return value === "checking" || value === "direct" || value === "derp";
+}
+
+export function tailcatPathKey(path: TailcatPath): "miaoPathChecking" | "miaoPathDirect" | "miaoPathDERP" {
+  switch (path) {
+    case "direct":
+      return "miaoPathDirect";
+    case "derp":
+      return "miaoPathDERP";
+    default:
+      return "miaoPathChecking";
+  }
+}
 
 export function isReceiveStatus(value: unknown): value is ReceiveStatus {
   return value === "connecting" || value === "queued" || value === "downloading" || value === "done" || value === "failed" || value === "cancelled" || value === "interrupted";
@@ -118,6 +137,7 @@ export function parseReceiveJob(raw: unknown): ReceiveJob | null {
     payload: readString(value, "payload", "Payload"),
     resumable: typeof resumable === "boolean" ? resumable : undefined,
     expiresAt: readString(value, "expiresAt", "ExpiresAt") || undefined,
+    peerPath: asPeerPath(readField(value, "peerPath", "PeerPath")),
   };
 }
 
@@ -151,6 +171,7 @@ export function parseShare(raw: unknown): MiaoShare | null {
     listening: typeof listening === "boolean" ? listening : undefined,
     byRef: byRef === true ? true : undefined,
     warning: warning || undefined,
+    peerPath: asPeerPath(readField(value, "peerPath", "PeerPath")),
   };
 }
 
@@ -174,9 +195,13 @@ export function upsertReceiveJob(list: ReceiveJob[], job: ReceiveJob): ReceiveJo
   }
   const bytesDone = incoming.status === prev.status ? Math.max(prev.bytesDone, incoming.bytesDone) : incoming.bytesDone;
   const next = list.slice();
+  const peerPath = restarting
+    ? incoming.peerPath
+    : incoming.peerPath ?? prev.peerPath;
   next[index] = {
     ...prev,
     ...incoming,
+    peerPath,
     bytesDone,
     bytesTotal: incoming.bytesTotal > 0 ? incoming.bytesTotal : prev.bytesTotal,
     files: (incoming.files?.length ? incoming.files : prev.files) ?? [],
@@ -188,6 +213,10 @@ export function upsertReceiveJob(list: ReceiveJob[], job: ReceiveJob): ReceiveJo
     error: incoming.status === "done" || incoming.status === "cancelled" ? "" : incoming.error || prev.error,
   };
   return next;
+}
+
+function asPeerPath(value: unknown): TailcatPath | undefined {
+  return isTailcatPath(value) ? value : undefined;
 }
 
 function asCount(value: unknown): number {

@@ -84,6 +84,66 @@ func (r *fakeRoom) Events() <-chan ChatEvent {
 	return r.events
 }
 
+func (r *fakeRoom) WatchPeerPath(ctx context.Context, peer string) <-chan PeerPath {
+	ch := make(chan PeerPath, 4)
+	go func() {
+		defer close(ch)
+		send := func(p PeerPath) bool {
+			select {
+			case <-ctx.Done():
+				return false
+			case ch <- p:
+				return true
+			}
+		}
+		if !send(PeerPath{Kind: PathChecking}) {
+			return
+		}
+		_ = peer
+		r.owner.mu.Lock()
+		hold := r.owner.pathHold
+		r.owner.mu.Unlock()
+		if hold != nil {
+			select {
+			case <-ctx.Done():
+				return
+			case <-hold:
+			}
+		}
+		steps := []PeerPath{
+			{Kind: PathDERP, Detail: "nyc"},
+			{Kind: PathDirect, Detail: "direct"},
+		}
+		for _, step := range steps {
+			if !send(step) {
+				return
+			}
+		}
+		<-ctx.Done()
+	}()
+	return ch
+}
+
+func (f *Fake) HoldPathProbe() func() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.pathHold == nil {
+		f.pathHold = make(chan struct{})
+	}
+	hold := f.pathHold
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if f.pathHold == hold {
+				close(f.pathHold)
+				f.pathHold = nil
+			}
+		})
+	}
+}
+
 func (r *fakeRoom) SetPeer(addr string) error {
 	r.owner.mu.Lock()
 	defer r.owner.mu.Unlock()

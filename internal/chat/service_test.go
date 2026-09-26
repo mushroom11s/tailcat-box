@@ -293,7 +293,16 @@ func (r *memRoom) Events() <-chan adapter.ChatEvent {
 	return r.events
 }
 func (r *memRoom) SetPeer(addr string) error { r.peer = addr; return nil }
-func (r *memRoom) Close() error              { return nil }
+func (r *memRoom) WatchPeerPath(ctx context.Context, peer string) <-chan adapter.PeerPath {
+	_ = peer
+	ch := make(chan adapter.PeerPath)
+	go func() {
+		defer close(ch)
+		<-ctx.Done()
+	}()
+	return ch
+}
+func (r *memRoom) Close() error { return nil }
 func (r *memRoom) SendEnvelope(ctx context.Context, port uint16, frame []byte) error {
 	if r.peer == "tc:not-a-real-peer" {
 		return fmt.Errorf("dial failed")

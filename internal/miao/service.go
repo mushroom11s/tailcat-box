@@ -100,6 +100,9 @@ type Snapshot struct {
 	Listening    bool       `json:"listening"`
 	ByRef        bool       `json:"byRef,omitempty"`
 	Warning      string     `json:"warning,omitempty"`
+	// PeerPath is the current session path to the peer while a send is in progress.
+	// It is checking, direct, or derp. Empty means no send is being probed.
+	PeerPath string `json:"peerPath,omitempty"`
 }
 
 // FileInfo is a display row. It does not include the storage path.
@@ -136,6 +139,9 @@ type ReceiveJob struct {
 	Payload    string      `json:"payload,omitempty"`
 	Resumable  bool        `json:"resumable,omitempty"`
 	ExpiresAt  string      `json:"expiresAt,omitempty"`
+	// PeerPath is the current session path to the host: checking, direct, or derp.
+	// It describes the path to the peer, not which path carried each byte.
+	PeerPath string `json:"peerPath,omitempty"`
 }
 
 // Service hosts any number of shares at once and can also join someone else's share.
@@ -437,6 +443,7 @@ func (s *Service) restartReceive(parent context.Context, run *receiveRun, raw, d
 	run.writing = false
 	run.job.Status = receiveConnecting
 	run.job.Error = ""
+	run.job.PeerPath = ""
 	run.job.Payload = strings.TrimSpace(raw)
 	run.job.Dest = dest
 	run.mu.Unlock()
@@ -857,6 +864,14 @@ func (s *Service) join(ctx context.Context, run *receiveRun, gen int, raw, dest 
 	}
 	go receivePackage(ctx, room, dest, destFn, ready, done, progress, partial, s.root)
 
+	pathCtx, stopPath := context.WithCancel(ctx)
+	defer stopPath()
+	if run != nil {
+		watchPeerPath(pathCtx, room, payload.Addr, func(kind string) {
+			s.noteReceivePath(run, gen, kind)
+		})
+	}
+
 	var local string
 	select {
 	case local = <-ready:
@@ -955,6 +970,9 @@ type host struct {
 	stopLife  context.CancelFunc
 	mu        sync.Mutex
 	sendMu    sync.Mutex
+	pathMu    sync.Mutex
+	path      string
+	sendGen   int
 	ended     bool
 	reason    string
 	sending   bool
@@ -1068,15 +1086,23 @@ func (h *host) handlePull(token, reply string, resume map[string]int64) {
 }
 
 func (h *host) finishSend() {
+	h.pathMu.Lock()
 	h.mu.Lock()
 	h.sending = false
+	h.sendGen++
+	h.path = ""
 	queued := h.queued
 	token, reply := h.qToken, h.qReply
 	resume := h.qResume
 	h.queued = false
 	h.qResume = nil
 	ended := h.ended
+	snap := h.snapshotLocked()
 	h.mu.Unlock()
+	if !ended {
+		h.publish(snap)
+	}
+	h.pathMu.Unlock()
 	if queued && !ended {
 		go h.handlePull(token, reply, resume)
 	}
@@ -1138,6 +1164,20 @@ func (h *host) sendPackage(reply string, files []StagedFile, resume map[string]i
 	defer func() {
 		callTransferHook("sent")
 	}()
+	h.mu.Lock()
+	room := h.room
+	h.sendGen++
+	gen := h.sendGen
+	base := h.ctx
+	h.mu.Unlock()
+	if base == nil {
+		base = context.Background()
+	}
+	pathCtx, stopPath := context.WithCancel(base)
+	defer stopPath()
+	watchPeerPath(pathCtx, room, reply, func(kind string) {
+		h.notePath(gen, kind)
+	})
 	if originBacked(files) {
 		checked, err := recheckOrigins(files)
 		if err != nil {
@@ -1309,6 +1349,7 @@ func (h *host) snapshotLocked() Snapshot {
 		Listening:    h.room != nil && h.address != "",
 		ByRef:        h.byRef,
 		Warning:      h.warning,
+		PeerPath:     h.path,
 	}
 }
 

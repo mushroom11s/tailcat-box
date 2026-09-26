@@ -32,6 +32,11 @@ type Room interface {
 	SetPeer(addr string) error
 	SendEnvelope(ctx context.Context, port uint16, frame []byte) error
 	Events() <-chan ChatEvent
+	// WatchPeerPath reports the session path to peer until ctx ends.
+	// It returns immediately. The first value is checking, before any probe.
+	// Later values are derp or direct, including an upgrade from derp to direct.
+	// This is the current path to the peer, not a per-byte guarantee.
+	WatchPeerPath(ctx context.Context, peer string) <-chan PeerPath
 	Close() error
 }
 

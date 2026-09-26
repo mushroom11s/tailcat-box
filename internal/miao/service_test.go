@@ -595,6 +595,128 @@ func waitArmed(t *testing.T, hit <-chan struct{}, stage string) {
 	}
 }
 
+func TestTransferDoesNotWaitForDirectPath(t *testing.T) {
+	root := t.TempDir()
+	fake := adapter.NewFake()
+	release := fake.HoldPathProbe()
+	t.Cleanup(release)
+	svc := New(fake, root)
+	snap, err := svc.Start([]Source{{Name: "note.txt", Data: []byte("hello")}}, Limits{MaxDownloads: 1}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := svc.Join(context.Background(), snap.Payload, t.TempDir(), adapter.NetworkOpts{})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("download waited for a direct path")
+	}
+}
+
+func TestPathUpgradesDuringTransfer(t *testing.T) {
+	root := t.TempDir()
+	fake := adapter.NewFake()
+	svc := New(fake, root)
+	events := collectEvents(t, svc)
+	payload := bytes.Repeat([]byte("a"), chunkSize+8)
+	snap, err := svc.Start([]Source{{Name: "big.bin", Data: payload}}, Limits{MaxDownloads: 2}, adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := hookTransfer(t, "chunk")
+	job, err := svc.StartReceive(context.Background(), snap.Payload, t.TempDir(), adapter.NetworkOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	var partial, shareDirect bool
+	deadline := time.After(3 * time.Second)
+	for !partial || !shareDirect || strings.Join(got, ",") != "checking,derp,direct" {
+		select {
+		case ev := <-events.receive:
+			if ev.ID != job.ID {
+				continue
+			}
+			if ev.PeerPath != "" && (len(got) == 0 || got[len(got)-1] != ev.PeerPath) {
+				got = append(got, ev.PeerPath)
+			}
+			if ev.Status == receiveDownloading && ev.PeerPath == adapter.PathDirect && ev.BytesDone > 0 && ev.BytesDone < int64(len(payload)) {
+				partial = true
+			}
+		case share := <-events.share:
+			if share.ID == snap.ID && share.Status == "active" && share.PeerPath == adapter.PathDirect {
+				shareDirect = true
+			}
+		case <-deadline:
+			t.Fatalf("paths=%v partial=%v shareDirect=%v", got, partial, shareDirect)
+		}
+	}
+	release()
+	done := waitReceive(t, events.receive, job.ID, receiveDone, nil)
+	if done.BytesDone != int64(len(payload)) {
+		t.Fatalf("done=%d", done.BytesDone)
+	}
+	cleared := waitSharePath(t, events, snap.ID, "")
+	if cleared.PeerPath != "" || cleared.Status != "active" {
+		t.Fatalf("after send path=%q status=%s", cleared.PeerPath, cleared.Status)
+	}
+}
+
+type liveEvents struct {
+	receive chan ReceiveJob
+	share   chan Snapshot
+}
+
+func collectEvents(t *testing.T, svc *Service) liveEvents {
+	t.Helper()
+	out := liveEvents{receive: make(chan ReceiveJob, 64), share: make(chan Snapshot, 64)}
+	go func() {
+		for ev := range svc.Events() {
+			switch ev.Kind {
+			case "miao-receive":
+				var job ReceiveJob
+				if json.Unmarshal([]byte(ev.Data), &job) == nil {
+					select {
+					case out.receive <- job:
+					default:
+					}
+				}
+			case "miao":
+				var snap Snapshot
+				if json.Unmarshal([]byte(ev.Data), &snap) == nil {
+					select {
+					case out.share <- snap:
+					default:
+					}
+				}
+			}
+		}
+	}()
+	return out
+}
+
+func waitSharePath(t *testing.T, events liveEvents, id, path string) Snapshot {
+	t.Helper()
+	deadline := time.After(3 * time.Second)
+	for {
+		select {
+		case snap := <-events.share:
+			if snap.ID == id && snap.PeerPath == path && snap.Status == "active" {
+				return snap
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for share %s path %q", id, path)
+		}
+	}
+}
+
 func hookTransfer(t *testing.T, stage string) func() {
 	t.Helper()
 	entered := make(chan struct{})

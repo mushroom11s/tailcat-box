@@ -21,8 +21,11 @@ import {
   miaoErrorKey,
   parseReceiveJob,
   parseShare,
+  isTailcatPath,
   receivePercent,
   receiveTerminal,
+  tailcatPathKey,
+  type TailcatPath,
   expiresSoon,
   nextRetryDelay,
   remainingTTL,
@@ -99,6 +102,22 @@ function receiveStatusLabel(status: string, t: (key: MessageKey) => string): str
     default:
       return t("miaoReceiveJob");
   }
+}
+
+function PathStatus({ kind, active }: { kind?: TailcatPath; active: boolean }) {
+  const { t } = useI18n();
+  if (!active) {
+    return null;
+  }
+  const shown = kind && isTailcatPath(kind) ? kind : "checking";
+  return (
+    <p className="miao-path">
+      <span className="miao-path-caption">{t("miaoPathCaption")}</span>
+      <span className={`miao-path-pill ${shown}`} role="status" aria-live="polite">
+        {t(tailcatPathKey(shown))}
+      </span>
+    </p>
+  );
 }
 
 function showRunningCat(status: ReceiveJob["status"]): boolean {
@@ -200,6 +219,7 @@ function ShareCard({
               {localizedMiaoError(share.warning, t)}
             </p>
           ) : null}
+          <PathStatus kind={share.peerPath} active={Boolean(share.peerPath)} />
           <p className="chat-quiet">
             {t("miaoTotal")} {formatBytes(share.total)}
           </p>
@@ -288,6 +308,7 @@ function ReceiveCard({
     <article className="glass miao-active miao-receive-card" aria-label={label}>
       <h3>{names || t("miaoFiles")}</h3>
       <p className="miao-receive-status">{status}</p>
+      <PathStatus kind={job.peerPath} active={active} />
       {files.length ? (
         <ul className="miao-files">
           {files.map((file) => (

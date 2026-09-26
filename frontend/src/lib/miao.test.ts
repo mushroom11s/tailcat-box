@@ -11,6 +11,7 @@ import {
   nextRetryDelay,
   parseJoin,
   parseReceiveJob,
+  parseShare,
   receivePercent,
   remainingTTL,
   shareTooLarge,
@@ -272,6 +273,25 @@ describe("miao share helpers", () => {
     expect(nextRetryDelay(2)).toBe(4000);
     expect(nextRetryDelay(3)).toBeNull();
     expect(miaoErrorKey(new Error("share did not start listening"))).toBe("miaoListenFailed");
+  });
+
+  it("keeps a session path and lets it upgrade without dropping bytes", () => {
+    const connecting: ReceiveJob = { id: "job", status: "connecting", bytesDone: 0, bytesTotal: 0, files: [], dest: "/tmp" };
+    const withDerp = upsertReceiveJob([connecting], { ...connecting, status: "downloading", bytesDone: 20, bytesTotal: 100, peerPath: "derp" });
+    expect(withDerp[0].peerPath).toBe("derp");
+    expect(withDerp[0].bytesDone).toBe(20);
+    const kept = upsertReceiveJob(withDerp, { ...connecting, status: "downloading", bytesDone: 40, bytesTotal: 100 });
+    expect(kept[0].peerPath).toBe("derp");
+    expect(kept[0].bytesDone).toBe(40);
+    const direct = upsertReceiveJob(kept, { ...kept[0], peerPath: "direct", bytesDone: 80 });
+    expect(direct[0].peerPath).toBe("direct");
+    const interrupted = upsertReceiveJob(direct, { ...direct[0], status: "interrupted", resumable: true });
+    const restarted = upsertReceiveJob(interrupted, { ...connecting, status: "connecting", bytesDone: 40, bytesTotal: 100 });
+    expect(restarted[0].peerPath).toBeUndefined();
+    expect(restarted[0].status).toBe("connecting");
+    expect(parseReceiveJob({ id: "job", status: "downloading", peerPath: "direct", bytesDone: 1, bytesTotal: 2 })?.peerPath).toBe("direct");
+    expect(parseShare({ id: "share", peerPath: "derp" })?.peerPath).toBe("derp");
+    expect(parseShare({ id: "share", peerPath: "wire" })?.peerPath).toBeUndefined();
   });
 });
 
