@@ -282,6 +282,126 @@ describe("Mew Share page", () => {
     expect(screen.getByText("Drop files here, or click to choose.")).toBeTruthy();
   });
 
+  it("shows the session path on the download and the share, then upgrades to direct", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const input = screen.getByLabelText("Choose files") as HTMLInputElement;
+    await user.upload(input, new File(["purr"], "path.txt", { type: "text/plain" }));
+    const code = ((await screen.findByLabelText("Share code")) as HTMLTextAreaElement).value;
+    setBrowserReceiveHold(true);
+    const seen = new Set<string>();
+    const seenDetails = new Set<string>();
+    const seenTips = new Set<string>();
+    const snap = () => {
+      const pill = document.querySelector(".miao-receive-card .miao-path-pill");
+      if (pill?.textContent) {
+        seen.add(pill.textContent);
+      }
+      const tip = pill?.getAttribute("title");
+      if (tip) {
+        seenTips.add(tip);
+      }
+      for (const detail of document.querySelectorAll(".miao-receive-card .miao-path-detail")) {
+        if (detail.textContent) {
+          seenDetails.add(detail.textContent);
+        }
+      }
+    };
+    const observer = new MutationObserver(snap);
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+    try {
+      await user.click(screen.getByRole("tab", { name: "Download" }));
+      const join = screen.getByRole("textbox", { name: "Share code" });
+      await user.click(join);
+      await user.paste(code);
+      await user.click(screen.getByRole("button", { name: "Download" }));
+      expect(await screen.findByText("Connecting…")).toBeTruthy();
+      await waitFor(() => {
+        snap();
+        expect(seen.has("Direct")).toBe(true);
+      });
+      expect(seen.has("Checking")).toBe(true);
+      expect(seen.has("Relay")).toBe(true);
+      expect(seenDetails.has("Tailcat official relay · Tokyo · End-to-end encrypted")).toBe(true);
+      expect([...seenTips].some((tip) => tip.includes("Forwarded via the official relay. Contents are end-to-end encrypted."))).toBe(true);
+      expect([...seenTips].some((tip) => tip.includes("Current path to peer"))).toBe(true);
+      expect(screen.getByText("Connecting…")).toBeTruthy();
+      expect(screen.getByText("Direct")).toBeTruthy();
+      expect(screen.getByText("End-to-end encrypted")).toBeTruthy();
+      expect(screen.queryByText("Tailcat official relay · Tokyo · End-to-end encrypted")).toBeNull();
+      await user.click(screen.getByRole("tab", { name: "Share" }));
+      const share = screen.getByRole("article", { name: "path.txt" });
+      expect(share.querySelector(".miao-path-pill")?.getAttribute("title") ?? "").toContain("Current path to peer");
+      expect(within(share).getByText("Direct")).toBeTruthy();
+      expect(cssBlock(css, ".miao-path-dot.direct")).toContain("var(--ok)");
+      expect(cssBlock(css, ".miao-path-dot.derp")).toContain("var(--warn)");
+      expect(cssBlock(css, ".miao-path-pill")).toContain("transparent");
+      expect(cssBlock(css, ".miao-path-pill")).not.toContain("var(--ok)");
+      expect(cssBlock(css, ".miao-path-dot")).toContain("box-shadow: none");
+      expect(cssBlock(css, ".miao-path-detail")).toContain("var(--faint)");
+      expect(cssBlock(css, ".miao-path-detail")).toContain("font-size: 12px");
+    } finally {
+      observer.disconnect();
+      resetBrowserMiao();
+      setBrowserReceiveHold(false);
+      releaseBrowserReceiveHolds();
+    }
+  });
+
+  it("shows the Chinese path labels", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("tailcat-locale", "zh-CN");
+    renderPage();
+    const input = screen.getByLabelText("选择文件") as HTMLInputElement;
+    await user.upload(input, new File(["purr"], "path.txt", { type: "text/plain" }));
+    const code = ((await screen.findByLabelText("分享口令")) as HTMLTextAreaElement).value;
+    setBrowserReceiveHold(true);
+    const seen = new Set<string>();
+    const seenDetails = new Set<string>();
+    const seenTips = new Set<string>();
+    const snap = () => {
+      const pill = document.querySelector(".miao-path-pill");
+      if (pill?.textContent) {
+        seen.add(pill.textContent);
+      }
+      const tip = pill?.getAttribute("title");
+      if (tip) {
+        seenTips.add(tip);
+      }
+      for (const detail of document.querySelectorAll(".miao-path-detail")) {
+        if (detail.textContent) {
+          seenDetails.add(detail.textContent);
+        }
+      }
+    };
+    const observer = new MutationObserver(snap);
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+    try {
+      await user.click(screen.getByRole("tab", { name: "下载" }));
+      const join = screen.getByRole("textbox", { name: "分享口令" });
+      await user.click(join);
+      await user.paste(code);
+      await user.click(screen.getByRole("button", { name: "下载" }));
+      expect(await screen.findByText("正在连接…")).toBeTruthy();
+      await waitFor(() => {
+        snap();
+        expect(seen.has("直连")).toBe(true);
+      });
+      expect(seen.has("探测中")).toBe(true);
+      expect(seen.has("中继")).toBe(true);
+      expect(seenDetails.has("Tailcat 官方中继 · 东京 · 端到端加密")).toBe(true);
+      expect([...seenTips].some((tip) => tip.includes("经官方中继转发，内容端到端加密"))).toBe(true);
+      expect([...seenTips].some((tip) => tip.includes("当前到对方的路径"))).toBe(true);
+      expect([...seen].some((label) => label.includes("DERP") || label.includes("端到端"))).toBe(false);
+      expect([...seenDetails].some((label) => label.includes("公网中继") || label.includes("DERP") || label.includes("猫砂盆"))).toBe(false);
+    } finally {
+      observer.disconnect();
+      resetBrowserMiao();
+      setBrowserReceiveHold(false);
+      releaseBrowserReceiveHolds();
+    }
+  });
+
   it("keeps the code field usable and resumes an interrupted download", async () => {
     const user = userEvent.setup();
     renderPage();

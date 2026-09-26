@@ -1,3 +1,5 @@
+import { translate, type Locale } from "../i18n/locale";
+
 export const MAX_SHARE_BYTES = 300 * 1024 * 1024;
 
 export type MiaoFileInput = {
@@ -29,6 +31,9 @@ export type MiaoShare = {
   listening?: boolean;
   byRef?: boolean;
   warning?: string;
+  peerPath?: TailcatPath;
+  relaySource?: RelaySource;
+  relayName?: string;
 };
 
 export type MiaoSavedFile = {
@@ -57,6 +62,9 @@ export type ReceiveJob = {
   payload?: string;
   resumable?: boolean;
   expiresAt?: string;
+  peerPath?: TailcatPath;
+  relaySource?: RelaySource;
+  relayName?: string;
 };
 
 const RECEIVE_RANK: Record<ReceiveStatus, number> = {
@@ -68,6 +76,144 @@ const RECEIVE_RANK: Record<ReceiveStatus, number> = {
   cancelled: 3,
   interrupted: 3,
 };
+
+export type TailcatPath = "checking" | "direct" | "derp";
+
+export type RelaySource = "public" | "custom";
+
+export function isTailcatPath(value: unknown): value is TailcatPath {
+  return value === "checking" || value === "direct" || value === "derp";
+}
+
+const RELAY_NAMES: Record<string, Record<Locale, string>> = {
+  tok: { en: "Tokyo", "zh-CN": "东京" },
+  tokyo: { en: "Tokyo", "zh-CN": "东京" },
+  nyc: { en: "New York", "zh-CN": "纽约" },
+  "new york": { en: "New York", "zh-CN": "纽约" },
+  "new york city": { en: "New York", "zh-CN": "纽约" },
+  sfo: { en: "San Francisco", "zh-CN": "旧金山" },
+  "san francisco": { en: "San Francisco", "zh-CN": "旧金山" },
+  sin: { en: "Singapore", "zh-CN": "新加坡" },
+  singapore: { en: "Singapore", "zh-CN": "新加坡" },
+  fra: { en: "Frankfurt", "zh-CN": "法兰克福" },
+  frankfurt: { en: "Frankfurt", "zh-CN": "法兰克福" },
+  lhr: { en: "London", "zh-CN": "伦敦" },
+  london: { en: "London", "zh-CN": "伦敦" },
+  sea: { en: "Seattle", "zh-CN": "西雅图" },
+  seattle: { en: "Seattle", "zh-CN": "西雅图" },
+  hkg: { en: "Hong Kong", "zh-CN": "香港" },
+  "hong kong": { en: "Hong Kong", "zh-CN": "香港" },
+  syd: { en: "Sydney", "zh-CN": "悉尼" },
+  sydney: { en: "Sydney", "zh-CN": "悉尼" },
+  par: { en: "Paris", "zh-CN": "巴黎" },
+  paris: { en: "Paris", "zh-CN": "巴黎" },
+  ams: { en: "Amsterdam", "zh-CN": "阿姆斯特丹" },
+  amsterdam: { en: "Amsterdam", "zh-CN": "阿姆斯特丹" },
+  ord: { en: "Chicago", "zh-CN": "芝加哥" },
+  chicago: { en: "Chicago", "zh-CN": "芝加哥" },
+  dfw: { en: "Dallas", "zh-CN": "达拉斯" },
+  dallas: { en: "Dallas", "zh-CN": "达拉斯" },
+  lax: { en: "Los Angeles", "zh-CN": "洛杉矶" },
+  "los angeles": { en: "Los Angeles", "zh-CN": "洛杉矶" },
+  tor: { en: "Toronto", "zh-CN": "多伦多" },
+  toronto: { en: "Toronto", "zh-CN": "多伦多" },
+  sao: { en: "São Paulo", "zh-CN": "圣保罗" },
+  "sao paulo": { en: "São Paulo", "zh-CN": "圣保罗" },
+  "são paulo": { en: "São Paulo", "zh-CN": "圣保罗" },
+  blr: { en: "Bangalore", "zh-CN": "班加罗尔" },
+  bangalore: { en: "Bangalore", "zh-CN": "班加罗尔" },
+  bengaluru: { en: "Bangalore", "zh-CN": "班加罗尔" },
+  hel: { en: "Helsinki", "zh-CN": "赫尔辛基" },
+  helsinki: { en: "Helsinki", "zh-CN": "赫尔辛基" },
+  waw: { en: "Warsaw", "zh-CN": "华沙" },
+  warsaw: { en: "Warsaw", "zh-CN": "华沙" },
+  mad: { en: "Madrid", "zh-CN": "马德里" },
+  madrid: { en: "Madrid", "zh-CN": "马德里" },
+  nue: { en: "Nuremberg", "zh-CN": "纽伦堡" },
+  nuremberg: { en: "Nuremberg", "zh-CN": "纽伦堡" },
+  den: { en: "Denver", "zh-CN": "丹佛" },
+  denver: { en: "Denver", "zh-CN": "丹佛" },
+  mia: { en: "Miami", "zh-CN": "迈阿密" },
+  miami: { en: "Miami", "zh-CN": "迈阿密" },
+  iad: { en: "Ashburn", "zh-CN": "阿什本" },
+  ashburn: { en: "Ashburn", "zh-CN": "阿什本" },
+  hnl: { en: "Honolulu", "zh-CN": "火奴鲁鲁" },
+  honolulu: { en: "Honolulu", "zh-CN": "火奴鲁鲁" },
+  jnb: { en: "Johannesburg", "zh-CN": "约翰内斯堡" },
+  johannesburg: { en: "Johannesburg", "zh-CN": "约翰内斯堡" },
+  dxb: { en: "Dubai", "zh-CN": "迪拜" },
+  dubai: { en: "Dubai", "zh-CN": "迪拜" },
+};
+
+function isOpaqueRelayLabel(value: string): boolean {
+  if (/^\d+$/.test(value)) {
+    return true;
+  }
+  if (value.includes("://") || value.includes(":")) {
+    return true;
+  }
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(value);
+}
+
+function displayRelayName(locale: Locale, raw: string | undefined, source: string | undefined): string {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed || isOpaqueRelayLabel(trimmed)) {
+    return "";
+  }
+  const key = trimmed.toLowerCase();
+  const known = RELAY_NAMES[key];
+  // A 2–4 letter code on a self-hosted map is that map's own code, not a Tailscale city.
+  if (known && (source !== "custom" || key.length > 4)) {
+    return known[locale];
+  }
+  return trimmed;
+}
+
+export function relayAttributionText(locale: Locale, source: string | undefined, name: string | undefined): string {
+  const label = displayRelayName(locale, name, source);
+  if (source === "custom") {
+    if (!label) {
+      return translate(locale, "miaoPathRelayCustomBare");
+    }
+    return translate(locale, "miaoPathRelayCustom").replaceAll("{name}", label);
+  }
+  if (label) {
+    return translate(locale, "miaoPathRelayOfficialNamed").replaceAll("{name}", label);
+  }
+  return translate(locale, "miaoPathRelayOfficial");
+}
+
+export function pathPrivacyText(locale: Locale, kind: TailcatPath, source?: string): string {
+  if (kind === "direct") {
+    return translate(locale, "miaoPathDirectEncrypted");
+  }
+  if (kind !== "derp") {
+    return "";
+  }
+  if (source === "custom") {
+    return translate(locale, "miaoPathCustomEncrypted");
+  }
+  return translate(locale, "miaoPathOfficialEncrypted");
+}
+
+export function pathAsideText(locale: Locale, kind: TailcatPath, source?: string, name?: string): string {
+  if (kind === "checking") {
+    return "";
+  }
+  const owner = kind === "derp" ? relayAttributionText(locale, source, name) : "";
+  return [owner, translate(locale, "miaoPathEncryptedShort")].filter(Boolean).join(" · ");
+}
+
+export function tailcatPathKey(path: TailcatPath): "miaoPathChecking" | "miaoPathDirect" | "miaoPathDERP" {
+  switch (path) {
+    case "direct":
+      return "miaoPathDirect";
+    case "derp":
+      return "miaoPathDERP";
+    default:
+      return "miaoPathChecking";
+  }
+}
 
 export function isReceiveStatus(value: unknown): value is ReceiveStatus {
   return value === "connecting" || value === "queued" || value === "downloading" || value === "done" || value === "failed" || value === "cancelled" || value === "interrupted";
@@ -118,6 +264,9 @@ export function parseReceiveJob(raw: unknown): ReceiveJob | null {
     payload: readString(value, "payload", "Payload"),
     resumable: typeof resumable === "boolean" ? resumable : undefined,
     expiresAt: readString(value, "expiresAt", "ExpiresAt") || undefined,
+    peerPath: asPeerPath(readField(value, "peerPath", "PeerPath")),
+    relaySource: asRelaySource(readField(value, "relaySource", "RelaySource")),
+    relayName: asRelayName(readField(value, "relayName", "RelayName")),
   };
 }
 
@@ -151,6 +300,9 @@ export function parseShare(raw: unknown): MiaoShare | null {
     listening: typeof listening === "boolean" ? listening : undefined,
     byRef: byRef === true ? true : undefined,
     warning: warning || undefined,
+    peerPath: asPeerPath(readField(value, "peerPath", "PeerPath")),
+    relaySource: asRelaySource(readField(value, "relaySource", "RelaySource")),
+    relayName: asRelayName(readField(value, "relayName", "RelayName")),
   };
 }
 
@@ -174,9 +326,18 @@ export function upsertReceiveJob(list: ReceiveJob[], job: ReceiveJob): ReceiveJo
   }
   const bytesDone = incoming.status === prev.status ? Math.max(prev.bytesDone, incoming.bytesDone) : incoming.bytesDone;
   const next = list.slice();
+  const peerPath = restarting
+    ? incoming.peerPath
+    : incoming.peerPath ?? prev.peerPath;
+  const keepRelay = !restarting && incoming.peerPath === undefined;
+  const relaySource = keepRelay ? prev.relaySource : incoming.relaySource;
+  const relayName = keepRelay ? prev.relayName : incoming.relayName;
   next[index] = {
     ...prev,
     ...incoming,
+    peerPath,
+    relaySource,
+    relayName,
     bytesDone,
     bytesTotal: incoming.bytesTotal > 0 ? incoming.bytesTotal : prev.bytesTotal,
     files: (incoming.files?.length ? incoming.files : prev.files) ?? [],
@@ -188,6 +349,22 @@ export function upsertReceiveJob(list: ReceiveJob[], job: ReceiveJob): ReceiveJo
     error: incoming.status === "done" || incoming.status === "cancelled" ? "" : incoming.error || prev.error,
   };
   return next;
+}
+
+function asPeerPath(value: unknown): TailcatPath | undefined {
+  return isTailcatPath(value) ? value : undefined;
+}
+
+function asRelaySource(value: unknown): RelaySource | undefined {
+  return value === "public" || value === "custom" ? value : undefined;
+}
+
+function asRelayName(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed || undefined;
 }
 
 function asCount(value: unknown): number {

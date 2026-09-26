@@ -2,11 +2,13 @@ import {
   encodeJoin,
   fileToBase64,
   parseJoin,
+  receiveTerminal,
   shareTooLarge,
   type MiaoFileInput,
   type MiaoReceipt,
   type MiaoShare,
   type ReceiveJob,
+  type TailcatPath,
 } from "./miao";
 
 function base64Bytes(data: string): number {
@@ -52,6 +54,8 @@ type SavedPartial = {
 
 const partials = new Map<string, SavedPartial>();
 const runTokens = new Map<string, number>();
+const pathTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
+const pathWatchGen = new Map<string, number>();
 
 function partialKey(addr: string, token: string, dest: string): string {
   return `${addr}\n${token}\n${dest}`;
@@ -107,6 +111,9 @@ function publicSnap(share: Stored, status = share.status, endReason = share.endR
     status,
     endReason,
     listening: Boolean(share.payload),
+    peerPath: share.peerPath,
+    relaySource: share.relaySource,
+    relayName: share.relayName,
   };
 }
 
@@ -194,6 +201,8 @@ export function resetBrowserMiao(): void {
   receiveLanes.clear();
   partials.clear();
   runTokens.clear();
+  clearPathTimers();
+  pathWatchGen.clear();
 }
 
 export async function browserStartMiao(files: MiaoFileInput[], ttlDays: number, forever: boolean, maxDownloads: number): Promise<MiaoShare> {
@@ -348,7 +357,77 @@ export function browserStartReceive(raw: string, dest: string): ReceiveJob {
   return job;
 }
 
+function clearPathTimers(jobID?: string): void {
+  const ids = jobID ? [jobID] : [...pathTimers.keys()];
+  for (const id of ids) {
+    for (const timer of pathTimers.get(id) ?? []) {
+      clearTimeout(timer);
+    }
+    pathTimers.delete(id);
+  }
+}
+
+function pathDelays(): number[] {
+  if (import.meta.env.VITEST || import.meta.env.MODE === "test") {
+    return [0, 40, 80];
+  }
+  return [0, 700, 2800];
+}
+
+function startPathWatch(share: Stored, jobID: string): void {
+  clearPathTimers(jobID);
+  const generation = (pathWatchGen.get(jobID) ?? 0) + 1;
+  pathWatchGen.set(jobID, generation);
+  const steps: Array<{ peerPath: TailcatPath; relaySource?: "public"; relayName?: string }> = [
+    { peerPath: "checking" },
+    { peerPath: "derp", relaySource: "public", relayName: "tok" },
+    { peerPath: "direct" },
+  ];
+  const timers = pathDelays().map((delay, index) =>
+    setTimeout(() => {
+      if (pathWatchGen.get(jobID) !== generation) {
+        return;
+      }
+      const job = receiveJobs.get(jobID);
+      if (!job || receiveTerminal(job.status)) {
+        return;
+      }
+      const step = steps[index];
+      emitReceive({ ...job, peerPath: step.peerPath, relaySource: step.relaySource, relayName: step.relayName });
+      if (pathWatchGen.get(jobID) !== generation || shares.get(share.id)?.status !== "active") {
+        return;
+      }
+      share.peerPath = step.peerPath;
+      share.relaySource = step.relaySource;
+      share.relayName = step.relayName;
+      publish(share, share.status, share.endReason ?? "");
+    }, delay),
+  );
+  pathTimers.set(jobID, timers);
+}
+
+function stopPathWatch(share: Stored | undefined, jobID: string): void {
+  pathWatchGen.set(jobID, (pathWatchGen.get(jobID) ?? 0) + 1);
+  clearPathTimers(jobID);
+  if (!share?.peerPath && !share?.relayName && !share?.relaySource) {
+    return;
+  }
+  if (share) {
+    share.peerPath = undefined;
+    share.relaySource = undefined;
+    share.relayName = undefined;
+  }
+  if (share?.status === "active") {
+    publish(share, "active");
+  }
+}
+
 async function simulateReceive(generation: number, runToken: number, jobID: string, addr: string, token: string): Promise<void> {
+  const shareForPath = findByPayload(addr, token);
+  try {
+  if (shareForPath) {
+    startPathWatch(shareForPath, jobID);
+  }
   const live = () => (generation === receiveGeneration && runTokens.get(jobID) === runToken ? receiveJobs.get(jobID) : undefined);
   const current = live();
   if (!current || current.status === "cancelled" || current.status === "interrupted") {
@@ -425,6 +504,9 @@ async function simulateReceive(generation: number, runToken: number, jobID: stri
     resumable: false,
     error: "",
   });
+  } finally {
+    stopPathWatch(shareForPath, jobID);
+  }
 }
 
 export function browserCancelReceive(jobID: string): void {
@@ -437,6 +519,7 @@ export function browserCancelReceive(jobID: string): void {
   }
   nextRun(jobID);
   const parsed = job.payload ? parseJoin(job.payload) : null;
+  stopPathWatch(parsed ? findByPayload(parsed.addr, parsed.token) : undefined, jobID);
   if (job.bytesDone > 0 && parsed) {
     rememberPartial(job, parsed.addr, parsed.token);
     emitReceive({ ...job, status: "interrupted", resumable: true, error: "" });

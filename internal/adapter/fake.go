@@ -20,6 +20,7 @@ type Fake struct {
 	captured    []CapturedFrame
 	resumeData  map[string][]byte
 	resumeDrops map[string]int
+	pathHold    chan struct{}
 }
 
 // CapturedFrame is one outbound chat frame recorded by the fake adapter.

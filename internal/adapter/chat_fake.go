@@ -46,12 +46,13 @@ func packFrame(meta map[string]any, payload []byte) ([]byte, error) {
 }
 
 type fakeRoom struct {
-	owner  *Fake
-	id     string
-	addr   string
-	peer   string
-	events chan ChatEvent
-	once   sync.Once
+	owner   *Fake
+	id      string
+	addr    string
+	peer    string
+	derpURL string
+	events  chan ChatEvent
+	once    sync.Once
 }
 
 func (f *Fake) StartRoom(ctx context.Context, opts RoomOpts) (Room, error) {
@@ -59,10 +60,11 @@ func (f *Fake) StartRoom(ctx context.Context, opts RoomOpts) (Room, error) {
 		return nil, fmt.Errorf("session id is required")
 	}
 	fr := &fakeRoom{
-		owner:  f,
-		id:     opts.SessionID,
-		addr:   fakeRoomAddress(opts.SessionID, opts.PrivateKeyJSON),
-		events: make(chan ChatEvent, 16),
+		owner:   f,
+		id:      opts.SessionID,
+		addr:    fakeRoomAddress(opts.SessionID, opts.PrivateKeyJSON),
+		derpURL: opts.DERPMapURL,
+		events:  make(chan ChatEvent, 16),
 	}
 	f.mu.Lock()
 	if f.chatRooms == nil {
@@ -82,6 +84,66 @@ func (r *fakeRoom) SessionID() string { return r.id }
 func (r *fakeRoom) Address() string   { return r.addr }
 func (r *fakeRoom) Events() <-chan ChatEvent {
 	return r.events
+}
+
+func (r *fakeRoom) WatchPeerPath(ctx context.Context, peer string) <-chan PeerPath {
+	ch := make(chan PeerPath, 4)
+	go func() {
+		defer close(ch)
+		send := func(p PeerPath) bool {
+			select {
+			case <-ctx.Done():
+				return false
+			case ch <- p:
+				return true
+			}
+		}
+		if !send(PeerPath{Kind: PathChecking}) {
+			return
+		}
+		_ = peer
+		r.owner.mu.Lock()
+		hold := r.owner.pathHold
+		r.owner.mu.Unlock()
+		if hold != nil {
+			select {
+			case <-ctx.Done():
+				return
+			case <-hold:
+			}
+		}
+		steps := []PeerPath{
+			AnnotateRelay(r.derpURL, PeerPath{Kind: PathDERP, Detail: "nyc"}, nil),
+			{Kind: PathDirect, Detail: "direct"},
+		}
+		for _, step := range steps {
+			if !send(step) {
+				return
+			}
+		}
+		<-ctx.Done()
+	}()
+	return ch
+}
+
+func (f *Fake) HoldPathProbe() func() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.pathHold == nil {
+		f.pathHold = make(chan struct{})
+	}
+	hold := f.pathHold
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if f.pathHold == hold {
+				close(f.pathHold)
+				f.pathHold = nil
+			}
+		})
+	}
 }
 
 func (r *fakeRoom) SetPeer(addr string) error {

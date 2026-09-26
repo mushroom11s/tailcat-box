@@ -11,7 +11,11 @@ import {
   nextRetryDelay,
   parseJoin,
   parseReceiveJob,
+  parseShare,
   receivePercent,
+  pathAsideText,
+  pathPrivacyText,
+  relayAttributionText,
   remainingTTL,
   shareTooLarge,
   shouldAutoRetryDownload,
@@ -272,6 +276,97 @@ describe("miao share helpers", () => {
     expect(nextRetryDelay(2)).toBe(4000);
     expect(nextRetryDelay(3)).toBeNull();
     expect(miaoErrorKey(new Error("share did not start listening"))).toBe("miaoListenFailed");
+  });
+
+  it("names the official Tailcat relay, a self-hosted relay, and end-to-end encryption", () => {
+    expect(relayAttributionText("en", "public", "tok")).toBe("Tailcat official relay · Tokyo");
+    expect(relayAttributionText("zh-CN", "public", "tok")).toBe("Tailcat 官方中继 · 东京");
+    expect(relayAttributionText("zh-CN", "public", "Tokyo")).toBe("Tailcat 官方中继 · 东京");
+    expect(relayAttributionText("en", "public", "")).toBe("Tailcat official relay");
+    expect(relayAttributionText("zh-CN", "public", "4")).toBe("Tailcat 官方中继");
+    expect(relayAttributionText("zh-CN", undefined, undefined)).toBe("Tailcat 官方中继");
+    expect(relayAttributionText("en", "custom", "derp.example.com")).toBe("Self-hosted relay · derp.example.com");
+    expect(relayAttributionText("zh-CN", "custom", "derp.example.com")).toBe("自建中继 · derp.example.com");
+    expect(relayAttributionText("zh-CN", "custom", "nyc")).toBe("自建中继 · nyc");
+    expect(relayAttributionText("zh-CN", "custom", "Tokyo")).toBe("自建中继 · 东京");
+    expect(relayAttributionText("zh-CN", "custom", "")).toBe("自建中继");
+    expect(pathPrivacyText("zh-CN", "derp", "public")).toBe("经官方中继转发，内容端到端加密");
+    expect(pathPrivacyText("en", "derp", "public")).toBe("Forwarded via the official relay. Contents are end-to-end encrypted.");
+    expect(pathPrivacyText("zh-CN", "derp", undefined)).toBe("经官方中继转发，内容端到端加密");
+    expect(pathPrivacyText("zh-CN", "derp", "custom")).toBe("经自建中继转发，内容端到端加密");
+    expect(pathPrivacyText("en", "derp", "custom")).toBe("Forwarded via a self-hosted relay. Contents are end-to-end encrypted.");
+    expect(pathPrivacyText("zh-CN", "direct")).toBe("直连传输，内容端到端加密");
+    expect(pathPrivacyText("en", "direct")).toBe("Direct. Contents are end-to-end encrypted.");
+    expect(pathPrivacyText("zh-CN", "checking")).toBe("");
+    expect(pathAsideText("zh-CN", "derp", "public", "tok")).toBe("Tailcat 官方中继 · 东京 · 端到端加密");
+    expect(pathAsideText("en", "derp", "public", "tok")).toBe("Tailcat official relay · Tokyo · End-to-end encrypted");
+    expect(pathAsideText("zh-CN", "derp", "custom", "derp.example.com")).toBe("自建中继 · derp.example.com · 端到端加密");
+    expect(pathAsideText("en", "direct")).toBe("End-to-end encrypted");
+    expect(pathAsideText("zh-CN", "direct")).toBe("端到端加密");
+    expect(pathAsideText("en", "checking")).toBe("");
+    for (const line of [
+      relayAttributionText("en", "public", "tok"),
+      relayAttributionText("zh-CN", "public", ""),
+      relayAttributionText("en", "custom", "derp.example.com"),
+      relayAttributionText("zh-CN", undefined, undefined),
+      pathPrivacyText("zh-CN", "derp", "public"),
+      pathPrivacyText("en", "direct"),
+    ]) {
+      expect(line.includes("公网中继")).toBe(false);
+      expect(line.includes("DERP")).toBe(false);
+      expect(line.includes("Tailcat Box")).toBe(false);
+    }
+  });
+
+  it("keeps relay ownership when progress omits it and clears it on direct or restart", () => {
+    const connecting: ReceiveJob = { id: "job", status: "connecting", bytesDone: 0, bytesTotal: 0, files: [], dest: "/tmp" };
+    const withDerp = upsertReceiveJob([connecting], {
+      ...connecting,
+      status: "downloading",
+      bytesDone: 20,
+      bytesTotal: 100,
+      peerPath: "derp",
+      relaySource: "public",
+      relayName: "tok",
+    });
+    expect(withDerp[0].relaySource).toBe("public");
+    expect(withDerp[0].relayName).toBe("tok");
+    const kept = upsertReceiveJob(withDerp, { ...connecting, status: "downloading", bytesDone: 40, bytesTotal: 100 });
+    expect(kept[0].relayName).toBe("tok");
+    const named = upsertReceiveJob(kept, { ...kept[0], peerPath: "derp", relaySource: "public", relayName: "Tokyo" });
+    expect(named[0].relayName).toBe("Tokyo");
+    const direct = upsertReceiveJob(named, { ...named[0], peerPath: "direct", relaySource: undefined, relayName: undefined, bytesDone: 80 });
+    expect(direct[0].peerPath).toBe("direct");
+    expect(direct[0].relayName).toBeUndefined();
+    expect(direct[0].relaySource).toBeUndefined();
+    const custom = parseReceiveJob({ id: "job", status: "downloading", peerPath: "derp", relaySource: "custom", relayName: "derp.example.com", bytesDone: 1, bytesTotal: 2 });
+    expect(custom?.relaySource).toBe("custom");
+    expect(custom?.relayName).toBe("derp.example.com");
+    expect(parseShare({ id: "share", peerPath: "derp", relaySource: "public", relayName: "sea" })?.relayName).toBe("sea");
+    const restarted = upsertReceiveJob(
+      upsertReceiveJob(direct, { ...direct[0], status: "interrupted", resumable: true }),
+      { ...connecting, status: "connecting", bytesDone: 40, bytesTotal: 100 },
+    );
+    expect(restarted[0].relayName).toBeUndefined();
+  });
+
+  it("keeps a session path and lets it upgrade without dropping bytes", () => {
+    const connecting: ReceiveJob = { id: "job", status: "connecting", bytesDone: 0, bytesTotal: 0, files: [], dest: "/tmp" };
+    const withDerp = upsertReceiveJob([connecting], { ...connecting, status: "downloading", bytesDone: 20, bytesTotal: 100, peerPath: "derp" });
+    expect(withDerp[0].peerPath).toBe("derp");
+    expect(withDerp[0].bytesDone).toBe(20);
+    const kept = upsertReceiveJob(withDerp, { ...connecting, status: "downloading", bytesDone: 40, bytesTotal: 100 });
+    expect(kept[0].peerPath).toBe("derp");
+    expect(kept[0].bytesDone).toBe(40);
+    const direct = upsertReceiveJob(kept, { ...kept[0], peerPath: "direct", bytesDone: 80 });
+    expect(direct[0].peerPath).toBe("direct");
+    const interrupted = upsertReceiveJob(direct, { ...direct[0], status: "interrupted", resumable: true });
+    const restarted = upsertReceiveJob(interrupted, { ...connecting, status: "connecting", bytesDone: 40, bytesTotal: 100 });
+    expect(restarted[0].peerPath).toBeUndefined();
+    expect(restarted[0].status).toBe("connecting");
+    expect(parseReceiveJob({ id: "job", status: "downloading", peerPath: "direct", bytesDone: 1, bytesTotal: 2 })?.peerPath).toBe("direct");
+    expect(parseShare({ id: "share", peerPath: "derp" })?.peerPath).toBe("derp");
+    expect(parseShare({ id: "share", peerPath: "wire" })?.peerPath).toBeUndefined();
   });
 });
 

@@ -21,8 +21,15 @@ import {
   miaoErrorKey,
   parseReceiveJob,
   parseShare,
+  isTailcatPath,
   receivePercent,
   receiveTerminal,
+  pathAsideText,
+  pathPrivacyText,
+  relayAttributionText,
+  tailcatPathKey,
+  type RelaySource,
+  type TailcatPath,
   expiresSoon,
   nextRetryDelay,
   remainingTTL,
@@ -99,6 +106,41 @@ function receiveStatusLabel(status: string, t: (key: MessageKey) => string): str
     default:
       return t("miaoReceiveJob");
   }
+}
+
+function PathStatus({
+  kind,
+  relaySource,
+  relayName,
+  active,
+}: {
+  kind?: TailcatPath;
+  relaySource?: RelaySource;
+  relayName?: string;
+  active: boolean;
+}) {
+  const { t, locale } = useI18n();
+  if (!active) {
+    return null;
+  }
+  const shown = kind && isTailcatPath(kind) ? kind : "checking";
+  const owner = shown === "derp" ? relayAttributionText(locale, relaySource, relayName) : "";
+  const privacy = pathPrivacyText(locale, shown, relaySource);
+  const aside = pathAsideText(locale, shown, relaySource, relayName);
+  const tip = [t("miaoPathCaption"), owner, privacy].filter(Boolean).join(" ");
+  return (
+    <p className="miao-path">
+      <span className={`miao-path-pill ${shown}`} role="status" aria-live="polite" aria-label={tip} title={tip}>
+        <span className={`miao-path-dot ${shown}`} aria-hidden="true" />
+        {t(tailcatPathKey(shown))}
+      </span>
+      {aside ? (
+        <span className="miao-path-detail" title={tip}>
+          {aside}
+        </span>
+      ) : null}
+    </p>
+  );
 }
 
 function showRunningCat(status: ReceiveJob["status"]): boolean {
@@ -200,6 +242,7 @@ function ShareCard({
               {localizedMiaoError(share.warning, t)}
             </p>
           ) : null}
+          <PathStatus kind={share.peerPath} relaySource={share.relaySource} relayName={share.relayName} active={Boolean(share.peerPath)} />
           <p className="chat-quiet">
             {t("miaoTotal")} {formatBytes(share.total)}
           </p>
@@ -288,6 +331,7 @@ function ReceiveCard({
     <article className="glass miao-active miao-receive-card" aria-label={label}>
       <h3>{names || t("miaoFiles")}</h3>
       <p className="miao-receive-status">{status}</p>
+      <PathStatus kind={job.peerPath} relaySource={job.relaySource} relayName={job.relayName} active={active} />
       {files.length ? (
         <ul className="miao-files">
           {files.map((file) => (
