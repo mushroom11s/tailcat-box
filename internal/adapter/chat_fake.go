@@ -46,12 +46,13 @@ func packFrame(meta map[string]any, payload []byte) ([]byte, error) {
 }
 
 type fakeRoom struct {
-	owner  *Fake
-	id     string
-	addr   string
-	peer   string
-	events chan ChatEvent
-	once   sync.Once
+	owner   *Fake
+	id      string
+	addr    string
+	peer    string
+	derpURL string
+	events  chan ChatEvent
+	once    sync.Once
 }
 
 func (f *Fake) StartRoom(ctx context.Context, opts RoomOpts) (Room, error) {
@@ -59,10 +60,11 @@ func (f *Fake) StartRoom(ctx context.Context, opts RoomOpts) (Room, error) {
 		return nil, fmt.Errorf("session id is required")
 	}
 	fr := &fakeRoom{
-		owner:  f,
-		id:     opts.SessionID,
-		addr:   fakeRoomAddress(opts.SessionID, opts.PrivateKeyJSON),
-		events: make(chan ChatEvent, 16),
+		owner:   f,
+		id:      opts.SessionID,
+		addr:    fakeRoomAddress(opts.SessionID, opts.PrivateKeyJSON),
+		derpURL: opts.DERPMapURL,
+		events:  make(chan ChatEvent, 16),
 	}
 	f.mu.Lock()
 	if f.chatRooms == nil {
@@ -111,7 +113,7 @@ func (r *fakeRoom) WatchPeerPath(ctx context.Context, peer string) <-chan PeerPa
 			}
 		}
 		steps := []PeerPath{
-			{Kind: PathDERP, Detail: "nyc"},
+			AnnotateRelay(r.derpURL, PeerPath{Kind: PathDERP, Detail: "nyc"}, nil),
 			{Kind: PathDirect, Detail: "direct"},
 		}
 		for _, step := range steps {

@@ -3,8 +3,11 @@ package adapter
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
+	"github.com/tailscale/tailcat"
 	"tailscale.com/ipn/ipnstate"
 )
 
@@ -43,8 +46,8 @@ func (r *realRoom) watchPeerPath(ctx context.Context, peer string, ch chan PeerP
 	ticker := time.NewTicker(300 * time.Millisecond)
 	defer ticker.Stop()
 	publish := func() bool {
-		next := MergePeerPath(status, disco)
-		if next.Kind == published.Kind && next.Detail == published.Detail {
+		next := AnnotateRelay(r.derpURL, MergePeerPath(status, disco), r.regionLabels())
+		if next.Kind == published.Kind && next.Detail == published.Detail && next.RelaySource == published.RelaySource && next.RelayName == published.RelayName {
 			return true
 		}
 		published = next
@@ -133,4 +136,52 @@ func (r *realRoom) sessionPath() (path PeerPath) {
 		}
 	}
 	return best
+}
+
+var (
+	regionLabelMu    sync.Mutex
+	regionLabelReady = map[string]bool{}
+	regionLabelCache = map[string][]RegionLabel{}
+)
+
+func (r *realRoom) regionLabels() []RegionLabel {
+	url := strings.TrimSpace(r.derpURL)
+	regionLabelMu.Lock()
+	labels := append([]RegionLabel(nil), regionLabelCache[url]...)
+	started := regionLabelReady[url]
+	if !started {
+		regionLabelReady[url] = true
+	}
+	regionLabelMu.Unlock()
+	if !started {
+		go fetchRegionLabels(url)
+	}
+	return labels
+}
+
+func fetchRegionLabels(mapURL string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	var opts []any
+	if strings.TrimSpace(mapURL) != "" {
+		opts = append(opts, tailcat.DERPMapURL(mapURL))
+	}
+	dm, err := tailcat.FetchDERPMap(ctx, opts...)
+	if err != nil || dm == nil {
+		return
+	}
+	labels := make([]RegionLabel, 0, len(dm.Regions))
+	for id, reg := range dm.Regions {
+		if reg == nil || strings.TrimSpace(reg.RegionName) == "" {
+			continue
+		}
+		labels = append(labels, RegionLabel{
+			ID:   fmt.Sprintf("%d", id),
+			Code: reg.RegionCode,
+			Name: reg.RegionName,
+		})
+	}
+	regionLabelMu.Lock()
+	regionLabelCache[strings.TrimSpace(mapURL)] = labels
+	regionLabelMu.Unlock()
 }

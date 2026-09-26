@@ -103,6 +103,10 @@ type Snapshot struct {
 	// PeerPath is the current session path to the peer while a send is in progress.
 	// It is checking, direct, or derp. Empty means no send is being probed.
 	PeerPath string `json:"peerPath,omitempty"`
+	// RelaySource is public or custom while PeerPath is derp.
+	RelaySource string `json:"relaySource,omitempty"`
+	// RelayName is a region or hostname for that relay. Empty means the public relay with no detail.
+	RelayName string `json:"relayName,omitempty"`
 }
 
 // FileInfo is a display row. It does not include the storage path.
@@ -142,6 +146,10 @@ type ReceiveJob struct {
 	// PeerPath is the current session path to the host: checking, direct, or derp.
 	// It describes the path to the peer, not which path carried each byte.
 	PeerPath string `json:"peerPath,omitempty"`
+	// RelaySource is public or custom while PeerPath is derp.
+	RelaySource string `json:"relaySource,omitempty"`
+	// RelayName is a region or hostname for that relay.
+	RelayName string `json:"relayName,omitempty"`
 }
 
 // Service hosts any number of shares at once and can also join someone else's share.
@@ -444,6 +452,8 @@ func (s *Service) restartReceive(parent context.Context, run *receiveRun, raw, d
 	run.job.Status = receiveConnecting
 	run.job.Error = ""
 	run.job.PeerPath = ""
+	run.job.RelaySource = ""
+	run.job.RelayName = ""
 	run.job.Payload = strings.TrimSpace(raw)
 	run.job.Dest = dest
 	run.mu.Unlock()
@@ -867,8 +877,8 @@ func (s *Service) join(ctx context.Context, run *receiveRun, gen int, raw, dest 
 	pathCtx, stopPath := context.WithCancel(ctx)
 	defer stopPath()
 	if run != nil {
-		watchPeerPath(pathCtx, room, payload.Addr, func(kind string) {
-			s.noteReceivePath(run, gen, kind)
+		watchPeerPath(pathCtx, room, payload.Addr, func(path adapter.PeerPath) {
+			s.noteReceivePath(run, gen, path)
 		})
 	}
 
@@ -941,45 +951,47 @@ func validateLimits(lim Limits) error {
 }
 
 type host struct {
-	svc       *Service
-	id        string
-	token     string
-	payload   string
-	address   string
-	dir       string
-	files     []StagedFile
-	byRef     bool
-	warning   string
-	total     int64
-	lim       Limits
-	forever   bool
-	expires   time.Time
-	downloads int
-	keyJSON   string
-	createdAt time.Time
-	region    string
-	derpURL   string
-	sess      *session.Session
-	room      adapter.Room
-	cancel    context.CancelFunc
-	ctx       context.Context
-	timer     *time.Timer
-	ready     chan struct{}
-	readySig  *readySignal
-	life      context.Context
-	stopLife  context.CancelFunc
-	mu        sync.Mutex
-	sendMu    sync.Mutex
-	pathMu    sync.Mutex
-	path      string
-	sendGen   int
-	ended     bool
-	reason    string
-	sending   bool
-	queued    bool
-	qToken    string
-	qReply    string
-	qResume   map[string]int64
+	svc         *Service
+	id          string
+	token       string
+	payload     string
+	address     string
+	dir         string
+	files       []StagedFile
+	byRef       bool
+	warning     string
+	total       int64
+	lim         Limits
+	forever     bool
+	expires     time.Time
+	downloads   int
+	keyJSON     string
+	createdAt   time.Time
+	region      string
+	derpURL     string
+	sess        *session.Session
+	room        adapter.Room
+	cancel      context.CancelFunc
+	ctx         context.Context
+	timer       *time.Timer
+	ready       chan struct{}
+	readySig    *readySignal
+	life        context.Context
+	stopLife    context.CancelFunc
+	mu          sync.Mutex
+	sendMu      sync.Mutex
+	pathMu      sync.Mutex
+	path        string
+	relaySource string
+	relayName   string
+	sendGen     int
+	ended       bool
+	reason      string
+	sending     bool
+	queued      bool
+	qToken      string
+	qReply      string
+	qResume     map[string]int64
 }
 
 func (h *host) readLoop() {
@@ -1091,6 +1103,8 @@ func (h *host) finishSend() {
 	h.sending = false
 	h.sendGen++
 	h.path = ""
+	h.relaySource = ""
+	h.relayName = ""
 	queued := h.queued
 	token, reply := h.qToken, h.qReply
 	resume := h.qResume
@@ -1175,8 +1189,8 @@ func (h *host) sendPackage(reply string, files []StagedFile, resume map[string]i
 	}
 	pathCtx, stopPath := context.WithCancel(base)
 	defer stopPath()
-	watchPeerPath(pathCtx, room, reply, func(kind string) {
-		h.notePath(gen, kind)
+	watchPeerPath(pathCtx, room, reply, func(path adapter.PeerPath) {
+		h.notePath(gen, path)
 	})
 	if originBacked(files) {
 		checked, err := recheckOrigins(files)
@@ -1350,6 +1364,8 @@ func (h *host) snapshotLocked() Snapshot {
 		ByRef:        h.byRef,
 		Warning:      h.warning,
 		PeerPath:     h.path,
+		RelaySource:  h.relaySource,
+		RelayName:    h.relayName,
 	}
 }
 

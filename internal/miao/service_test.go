@@ -647,6 +647,12 @@ func TestPathUpgradesDuringTransfer(t *testing.T) {
 			if ev.PeerPath != "" && (len(got) == 0 || got[len(got)-1] != ev.PeerPath) {
 				got = append(got, ev.PeerPath)
 			}
+			if ev.PeerPath == adapter.PathDERP && (ev.RelaySource != adapter.RelayPublic || ev.RelayName != "nyc") {
+				t.Fatalf("relay attribution source=%q name=%q", ev.RelaySource, ev.RelayName)
+			}
+			if ev.PeerPath == adapter.PathDirect && (ev.RelaySource != "" || ev.RelayName != "") {
+				t.Fatalf("direct kept relay source=%q name=%q", ev.RelaySource, ev.RelayName)
+			}
 			if ev.Status == receiveDownloading && ev.PeerPath == adapter.PathDirect && ev.BytesDone > 0 && ev.BytesDone < int64(len(payload)) {
 				partial = true
 			}

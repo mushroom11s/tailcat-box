@@ -17,16 +17,17 @@ import (
 const maxChatFrame = 64 << 20
 
 type realRoom struct {
-	real   *Real
-	srv    *tailcat.Server
-	id     string
-	addr   string
-	peer   string
-	events chan ChatEvent
-	cancel context.CancelFunc
-	once   sync.Once
-	mu     sync.Mutex
-	done   bool
+	real    *Real
+	srv     *tailcat.Server
+	id      string
+	addr    string
+	peer    string
+	derpURL string
+	events  chan ChatEvent
+	cancel  context.CancelFunc
+	once    sync.Once
+	mu      sync.Mutex
+	done    bool
 }
 
 func (r *Real) StartRoom(ctx context.Context, opts RoomOpts) (Room, error) {
@@ -49,6 +50,7 @@ func (r *Real) StartRoom(ctx context.Context, opts RoomOpts) (Room, error) {
 	if opts.Region != "" || opts.DERPMapURL != "" {
 		netOpts = NetworkOpts{Region: opts.Region, DERPMapURL: opts.DERPMapURL}
 	}
+	room.derpURL = netOpts.DERPMapURL
 	if netOpts.DERPMapURL != "" {
 		srv.DERPMapURL = netOpts.DERPMapURL
 	}

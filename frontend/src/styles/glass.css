@@ -3076,6 +3076,12 @@ textarea {
   font-size: 12px;
 }
 
+.miao-path-detail {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .miao-path-pill {
   font-size: 12px;
   font-weight: 650;

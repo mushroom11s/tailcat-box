@@ -290,10 +290,15 @@ describe("Mew Share page", () => {
     const code = ((await screen.findByLabelText("Share code")) as HTMLTextAreaElement).value;
     setBrowserReceiveHold(true);
     const seen = new Set<string>();
+    const seenDetails = new Set<string>();
     const snap = () => {
       const pill = document.querySelector(".miao-receive-card .miao-path-pill");
       if (pill?.textContent) {
         seen.add(pill.textContent);
+      }
+      const detail = document.querySelector(".miao-receive-card .miao-path-detail");
+      if (detail?.textContent) {
+        seenDetails.add(detail.textContent);
       }
     };
     const observer = new MutationObserver(snap);
@@ -310,9 +315,11 @@ describe("Mew Share page", () => {
         expect(seen.has("Direct")).toBe(true);
       });
       expect(seen.has("Checking")).toBe(true);
-      expect(seen.has("Relay (DERP)")).toBe(true);
+      expect(seen.has("Relay")).toBe(true);
+      expect(seenDetails.has("Via the Tailscale Tokyo relay")).toBe(true);
       expect(screen.getByText("Connecting…")).toBeTruthy();
       expect(screen.getByText("Direct")).toBeTruthy();
+      expect(screen.queryByText("Via the Tailscale Tokyo relay")).toBeNull();
       await user.click(screen.getByRole("tab", { name: "Share" }));
       const share = screen.getByRole("article", { name: "path.txt" });
       expect(within(share).getByText("Current path to peer")).toBeTruthy();
@@ -320,8 +327,10 @@ describe("Mew Share page", () => {
       expect(cssBlock(css, ".miao-path-pill.direct")).toContain("var(--ok)");
       expect(cssBlock(css, ".miao-path-pill.derp")).toContain("var(--warn)");
       expect(cssBlock(css, ".miao-path-caption")).toContain("var(--muted)");
+      expect(cssBlock(css, ".miao-path-detail")).toContain("var(--muted)");
     } finally {
       observer.disconnect();
+      resetBrowserMiao();
       setBrowserReceiveHold(false);
       releaseBrowserReceiveHolds();
     }
@@ -336,10 +345,15 @@ describe("Mew Share page", () => {
     const code = ((await screen.findByLabelText("分享口令")) as HTMLTextAreaElement).value;
     setBrowserReceiveHold(true);
     const seen = new Set<string>();
+    const seenDetails = new Set<string>();
     const snap = () => {
       const pill = document.querySelector(".miao-path-pill");
       if (pill?.textContent) {
         seen.add(pill.textContent);
+      }
+      const detail = document.querySelector(".miao-path-detail");
+      if (detail?.textContent) {
+        seenDetails.add(detail.textContent);
       }
     };
     const observer = new MutationObserver(snap);
@@ -357,9 +371,12 @@ describe("Mew Share page", () => {
       });
       expect(seen.has("探测中")).toBe(true);
       expect(seen.has("中继")).toBe(true);
+      expect(seenDetails.has("经 Tailscale 东京中继")).toBe(true);
       expect([...seen].some((label) => label.includes("DERP"))).toBe(false);
+      expect([...seenDetails].some((label) => label.includes("DERP") || label.includes("猫砂盆"))).toBe(false);
     } finally {
       observer.disconnect();
+      resetBrowserMiao();
       setBrowserReceiveHold(false);
       releaseBrowserReceiveHolds();
     }

@@ -112,6 +112,8 @@ function publicSnap(share: Stored, status = share.status, endReason = share.endR
     endReason,
     listening: Boolean(share.payload),
     peerPath: share.peerPath,
+    relaySource: share.relaySource,
+    relayName: share.relayName,
   };
 }
 
@@ -369,14 +371,18 @@ function pathDelays(): number[] {
   if (import.meta.env.VITEST || import.meta.env.MODE === "test") {
     return [0, 40, 80];
   }
-  return [0, 600, 1600];
+  return [0, 700, 2800];
 }
 
 function startPathWatch(share: Stored, jobID: string): void {
   clearPathTimers(jobID);
   const generation = (pathWatchGen.get(jobID) ?? 0) + 1;
   pathWatchGen.set(jobID, generation);
-  const steps: TailcatPath[] = ["checking", "derp", "direct"];
+  const steps: Array<{ peerPath: TailcatPath; relaySource?: "public"; relayName?: string }> = [
+    { peerPath: "checking" },
+    { peerPath: "derp", relaySource: "public", relayName: "tok" },
+    { peerPath: "direct" },
+  ];
   const timers = pathDelays().map((delay, index) =>
     setTimeout(() => {
       if (pathWatchGen.get(jobID) !== generation) {
@@ -386,12 +392,14 @@ function startPathWatch(share: Stored, jobID: string): void {
       if (!job || receiveTerminal(job.status)) {
         return;
       }
-      const peerPath = steps[index];
-      emitReceive({ ...job, peerPath });
+      const step = steps[index];
+      emitReceive({ ...job, peerPath: step.peerPath, relaySource: step.relaySource, relayName: step.relayName });
       if (pathWatchGen.get(jobID) !== generation || shares.get(share.id)?.status !== "active") {
         return;
       }
-      share.peerPath = peerPath;
+      share.peerPath = step.peerPath;
+      share.relaySource = step.relaySource;
+      share.relayName = step.relayName;
       publish(share, share.status, share.endReason ?? "");
     }, delay),
   );
@@ -401,11 +409,15 @@ function startPathWatch(share: Stored, jobID: string): void {
 function stopPathWatch(share: Stored | undefined, jobID: string): void {
   pathWatchGen.set(jobID, (pathWatchGen.get(jobID) ?? 0) + 1);
   clearPathTimers(jobID);
-  if (!share?.peerPath) {
+  if (!share?.peerPath && !share?.relayName && !share?.relaySource) {
     return;
   }
-  share.peerPath = undefined;
-  if (share.status === "active") {
+  if (share) {
+    share.peerPath = undefined;
+    share.relaySource = undefined;
+    share.relayName = undefined;
+  }
+  if (share?.status === "active") {
     publish(share, "active");
   }
 }

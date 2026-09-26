@@ -13,6 +13,7 @@ import {
   parseReceiveJob,
   parseShare,
   receivePercent,
+  relayAttributionText,
   remainingTTL,
   shareTooLarge,
   shouldAutoRetryDownload,
@@ -273,6 +274,61 @@ describe("miao share helpers", () => {
     expect(nextRetryDelay(2)).toBe(4000);
     expect(nextRetryDelay(3)).toBeNull();
     expect(miaoErrorKey(new Error("share did not start listening"))).toBe("miaoListenFailed");
+  });
+
+  it("says whose relay a path uses and falls back to the public relay", () => {
+    expect(relayAttributionText("en", "public", "tok")).toBe("Via the Tailscale Tokyo relay");
+    expect(relayAttributionText("zh-CN", "public", "tok")).toBe("经 Tailscale 东京中继");
+    expect(relayAttributionText("zh-CN", "public", "Tokyo")).toBe("经 Tailscale 东京中继");
+    expect(relayAttributionText("en", "public", "")).toBe("Via the public relay");
+    expect(relayAttributionText("zh-CN", "public", "4")).toBe("经公网中继");
+    expect(relayAttributionText("zh-CN", undefined, undefined)).toBe("经公网中继");
+    expect(relayAttributionText("en", "custom", "derp.example.com")).toBe("Via a self-hosted relay (derp.example.com)");
+    expect(relayAttributionText("zh-CN", "custom", "derp.example.com")).toBe("经自建中继 derp.example.com");
+    expect(relayAttributionText("zh-CN", "custom", "nyc")).toBe("经自建中继 nyc");
+    expect(relayAttributionText("zh-CN", "custom", "Tokyo")).toBe("经自建中继 东京");
+    expect(relayAttributionText("zh-CN", "custom", "")).toBe("经自建中继");
+    for (const line of [
+      relayAttributionText("en", "public", "tok"),
+      relayAttributionText("zh-CN", "public", ""),
+      relayAttributionText("en", "custom", "derp.example.com"),
+      relayAttributionText("zh-CN", undefined, undefined),
+    ]) {
+      expect(line.includes("Tailcat Box")).toBe(false);
+      expect(line.includes("DERP")).toBe(false);
+    }
+  });
+
+  it("keeps relay ownership when progress omits it and clears it on direct or restart", () => {
+    const connecting: ReceiveJob = { id: "job", status: "connecting", bytesDone: 0, bytesTotal: 0, files: [], dest: "/tmp" };
+    const withDerp = upsertReceiveJob([connecting], {
+      ...connecting,
+      status: "downloading",
+      bytesDone: 20,
+      bytesTotal: 100,
+      peerPath: "derp",
+      relaySource: "public",
+      relayName: "tok",
+    });
+    expect(withDerp[0].relaySource).toBe("public");
+    expect(withDerp[0].relayName).toBe("tok");
+    const kept = upsertReceiveJob(withDerp, { ...connecting, status: "downloading", bytesDone: 40, bytesTotal: 100 });
+    expect(kept[0].relayName).toBe("tok");
+    const named = upsertReceiveJob(kept, { ...kept[0], peerPath: "derp", relaySource: "public", relayName: "Tokyo" });
+    expect(named[0].relayName).toBe("Tokyo");
+    const direct = upsertReceiveJob(named, { ...named[0], peerPath: "direct", relaySource: undefined, relayName: undefined, bytesDone: 80 });
+    expect(direct[0].peerPath).toBe("direct");
+    expect(direct[0].relayName).toBeUndefined();
+    expect(direct[0].relaySource).toBeUndefined();
+    const custom = parseReceiveJob({ id: "job", status: "downloading", peerPath: "derp", relaySource: "custom", relayName: "derp.example.com", bytesDone: 1, bytesTotal: 2 });
+    expect(custom?.relaySource).toBe("custom");
+    expect(custom?.relayName).toBe("derp.example.com");
+    expect(parseShare({ id: "share", peerPath: "derp", relaySource: "public", relayName: "sea" })?.relayName).toBe("sea");
+    const restarted = upsertReceiveJob(
+      upsertReceiveJob(direct, { ...direct[0], status: "interrupted", resumable: true }),
+      { ...connecting, status: "connecting", bytesDone: 40, bytesTotal: 100 },
+    );
+    expect(restarted[0].relayName).toBeUndefined();
   });
 
   it("keeps a session path and lets it upgrade without dropping bytes", () => {
