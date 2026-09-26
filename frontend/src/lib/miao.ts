@@ -178,9 +178,22 @@ export function relayAttributionText(locale: Locale, source: string | undefined,
     return translate(locale, "miaoPathRelayCustom").replaceAll("{name}", label);
   }
   if (label) {
-    return translate(locale, "miaoPathRelayTailscale").replaceAll("{name}", label);
+    return translate(locale, "miaoPathRelayOfficialNamed").replaceAll("{name}", label);
   }
-  return translate(locale, "miaoPathRelayPublic");
+  return translate(locale, "miaoPathRelayOfficial");
+}
+
+export function pathPrivacyText(locale: Locale, kind: TailcatPath, source?: string): string {
+  if (kind === "direct") {
+    return translate(locale, "miaoPathDirectEncrypted");
+  }
+  if (kind !== "derp") {
+    return "";
+  }
+  if (source === "custom") {
+    return translate(locale, "miaoPathCustomEncrypted");
+  }
+  return translate(locale, "miaoPathOfficialEncrypted");
 }
 
 export function tailcatPathKey(path: TailcatPath): "miaoPathChecking" | "miaoPathDirect" | "miaoPathDERP" {

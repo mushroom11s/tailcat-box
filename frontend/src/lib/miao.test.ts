@@ -13,6 +13,7 @@ import {
   parseReceiveJob,
   parseShare,
   receivePercent,
+  pathPrivacyText,
   relayAttributionText,
   remainingTTL,
   shareTooLarge,
@@ -276,26 +277,37 @@ describe("miao share helpers", () => {
     expect(miaoErrorKey(new Error("share did not start listening"))).toBe("miaoListenFailed");
   });
 
-  it("says whose relay a path uses and falls back to the public relay", () => {
-    expect(relayAttributionText("en", "public", "tok")).toBe("Via the Tailscale Tokyo relay");
-    expect(relayAttributionText("zh-CN", "public", "tok")).toBe("经 Tailscale 东京中继");
-    expect(relayAttributionText("zh-CN", "public", "Tokyo")).toBe("经 Tailscale 东京中继");
-    expect(relayAttributionText("en", "public", "")).toBe("Via the public relay");
-    expect(relayAttributionText("zh-CN", "public", "4")).toBe("经公网中继");
-    expect(relayAttributionText("zh-CN", undefined, undefined)).toBe("经公网中继");
-    expect(relayAttributionText("en", "custom", "derp.example.com")).toBe("Via a self-hosted relay (derp.example.com)");
-    expect(relayAttributionText("zh-CN", "custom", "derp.example.com")).toBe("经自建中继 derp.example.com");
-    expect(relayAttributionText("zh-CN", "custom", "nyc")).toBe("经自建中继 nyc");
-    expect(relayAttributionText("zh-CN", "custom", "Tokyo")).toBe("经自建中继 东京");
-    expect(relayAttributionText("zh-CN", "custom", "")).toBe("经自建中继");
+  it("names the official Tailcat relay, a self-hosted relay, and end-to-end encryption", () => {
+    expect(relayAttributionText("en", "public", "tok")).toBe("Tailcat official relay · Tokyo");
+    expect(relayAttributionText("zh-CN", "public", "tok")).toBe("Tailcat 官方中继 · 东京");
+    expect(relayAttributionText("zh-CN", "public", "Tokyo")).toBe("Tailcat 官方中继 · 东京");
+    expect(relayAttributionText("en", "public", "")).toBe("Tailcat official relay");
+    expect(relayAttributionText("zh-CN", "public", "4")).toBe("Tailcat 官方中继");
+    expect(relayAttributionText("zh-CN", undefined, undefined)).toBe("Tailcat 官方中继");
+    expect(relayAttributionText("en", "custom", "derp.example.com")).toBe("Self-hosted relay · derp.example.com");
+    expect(relayAttributionText("zh-CN", "custom", "derp.example.com")).toBe("自建中继 · derp.example.com");
+    expect(relayAttributionText("zh-CN", "custom", "nyc")).toBe("自建中继 · nyc");
+    expect(relayAttributionText("zh-CN", "custom", "Tokyo")).toBe("自建中继 · 东京");
+    expect(relayAttributionText("zh-CN", "custom", "")).toBe("自建中继");
+    expect(pathPrivacyText("zh-CN", "derp", "public")).toBe("经官方中继转发，内容端到端加密");
+    expect(pathPrivacyText("en", "derp", "public")).toBe("Forwarded via the official relay. Contents are end-to-end encrypted.");
+    expect(pathPrivacyText("zh-CN", "derp", undefined)).toBe("经官方中继转发，内容端到端加密");
+    expect(pathPrivacyText("zh-CN", "derp", "custom")).toBe("经自建中继转发，内容端到端加密");
+    expect(pathPrivacyText("en", "derp", "custom")).toBe("Forwarded via a self-hosted relay. Contents are end-to-end encrypted.");
+    expect(pathPrivacyText("zh-CN", "direct")).toBe("直连传输，内容端到端加密");
+    expect(pathPrivacyText("en", "direct")).toBe("Direct. Contents are end-to-end encrypted.");
+    expect(pathPrivacyText("zh-CN", "checking")).toBe("");
     for (const line of [
       relayAttributionText("en", "public", "tok"),
       relayAttributionText("zh-CN", "public", ""),
       relayAttributionText("en", "custom", "derp.example.com"),
       relayAttributionText("zh-CN", undefined, undefined),
+      pathPrivacyText("zh-CN", "derp", "public"),
+      pathPrivacyText("en", "direct"),
     ]) {
-      expect(line.includes("Tailcat Box")).toBe(false);
+      expect(line.includes("公网中继")).toBe(false);
       expect(line.includes("DERP")).toBe(false);
+      expect(line.includes("Tailcat Box")).toBe(false);
     }
   });
 

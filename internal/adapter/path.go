@@ -12,7 +12,7 @@ const (
 	PathDirect = "direct"
 	// PathDERP means the known session path is a DERP or other relay.
 	PathDERP = "derp"
-	// RelayPublic is the default public DERP map. It is not a Tailcat Box server.
+	// RelayPublic is Tailcat's default public DERP map: the official relay.
 	RelayPublic = "public"
 	// RelayCustom is a user-configured DERP map.
 	RelayCustom = "custom"
@@ -94,9 +94,8 @@ func MergePeerPath(a, b PeerPath) PeerPath {
 	return PeerPath{Kind: PathChecking}
 }
 
-// AttributeRelay says whether a relay belongs to the public map or a user map,
-// and the readable name to show. An empty name means the caller should use the
-// generic public-relay wording. It never names Tailcat Box as the relay owner.
+// AttributeRelay says whether a relay is Tailcat's official map or a user map,
+// and the readable region or host to show. An empty name means no region was known.
 func AttributeRelay(mapURL, detail, regionName string) (source, name string) {
 	if defaultDERPMap(mapURL) {
 		source = RelayPublic

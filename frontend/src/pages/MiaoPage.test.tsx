@@ -296,9 +296,10 @@ describe("Mew Share page", () => {
       if (pill?.textContent) {
         seen.add(pill.textContent);
       }
-      const detail = document.querySelector(".miao-receive-card .miao-path-detail");
-      if (detail?.textContent) {
-        seenDetails.add(detail.textContent);
+      for (const detail of document.querySelectorAll(".miao-receive-card .miao-path-detail")) {
+        if (detail.textContent) {
+          seenDetails.add(detail.textContent);
+        }
       }
     };
     const observer = new MutationObserver(snap);
@@ -316,10 +317,12 @@ describe("Mew Share page", () => {
       });
       expect(seen.has("Checking")).toBe(true);
       expect(seen.has("Relay")).toBe(true);
-      expect(seenDetails.has("Via the Tailscale Tokyo relay")).toBe(true);
+      expect(seenDetails.has("Tailcat official relay · Tokyo")).toBe(true);
+      expect(seenDetails.has("Forwarded via the official relay. Contents are end-to-end encrypted.")).toBe(true);
       expect(screen.getByText("Connecting…")).toBeTruthy();
       expect(screen.getByText("Direct")).toBeTruthy();
-      expect(screen.queryByText("Via the Tailscale Tokyo relay")).toBeNull();
+      expect(screen.getByText("Direct. Contents are end-to-end encrypted.")).toBeTruthy();
+      expect(screen.queryByText("Tailcat official relay · Tokyo")).toBeNull();
       await user.click(screen.getByRole("tab", { name: "Share" }));
       const share = screen.getByRole("article", { name: "path.txt" });
       expect(within(share).getByText("Current path to peer")).toBeTruthy();
@@ -351,9 +354,10 @@ describe("Mew Share page", () => {
       if (pill?.textContent) {
         seen.add(pill.textContent);
       }
-      const detail = document.querySelector(".miao-path-detail");
-      if (detail?.textContent) {
-        seenDetails.add(detail.textContent);
+      for (const detail of document.querySelectorAll(".miao-path-detail")) {
+        if (detail.textContent) {
+          seenDetails.add(detail.textContent);
+        }
       }
     };
     const observer = new MutationObserver(snap);
@@ -371,9 +375,10 @@ describe("Mew Share page", () => {
       });
       expect(seen.has("探测中")).toBe(true);
       expect(seen.has("中继")).toBe(true);
-      expect(seenDetails.has("经 Tailscale 东京中继")).toBe(true);
+      expect(seenDetails.has("Tailcat 官方中继 · 东京")).toBe(true);
+      expect(seenDetails.has("经官方中继转发，内容端到端加密")).toBe(true);
       expect([...seen].some((label) => label.includes("DERP"))).toBe(false);
-      expect([...seenDetails].some((label) => label.includes("DERP") || label.includes("猫砂盆"))).toBe(false);
+      expect([...seenDetails].some((label) => label.includes("公网中继") || label.includes("DERP") || label.includes("猫砂盆"))).toBe(false);
     } finally {
       observer.disconnect();
       resetBrowserMiao();

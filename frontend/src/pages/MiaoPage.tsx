@@ -24,6 +24,7 @@ import {
   isTailcatPath,
   receivePercent,
   receiveTerminal,
+  pathPrivacyText,
   relayAttributionText,
   tailcatPathKey,
   type RelaySource,
@@ -122,16 +123,23 @@ function PathStatus({
     return null;
   }
   const shown = kind && isTailcatPath(kind) ? kind : "checking";
-  const detail = shown === "derp" ? relayAttributionText(locale, relaySource, relayName) : "";
+  const owner = shown === "derp" ? relayAttributionText(locale, relaySource, relayName) : "";
+  const privacy = pathPrivacyText(locale, shown, relaySource);
+  const tip = [owner, privacy].filter(Boolean).join(" ");
   return (
     <p className="miao-path">
       <span className="miao-path-caption">{t("miaoPathCaption")}</span>
-      <span className={`miao-path-pill ${shown}`} role="status" aria-live="polite" title={detail || undefined}>
+      <span className={`miao-path-pill ${shown}`} role="status" aria-live="polite" title={tip || undefined}>
         {t(tailcatPathKey(shown))}
       </span>
-      {detail ? (
-        <span className="miao-path-detail" title={detail}>
-          {detail}
+      {owner ? (
+        <span className="miao-path-detail" title={owner}>
+          {owner}
+        </span>
+      ) : null}
+      {privacy ? (
+        <span className="miao-path-detail" title={privacy}>
+          {privacy}
         </span>
       ) : null}
     </p>
