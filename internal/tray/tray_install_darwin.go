@@ -24,7 +24,8 @@ func (c *Controller) install(icon []byte) {
 		icon = DefaultIcon
 	}
 	if len(icon) > 0 {
-		systray.SetIcon(icon)
+		// Template, not the color PNG. SetOnClick stays off: it crashes the menu.
+		systray.SetTemplateIcon(icon, icon)
 	}
 	c.bindProduct(func(title, tooltip string) {
 		// Icon-only menu bar: tooltip only, no SetTitle text beside the icon.
