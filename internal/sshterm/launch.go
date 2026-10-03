@@ -19,6 +19,7 @@ func Launch(addr, token string) error {
 		return err
 	}
 	cmd := exec.Command(bin, args...)
+	detachCommand(cmd)
 	return cmd.Start()
 }
 

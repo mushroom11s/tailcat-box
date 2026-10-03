@@ -75,7 +75,8 @@ func (f *sshFan) subscribe() (<-chan []byte, func()) {
 	f.mu.Unlock()
 	go func() {
 		for _, p := range replay {
-			sub.ch <- p
+			// cancel closes the channel. send recovers; a raw send panics the process.
+			sub.send(p)
 		}
 	}()
 	cancel := func() {
